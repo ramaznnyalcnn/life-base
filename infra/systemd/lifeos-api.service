@@ -1,0 +1,15 @@
+[Unit]
+Description=Life OS API
+After=network.target postgresql.service
+Requires=lifeos-migrate.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/lifeos
+EnvironmentFile=/opt/lifeos/.env
+ExecStart=/opt/lifeos/infra/scripts/backend-start.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
