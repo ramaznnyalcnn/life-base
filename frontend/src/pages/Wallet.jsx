@@ -61,6 +61,7 @@ export default function WalletPage({ onNavigate }) {
   const [cardForm, setCardForm] = useState(INITIAL_CARD_FORM);
   const [sections, setSections] = useState(INITIAL_SECTIONS);
   const [selectedCardId, setSelectedCardId] = useState(null);
+  const [flippedAssetId, setFlippedAssetId] = useState(null);
 
   function formatShortDate(value) {
     return new Intl.DateTimeFormat("tr-TR", {
@@ -134,6 +135,8 @@ export default function WalletPage({ onNavigate }) {
     0
   );
   const otherAccounts = summary?.accounts.filter((account) => account.type !== "credit_card") ?? [];
+  const stageItems = creditAccounts.length ? creditAccounts : otherAccounts;
+  const stageKind = creditAccounts.length ? "cards" : "accounts";
   const monthlyExpense = Number(summary?.monthly_flow.total_expense ?? 0);
   const monthlyPayments = Number(summary?.monthly_flow.total_payments ?? 0);
   const latestStatement = statements[0] ?? null;
@@ -158,6 +161,17 @@ export default function WalletPage({ onNavigate }) {
       setSelectedCardId(creditAccounts[0].id);
     }
   }, [creditAccounts, selectedCardId]);
+
+  useEffect(() => {
+    if (!stageItems.length) {
+      setFlippedAssetId(null);
+      return;
+    }
+
+    if (!stageItems.some((item) => item.id === flippedAssetId)) {
+      setFlippedAssetId(null);
+    }
+  }, [flippedAssetId, stageItems]);
 
   function toggleSection(sectionKey) {
     setSections((current) => ({
@@ -233,6 +247,13 @@ export default function WalletPage({ onNavigate }) {
     }
   }
 
+  function handleAssetFlip(account) {
+    setFlippedAssetId((current) => (current === account.id ? null : account.id));
+    if (account.type === "credit_card") {
+      setSelectedCardId(account.id);
+    }
+  }
+
   return (
     <main className="shell shell--wallet">
       {loading ? <section className="wallet-grid"><article className="metric-card">Yukleniyor...</article></section> : null}
@@ -240,15 +261,103 @@ export default function WalletPage({ onNavigate }) {
 
       {summary ? (
         <>
+          <section className="wallet-asset-stage">
+            <div className="wallet-asset-stage__header">
+              <div>
+                <p className="status-card__eyebrow">{stageKind === "cards" ? "Kartlar" : "Hesaplar"}</p>
+                <h2>{stageKind === "cards" ? "Aktif kartlarini hizli gor" : "Aktif hesaplarini hizli gor"}</h2>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={stageKind === "cards" ? openCreateCardForm : () => onNavigate?.("manage")}
+              >
+                {stageKind === "cards" ? "Kart Ekle" : "Hesap Yonet"}
+              </button>
+            </div>
+
+            <div className="wallet-asset-stage__grid">
+              {stageItems.length ? (
+                stageItems.map((account) => {
+                  const chip = getAccountChip(account.type);
+                  const statement = statements.find((item) => item.account_id === account.id) ?? null;
+                  const isFlipped = flippedAssetId === account.id;
+                  const availableValue =
+                    account.type === "credit_card"
+                      ? formatMoney(Number(account.available_credit ?? account.balance ?? 0))
+                      : formatMoney(account.balance);
+
+                  return (
+                    <button
+                      key={account.id}
+                      className={[
+                        "wallet-flip-card",
+                        isFlipped ? "wallet-flip-card--flipped" : "",
+                        selectedCard?.id === account.id ? "wallet-flip-card--selected" : ""
+                      ].filter(Boolean).join(" ")}
+                      type="button"
+                      onClick={() => handleAssetFlip(account)}
+                    >
+                      <div className="wallet-flip-card__inner">
+                        <div className="wallet-flip-card__face wallet-flip-card__face--front">
+                          <div className="wallet-flip-card__topline">
+                            <span className="wallet-flip-card__chip">{chip.label}</span>
+                            <span className="wallet-flip-card__issuer">{account.issuer ?? "Life Base"}</span>
+                          </div>
+                          <strong>{account.name}</strong>
+                          <span className="wallet-flip-card__amount">{availableValue}</span>
+                          <div className="wallet-flip-card__footer">
+                            <span>{account.type === "credit_card" ? "Kullanilabilir" : "Bakiye"}</span>
+                            <span>{account.type === "credit_card" ? formatMoney(account.credit_limit ?? 0) : chip.icon}</span>
+                          </div>
+                        </div>
+
+                        <div className="wallet-flip-card__face wallet-flip-card__face--back">
+                          <div className="wallet-flip-card__topline">
+                            <span className="wallet-flip-card__chip">{chip.icon}</span>
+                            <span>{account.is_active === false ? "Pasif" : "Aktif"}</span>
+                          </div>
+                          <strong>{account.name}</strong>
+                          {account.type === "credit_card" ? (
+                            <>
+                              <span className="wallet-flip-card__amount">{formatMoney(account.used_credit ?? 0)}</span>
+                              <div className="wallet-flip-card__footer wallet-flip-card__footer--detail">
+                                <span>Kesim {formatDayValue(account.statement_day)}</span>
+                                <span>
+                                  {statement?.due_date ? `Odeme ${formatShortDate(statement.due_date)}` : `Son odeme ${formatDayValue(account.due_day)}`}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <span className="wallet-flip-card__amount">{formatMoney(account.balance)}</span>
+                              <div className="wallet-flip-card__footer wallet-flip-card__footer--detail">
+                                <span>{chip.label}</span>
+                                <span>{account.currency ?? "TRY"}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <article className="wallet-snapshot-card">
+                  <p className="wallet-snapshot-card__label">Hazir alan yok</p>
+                  <strong>Kart veya hesap eklenmedi</strong>
+                  <span>Ilk finans alanini yonetim ekranindan ekleyebilirsin.</span>
+                </article>
+              )}
+            </div>
+          </section>
+
           <section className="wallet-overview-panel">
             <div className="wallet-overview-panel__header">
               <div>
                 <p className="status-card__eyebrow">Ana Toplam</p>
                 <h1 className="wallet-overview-panel__value">{formatMoney(summary.net_worth)}</h1>
               </div>
-              <span className="wallet-overview-panel__badge">
-                {summary.active_card_count} kart / {summary.active_account_count} hesap
-              </span>
             </div>
             <div className="wallet-overview-panel__meta">
               <article>
@@ -414,9 +523,6 @@ export default function WalletPage({ onNavigate }) {
                         <h3>Kart ve hesap ozeti</h3>
                       </div>
                       <div className="wallet-card-shell__actions">
-                        <span className="wallet-card-shell__badge">
-                          {summary.active_card_count} kart · {summary.active_account_count} hesap
-                        </span>
                         <button className="secondary-button" type="button" onClick={openCreateCardForm}>
                           Kart Ekle
                         </button>

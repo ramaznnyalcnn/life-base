@@ -1,6 +1,7 @@
 """Request and response schemas."""
 
 from app.schemas.account import AccountCreate, AccountRead, AccountUpdate
+from app.schemas.auth import AuthSessionRead, LoginRequest, UserRead
 from app.schemas.ai import (
     AIAction,
     AIEventPayload,
@@ -39,6 +40,7 @@ __all__ = [
     "AccountCreate",
     "AccountRead",
     "AccountUpdate",
+    "AuthSessionRead",
     "AIAction",
     "AIParseRequest",
     "AIParseResponse",
@@ -50,6 +52,8 @@ __all__ = [
     "AISummaryPayload",
     "SummaryRange",
     "SummaryMetric",
+    "LoginRequest",
+    "UserRead",
     "EventCreate",
     "EventRead",
     "EventUpdate",

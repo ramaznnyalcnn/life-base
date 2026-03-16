@@ -282,10 +282,14 @@ def delete_transaction(session: Session, transaction_id: int, *, user_id: int | 
     session.commit()
 
 
-def get_period_bounds(period: SummaryPeriod) -> tuple[datetime | None, datetime | None]:
+def get_period_bounds(
+    period: SummaryPeriod,
+    *,
+    reference_time: datetime | None = None,
+) -> tuple[datetime | None, datetime | None]:
     """Return UTC period boundaries for summaries."""
 
-    now = datetime.now(timezone.utc)
+    now = reference_time or datetime.now(timezone.utc)
     if period == SummaryPeriod.ALL:
         return None, None
     if period == SummaryPeriod.WEEK:
@@ -301,11 +305,12 @@ def build_transaction_summary(
     period: SummaryPeriod,
     *,
     user_id: int | None = None,
+    reference_time: datetime | None = None,
 ) -> TransactionSummary:
     """Aggregate transactions for dashboard summaries."""
     owner_id = _resolve_user_id(session, user_id)
 
-    start, end = get_period_bounds(period)
+    start, end = get_period_bounds(period, reference_time=reference_time)
     query = select(Transaction).where(Transaction.user_id == owner_id)
 
     if start is not None:

@@ -83,7 +83,7 @@ describe("WalletPage", () => {
 
     expect(await screen.findByText("Ana Toplam")).toBeInTheDocument();
     expect(screen.getByText("Gelir Gider")).toBeInTheDocument();
-    expect(screen.getByText("Kartlar")).toBeInTheDocument();
+    expect(screen.getAllByText("Kartlar").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Diger Hesaplar")).toBeInTheDocument();
     expect(screen.getAllByText("Akbank Platinum").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Secili Kart")).not.toBeInTheDocument();
@@ -93,7 +93,7 @@ describe("WalletPage", () => {
     expect(screen.getAllByText("Akbank Platinum").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Secili Kart").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Kart Bilgileri")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Kart Ekle" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Kart Ekle" }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Ayar" })).toBeInTheDocument();
     expect(screen.getByText("OD")).toBeInTheDocument();
     expect(screen.getByText("RS")).toBeInTheDocument();

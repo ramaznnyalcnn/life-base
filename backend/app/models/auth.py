@@ -18,7 +18,9 @@ class User(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(160))
+    password_hash: Mapped[str] = mapped_column(String(512), default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
     api_tokens = relationship("AccessToken", back_populates="user", cascade="all, delete-orphan")
     accounts = relationship("Account", back_populates="user")

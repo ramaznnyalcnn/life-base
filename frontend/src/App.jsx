@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
+import { fetchBackendHealth, fetchCurrentUser } from "./api/auth";
+import { clearStoredSession, getStoredSession, SESSION_EVENT_NAME, setStoredSession } from "./auth/session";
 import AddPage from "./pages/AddPage";
 import CalendarPage from "./pages/Calendar";
 import HistoryPage from "./pages/HistoryPage";
+import LoginPage from "./pages/LoginPage";
 import ManagePage from "./pages/ManagePage";
 import SettingsPage from "./pages/SettingsPage";
 import WalletPage from "./pages/Wallet";
@@ -19,6 +22,10 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("wallet");
+  const [session, setSession] = useState(() => getStoredSession());
+  const [authReady, setAuthReady] = useState(false);
+  const [requiresLogin, setRequiresLogin] = useState(true);
+  const [bootError, setBootError] = useState("");
   const [isDockSliding, setIsDockSliding] = useState(false);
   const holdTimerRef = useRef(null);
   const pointerIdRef = useRef(null);
@@ -26,8 +33,68 @@ export default function App() {
   const slideStartedRef = useRef(false);
 
   useEffect(() => {
-    enablePushNotifications().catch(() => null);
+    let cancelled = false;
+
+    async function bootstrap() {
+      try {
+        const health = await fetchBackendHealth();
+        if (cancelled) {
+          return;
+        }
+
+        const secureMode = !health?.mode?.single_user;
+        setRequiresLogin(secureMode);
+        setBootError("");
+
+        const storedSession = getStoredSession();
+        if (!secureMode || !storedSession?.accessToken) {
+          setAuthReady(true);
+          return;
+        }
+
+        const currentUser = await fetchCurrentUser();
+        if (cancelled) {
+          return;
+        }
+
+        const nextSession = {
+          accessToken: storedSession.accessToken,
+          user: currentUser
+        };
+        setStoredSession(nextSession);
+        setSession(nextSession);
+        setAuthReady(true);
+      } catch (nextError) {
+        if (!cancelled) {
+          setBootError(nextError.message);
+          setAuthReady(true);
+        }
+      }
+    }
+
+    bootstrap();
+
+    function handleSessionChange() {
+      if (!cancelled) {
+        setSession(getStoredSession());
+      }
+    }
+
+    window.addEventListener(SESSION_EVENT_NAME, handleSessionChange);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SESSION_EVENT_NAME, handleSessionChange);
+    };
   }, []);
+
+  useEffect(() => {
+    if ((requiresLogin && !session?.accessToken) || !authReady) {
+      return;
+    }
+
+    enablePushNotifications().catch(() => null);
+  }, [authReady, requiresLogin, session?.accessToken]);
 
   useEffect(() => () => {
     if (holdTimerRef.current !== null) {
@@ -105,12 +172,44 @@ export default function App() {
 
   const activeItem = NAV_ITEMS.find((item) => item.id === activeTab) ?? NAV_ITEMS[0];
   const ActivePage = activeItem.page;
+  const currentUser = session?.user ?? null;
+
+  if (!authReady) {
+    return (
+      <main className="shell shell--auth">
+        <section className="compose-panel auth-panel">
+          <p className="status-card__eyebrow">Life Base</p>
+          <h1>Hazirlaniyor...</h1>
+        </section>
+      </main>
+    );
+  }
+
+  if (requiresLogin && !session?.accessToken) {
+    return (
+      <LoginPage
+        bootError={bootError}
+        onAuthenticated={(nextUser) => {
+          setSession((current) => (current ? { ...current, user: nextUser } : getStoredSession()));
+          setBootError("");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="app-frame">
       <div className="app-content">
         <div className="app-content__page">
-          <ActivePage onNavigate={setActiveTab} />
+          <ActivePage
+            onNavigate={setActiveTab}
+            currentUser={currentUser}
+            onLogout={() => {
+              clearStoredSession();
+              setSession(null);
+              setActiveTab("wallet");
+            }}
+          />
         </div>
       </div>
 

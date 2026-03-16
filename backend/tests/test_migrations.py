@@ -15,6 +15,7 @@ def test_alembic_files_exist():
     assert (base / "versions" / "20260310_0004_auth_and_user_scoping.py").exists()
     assert (base / "versions" / "20260313_0005_event_importance.py").exists()
     assert (base / "versions" / "20260314_0006_transfers.py").exists()
+    assert (base / "versions" / "20260316_0009_user_passwords_and_admins.py").exists()
 
 
 def test_initial_migration_contains_core_tables():
@@ -67,3 +68,12 @@ def test_transfers_migration_contains_transfer_table():
     assert "transfers" in migration
     assert "source_account_id" in migration
     assert "destination_account_id" in migration
+
+
+def test_user_password_migration_contains_password_and_admin_fields():
+    migration = (
+        REPO_ROOT / "backend" / "alembic" / "versions" / "20260316_0009_user_passwords_and_admins.py"
+    ).read_text()
+
+    assert "password_hash" in migration
+    assert "is_admin" in migration

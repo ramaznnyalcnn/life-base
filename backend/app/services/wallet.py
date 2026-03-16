@@ -182,8 +182,18 @@ def build_wallet_summary(
         previous_year_net=previous_year_flow.net_flow,
         active_account_count=len(accounts),
         active_card_count=sum(1 for account in accounts if account.type == AccountType.CREDIT_CARD),
-        weekly_flow=build_transaction_summary(session, SummaryPeriod.WEEK, user_id=owner_id),
-        monthly_flow=build_transaction_summary(session, SummaryPeriod.MONTH, user_id=owner_id),
+        weekly_flow=build_transaction_summary(
+            session,
+            SummaryPeriod.WEEK,
+            user_id=owner_id,
+            reference_time=current_time,
+        ),
+        monthly_flow=build_transaction_summary(
+            session,
+            SummaryPeriod.MONTH,
+            user_id=owner_id,
+            reference_time=current_time,
+        ),
         accounts=account_cards,
     )
 

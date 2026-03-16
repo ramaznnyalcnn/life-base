@@ -12,6 +12,7 @@ from sqlalchemy.exc import ProgrammingError
 from app.api.routes import (
     ai_router,
     accounts_router,
+    auth_router,
     events_router,
     notifications_router,
     transfers_router,
@@ -62,6 +63,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(ai_router, prefix=settings.api_v1_prefix)
 app.include_router(accounts_router, prefix=settings.api_v1_prefix)
 app.include_router(events_router, prefix=settings.api_v1_prefix)
