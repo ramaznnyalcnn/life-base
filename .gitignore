@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+
+# Env
+.env
+.env.*
+
+# Test artifacts
+backend/tests/.test.db
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local artifacts
+2026-03-14_22-26.png
