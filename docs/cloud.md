@@ -4,25 +4,40 @@
 
 - Local PostgreSQL migration applied successfully
 - API boots and answers `/health`
-- Container packaging is ready for backend-only deployment
+- Container packaging is ready for full-stack deployment
 
-## Generic cloud path
+## Recommended Docker path
 
-1. Build the image from `backend/Dockerfile`
-2. Provide a managed PostgreSQL `DATABASE_URL`
-3. Run one migration job using `infra/scripts/backend-migrate.sh`
-4. Run the API container using `infra/scripts/backend-start.sh`
-5. Run a second worker container using `python -m app.cli.run_reminder_worker --interval 60`
+1. Copy `.env.example` to `.env`
+2. Fill production secrets and review `POSTGRES_*`, `WEB_APP_URL`, `VAPID_*`, `OPENROUTER_*`
+3. Start the stack with `docker compose -f infra/compose/prod-stack.yml up -d --build`
+4. Verify `http://SERVER_IP:${WEB_PORT:-8080}/health`
+5. When the app is stable, put TLS in front of the `web` service and map `WEB_PORT=80`
 
-## Local stack simulation
-
-```bash
-docker compose -f infra/compose/backend-stack.yml up --build
-```
-
-This brings up:
+This stack brings up:
 
 - PostgreSQL
 - one-shot migration container
 - API container
 - reminder worker container
+- nginx web container serving the frontend and proxying `/api/`
+
+## Backend-only local simulation
+
+```bash
+docker compose -f infra/compose/backend-stack.yml up --build
+```
+
+## Full-stack local or VPS simulation
+
+```bash
+docker compose -f infra/compose/prod-stack.yml up -d --build
+```
+
+Default exposed port is `8080` so local runs do not fight with an existing host nginx.
+
+## Important notes
+
+- Current frontend does not have a login flow, so keep `APP_API_TOKEN` empty unless an outer auth layer is in front of the app.
+- The `db` service is intentionally not published to the host.
+- For same-origin deployment, keep `VITE_API_BASE_URL=/api/v1`.
