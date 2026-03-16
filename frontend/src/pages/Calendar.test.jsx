@@ -79,9 +79,13 @@ describe("CalendarPage", () => {
     const user = userEvent.setup();
     render(<CalendarPage />);
 
-    expect(await screen.findByText("Aylik Takvim")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: new Intl.DateTimeFormat("tr-TR", {
+      month: "long",
+      year: "numeric"
+    }).format(new Date()) })).toBeInTheDocument();
     expect(screen.getByText("1 Haftalik Program")).toBeInTheDocument();
-    expect(screen.getByText("Secili Gunun Havasi")).toBeInTheDocument();
+    expect(screen.queryByText("Aylik Takvim")).not.toBeInTheDocument();
+    expect(screen.queryByText("Secili Gunun Havasi")).not.toBeInTheDocument();
 
     expect(screen.getAllByText("Disci Randevusu").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("button", { name: "Tamamla" }).length).toBeGreaterThanOrEqual(1);

@@ -1,15 +1,18 @@
 import { getOrCreateDeviceId } from "../device";
+import { clearStoredSession, getStoredAccessToken } from "../auth/session";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
 export async function apiRequest(path, options = {}) {
+  const accessToken = getStoredAccessToken();
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       headers: {
         "Content-Type": "application/json",
         "X-Device-Id": getOrCreateDeviceId(),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(options.headers ?? {})
       },
       ...options
@@ -28,6 +31,9 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && accessToken) {
+      clearStoredSession();
+    }
     const detail =
       payload?.detail ??
       (response.status >= 500

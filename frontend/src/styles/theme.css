@@ -50,6 +50,11 @@ select {
   padding: 2.25rem 1rem 5.5rem;
 }
 
+.shell--calendar {
+  padding-top: calc(0.75rem + env(safe-area-inset-top));
+  padding-bottom: calc(5.8rem + env(safe-area-inset-bottom));
+}
+
 .shell--wallet {
   position: relative;
   isolation: isolate;
@@ -435,6 +440,7 @@ select {
   gap: 1rem;
 }
 
+.wallet-asset-stage,
 .wallet-overview-panel {
   border: 1px solid rgba(124, 156, 255, 0.16);
   border-radius: calc(var(--radius) + 0.45rem);
@@ -446,6 +452,13 @@ select {
   box-shadow: 0 22px 44px rgba(3, 10, 22, 0.22);
 }
 
+.wallet-asset-stage {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.wallet-asset-stage__header,
 .wallet-overview-panel__header,
 .wallet-overview-panel__meta,
 .wallet-fold__header,
@@ -459,6 +472,7 @@ select {
   gap: 1rem;
 }
 
+.wallet-asset-stage__header,
 .wallet-overview-panel__header {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
@@ -470,17 +484,96 @@ select {
   line-height: 0.94;
 }
 
-.wallet-overview-panel__badge {
-  display: inline-flex;
+.wallet-asset-stage__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
+  gap: 1rem;
+}
+
+.wallet-flip-card {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  perspective: 1200px;
+  cursor: pointer;
+  min-height: 14rem;
+  text-align: left;
+  color: inherit;
+}
+
+.wallet-flip-card__inner {
+  position: relative;
+  min-height: 14rem;
+  transform-style: preserve-3d;
+  transition: transform 420ms ease;
+}
+
+.wallet-flip-card--flipped .wallet-flip-card__inner {
+  transform: rotateY(180deg);
+}
+
+.wallet-flip-card__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  display: grid;
+  align-content: space-between;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid rgba(230, 237, 243, 0.08);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at top right, rgba(124, 156, 255, 0.22), transparent 16rem),
+    linear-gradient(180deg, rgba(28, 38, 51, 0.98) 0%, rgba(13, 17, 23, 1) 100%);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
+}
+
+.wallet-flip-card__face--back {
+  transform: rotateY(180deg);
+  background:
+    radial-gradient(circle at bottom left, rgba(117, 227, 210, 0.18), transparent 16rem),
+    linear-gradient(180deg, rgba(15, 22, 31, 0.98) 0%, rgba(5, 9, 15, 1) 100%);
+}
+
+.wallet-flip-card--selected .wallet-flip-card__face {
+  box-shadow: 0 0 0 1px rgba(124, 156, 255, 0.22), 0 18px 36px rgba(0, 0, 0, 0.26);
+}
+
+.wallet-flip-card__topline,
+.wallet-flip-card__footer {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 2.2rem;
-  padding: 0.45rem 0.8rem;
-  border-radius: 999px;
-  background: rgba(230, 237, 243, 0.08);
-  color: var(--text);
-  font-size: 0.86rem;
-  font-weight: 700;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.wallet-flip-card__chip,
+.wallet-flip-card__issuer {
+  color: rgba(230, 237, 243, 0.72);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wallet-flip-card strong {
+  display: block;
+  font-size: 1.05rem;
+}
+
+.wallet-flip-card__amount {
+  display: block;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.02;
+}
+
+.wallet-flip-card__footer {
+  color: rgba(230, 237, 243, 0.72);
+  font-size: 0.84rem;
+}
+
+.wallet-flip-card__footer--detail {
+  align-items: end;
+  line-height: 1.35;
 }
 
 .wallet-overview-panel__meta {
@@ -2600,7 +2693,8 @@ select {
   position: sticky;
   top: 0;
   min-height: 100svh;
-  background: var(--bg);
+  padding-top: max(0.2rem, env(safe-area-inset-top));
+  background: #000;
 }
 
 .calendar-entry__stage {
@@ -2616,15 +2710,15 @@ select {
 }
 
 .calendar-month-panel {
-  min-height: calc(100svh - 8.5rem);
+  min-height: calc(100svh - 4.4rem - env(safe-area-inset-top));
   display: grid;
   align-content: start;
   position: relative;
   z-index: 1;
   overflow: clip;
   background:
-    radial-gradient(circle at top left, rgba(124, 156, 255, 0.12), transparent 24rem),
-    linear-gradient(180deg, rgba(22, 27, 34, 0.98) 0%, rgba(22, 27, 34, 1) 100%);
+    radial-gradient(circle at top left, rgba(124, 156, 255, 0.08), transparent 24rem),
+    linear-gradient(180deg, rgba(6, 6, 6, 0.98) 0%, rgba(0, 0, 0, 1) 100%);
 }
 
 .calendar-month-panel__content {
@@ -2639,39 +2733,10 @@ select {
   font-size: 0.95rem;
 }
 
-.calendar-entry__lead {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: center;
-  margin-top: 1.15rem;
-}
-
-.calendar-entry__lead-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: rgba(230, 237, 243, 0.62);
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.calendar-entry__lead strong {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.62rem 0.92rem;
-  border-radius: 999px;
-  background: rgba(124, 156, 255, 0.18);
-  border: 1px solid rgba(124, 156, 255, 0.18);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
 .calendar-entry__today-block {
   position: relative;
   z-index: 3;
-  margin-top: 1.15rem;
+  margin-top: 0.9rem;
 }
 
 .calendar-entry__today-shell {
@@ -2702,10 +2767,10 @@ select {
 .calendar-week-shell {
   position: relative;
   z-index: 1;
-  background: var(--bg);
+  background: #000;
   min-height: 100svh;
-  margin-top: clamp(10rem, 28vh, 18rem);
-  padding-top: clamp(7rem, 20vh, 12rem);
+  margin-top: clamp(4rem, 12vh, 8rem);
+  padding-top: clamp(2rem, 6vh, 4rem);
   transform-origin: center top;
   transition: transform 260ms ease, opacity 260ms ease;
 }
@@ -2728,38 +2793,22 @@ select {
   margin: 0.35rem 0 0;
 }
 
-.calendar-entry__today-weather {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: 999px;
-  background: rgba(124, 156, 255, 0.18);
-  color: var(--text);
-}
-
 .calendar-entry__today-list {
   display: grid;
   gap: 0.75rem;
   margin-top: 1rem;
 }
 
-.calendar-entry__today-kicker {
+.calendar-entry__today-count {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
-  margin-top: 1rem;
-  padding: 0.75rem 0.95rem;
+  padding: 0.55rem 0.85rem;
   border: 1px solid rgba(230, 237, 243, 0.08);
   border-radius: 999px;
-  background: rgba(22, 27, 34, 0.96);
-  color: rgba(230, 237, 243, 0.78);
-  backdrop-filter: blur(18px);
-}
-
-.calendar-entry__today-kicker strong {
+  background: rgba(13, 17, 23, 0.92);
   color: var(--text);
+  backdrop-filter: blur(18px);
 }
 
 .calendar-entry__spotlight-card {
@@ -2865,8 +2914,8 @@ select {
   z-index: 2;
   pointer-events: none;
   background:
-    radial-gradient(circle at center, rgba(13, 17, 23, 0) 0%, rgba(13, 17, 23, 0.08) 30%, rgba(13, 17, 23, 0.92) 68%, rgba(13, 17, 23, 1) 100%),
-    linear-gradient(180deg, rgba(13, 17, 23, 0) 0%, rgba(13, 17, 23, 0.88) 48%, rgba(13, 17, 23, 1) 100%);
+    radial-gradient(circle at center, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.08) 24%, rgba(0, 0, 0, 0.96) 64%, rgba(0, 0, 0, 1) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.92) 48%, rgba(0, 0, 0, 1) 100%);
 }
 
 .calendar-month-panel__header,
@@ -2894,46 +2943,15 @@ select {
   align-items: center;
 }
 
+.calendar-month-panel__header {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
 .calendar-month-panel__header h1,
 .calendar-planner__header h2,
 .calendar-day-panel__header h2 {
   margin: 0.35rem 0 0;
-}
-
-.calendar-month-panel__summary {
-  justify-items: end;
-  gap: 0.45rem;
-}
-
-.calendar-month-panel__summary span,
-.calendar-day-panel__summary span {
-  color: var(--text);
-  font-size: 0.82rem;
-  padding: 0.42rem 0.72rem;
-  border: 1px solid rgba(230, 237, 243, 0.06);
-  border-radius: 999px;
-  background: rgba(13, 17, 23, 0.28);
-}
-
-.weather-icon {
-  display: inline-block;
-  color: var(--accent);
-  flex: none;
-}
-
-.weather-icon--tiny {
-  width: 0.95rem;
-  height: 0.95rem;
-}
-
-.weather-icon--small {
-  width: 1.15rem;
-  height: 1.15rem;
-}
-
-.weather-icon--large {
-  width: 2rem;
-  height: 2rem;
 }
 
 .calendar-month-panel__weekdays,
@@ -2997,17 +3015,6 @@ select {
 .calendar-month-day--filled-end {
   border-top-left-radius: 0.55rem;
   border-bottom-left-radius: 0.55rem;
-}
-
-.calendar-month-day__weather {
-  position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.24rem;
-  color: var(--muted);
-  font-size: 0.72rem;
 }
 
 .calendar-month-day__number {
@@ -3137,29 +3144,11 @@ select {
 }
 
 .calendar-day-panel__summary {
-  min-width: 6.5rem;
+  min-width: auto;
   justify-items: end;
   align-content: start;
   gap: 0.55rem;
   text-align: right;
-}
-
-.calendar-day-panel__weather {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.2rem 0 0;
-}
-
-.calendar-day-panel__weather-copy {
-  display: grid;
-  gap: 0.1rem;
-  justify-items: end;
-}
-
-.calendar-day-panel__weather small {
-  color: var(--muted);
-  font-size: 0.75rem;
 }
 
 .calendar-day-panel__count {
@@ -3187,81 +3176,6 @@ select {
   border-radius: 1rem;
   background: rgba(13, 17, 23, 0.32);
   color: rgba(230, 237, 243, 0.7);
-}
-
-.calendar-location-panel__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.95fr);
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.calendar-location-weather,
-.calendar-location-map {
-  border: 1px solid rgba(230, 237, 243, 0.06);
-  border-radius: 1.35rem;
-  background: rgba(13, 17, 23, 0.28);
-  padding: 1rem;
-}
-
-.calendar-location-weather {
-  background:
-    radial-gradient(circle at top right, rgba(124, 156, 255, 0.18), transparent 16rem),
-    linear-gradient(180deg, rgba(31, 38, 48, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
-}
-
-.calendar-location-weather__header {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.85rem;
-  align-items: center;
-}
-
-.calendar-location-weather__header h2 {
-  margin: 0.3rem 0 0;
-}
-
-.calendar-location-weather__icon {
-  width: 4.2rem;
-  height: 4.2rem;
-  border-radius: 1.25rem;
-  display: grid;
-  place-items: center;
-  color: #b7c8ff;
-  background: rgba(124, 156, 255, 0.14);
-}
-
-.calendar-location-weather__stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.8rem;
-  margin-top: 1rem;
-}
-
-.calendar-location-weather__stats article {
-  border: 1px solid rgba(230, 237, 243, 0.06);
-  border-radius: 1rem;
-  background: rgba(13, 17, 23, 0.28);
-  padding: 0.85rem 0.9rem;
-}
-
-.calendar-location-weather__stats span {
-  display: block;
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.calendar-location-weather__stats strong {
-  display: block;
-  margin-top: 0.3rem;
-}
-
-.calendar-location-map__frame {
-  width: 100%;
-  min-height: 16rem;
-  margin-top: 0.75rem;
-  border: 0;
-  border-radius: 1rem;
 }
 
 .calendar-agenda-list {
@@ -3786,6 +3700,7 @@ select {
 
 @media (max-width: 719px) {
   .wallet-overview-panel__header,
+  .wallet-asset-stage__header,
   .wallet-overview-panel__meta,
   .wallet-snapshot-grid,
   .wallet-alert-strip,
@@ -3811,9 +3726,6 @@ select {
   .calendar-month-panel__header,
   .calendar-day-panel__header,
   .calendar-planner__header,
-  .calendar-location-panel__grid,
-  .calendar-location-weather__header,
-  .calendar-entry__lead,
   .calendar-entry__today-header,
   .calendar-entry__today-item {
     grid-template-columns: minmax(0, 1fr);
@@ -3830,6 +3742,7 @@ select {
   }
 
   .wallet-card-stack,
+  .wallet-asset-stage__grid,
   .history-deep-filters {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3857,10 +3770,6 @@ select {
 
   .calendar-entry {
     min-height: 160svh;
-  }
-
-  .calendar-location-weather__stats {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .wallet-grid {

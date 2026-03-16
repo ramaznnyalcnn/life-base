@@ -1,21 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { deleteEvent, fetchCalendarDashboard, updateEvent } from "../api/events";
-import { buildMapEmbedUrl, fetchWeatherBundle, reverseGeocode } from "../api/weather";
 
 const INITIAL_EDIT_FORM = {
   title: "",
   description: "",
   starts_at: "",
   is_important: false
-};
-const INITIAL_LOCATION_STATE = {
-  status: "idle",
-  placeLabel: "Mevcut Konum",
-  current: null,
-  forecastByDay: {},
-  mapUrl: "",
-  message: ""
 };
 
 function addDays(value, amount) {
@@ -125,78 +116,6 @@ function getDisplayDescription(event) {
   return event.description?.trim() ?? "";
 }
 
-function getWeatherMeta(code, isDay = 1) {
-  if (code === 0) {
-    return {
-      icon: isDay ? "sun" : "moon",
-      label: isDay ? "Gunesli" : "Acik Gece",
-      short: isDay ? "Gunes" : "Acik"
-    };
-  }
-  if ([1, 2, 3].includes(code)) {
-    return {
-      icon: "cloud",
-      label: "Bulutlu",
-      short: "Bulut"
-    };
-  }
-  if ([45, 48].includes(code)) {
-    return {
-      icon: "fog",
-      label: "Sisli",
-      short: "Sis"
-    };
-  }
-  if ([51, 53, 55, 56, 57, 61, 63, 65, 80, 81, 82].includes(code)) {
-    return {
-      icon: "rain",
-      label: "Yagmurlu",
-      short: "Yagmur"
-    };
-  }
-  if ([66, 67, 71, 73, 75, 77, 85, 86].includes(code)) {
-    return {
-      icon: "snow",
-      label: "Kar",
-      short: "Kar"
-    };
-  }
-  if ([95, 96, 99].includes(code)) {
-    return {
-      icon: "storm",
-      label: "Firtina",
-      short: "Firtina"
-    };
-  }
-
-  return {
-    icon: "cloud",
-    label: "Degisken",
-    short: "Degisken"
-  };
-}
-
-function getFallbackWeatherSlot(value) {
-  const variants = [
-    { code: 0, temp: "21°", highLow: "24° / 16°" },
-    { code: 3, temp: "18°", highLow: "20° / 15°" },
-    { code: 61, temp: "16°", highLow: "18° / 13°" }
-  ];
-
-  const date = new Date(value);
-  const variant = variants[(date.getDate() + date.getMonth()) % variants.length];
-  const meta = getWeatherMeta(variant.code, 1);
-
-  return {
-    ...meta,
-    ...variant
-  };
-}
-
-function getWeatherSnapshot(value, forecastByDay) {
-  return forecastByDay[toDateKey(value)] ?? getFallbackWeatherSlot(value);
-}
-
 function getEventVisualTone(event) {
   const text = `${event.title} ${getDisplayDescription(event)}`.toLowerCase();
 
@@ -246,7 +165,7 @@ function getEventMediaGlyph(visualTone) {
   }
 }
 
-function buildMonthGrid(eventsByDay, forecastByDay) {
+function buildMonthGrid(eventsByDay) {
   const today = new Date();
   const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const gridStart = addDays(currentMonth, -((currentMonth.getDay() + 6) % 7));
@@ -280,8 +199,7 @@ function buildMonthGrid(eventsByDay, forecastByDay) {
       inCurrentMonth: date.getMonth() === today.getMonth(),
       isToday: key === toDateKey(today),
       isSelected: false,
-      fillState,
-      weather: getWeatherSnapshot(date, forecastByDay)
+      fillState
     });
   }
 
@@ -294,86 +212,6 @@ function getTodayOpenState() {
   };
 }
 
-function buildForecastByDay(payload) {
-  const daily = payload.daily ?? {};
-  const times = daily.time ?? [];
-  const codes = daily.weather_code ?? [];
-  const maxValues = daily.temperature_2m_max ?? [];
-  const minValues = daily.temperature_2m_min ?? [];
-
-  return times.reduce((accumulator, key, index) => {
-    const code = codes[index] ?? 0;
-    const meta = getWeatherMeta(code, 1);
-    accumulator[key] = {
-      ...meta,
-      code,
-      temp: `${Math.round(maxValues[index] ?? 0)}°`,
-      highLow: `${Math.round(maxValues[index] ?? 0)}° / ${Math.round(minValues[index] ?? 0)}°`
-    };
-    return accumulator;
-  }, {});
-}
-
-function buildPlaceLabel(payload, fallbackLabel) {
-  const address = payload?.address ?? {};
-  return (
-    address.city ||
-    address.town ||
-    address.state ||
-    address.county ||
-    address.village ||
-    fallbackLabel
-  );
-}
-
-function WeatherIcon({ code, isDay = 1, className = "" }) {
-  const { icon } = getWeatherMeta(code, isDay);
-
-  return (
-    <svg
-      className={["weather-icon", className].filter(Boolean).join(" ")}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      {icon === "sun" ? (
-        <>
-          <circle cx="12" cy="12" r="4.2" fill="currentColor" />
-          <path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.72 5.28l-2.12 2.12M7.4 16.6l-2.12 2.12M18.72 18.72 16.6 16.6M7.4 7.4 5.28 5.28" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-        </>
-      ) : null}
-      {icon === "moon" ? <path d="M14.7 2.8a8.8 8.8 0 1 0 6.5 14.4 9.6 9.6 0 0 1-6.5-14.4Z" fill="currentColor" /> : null}
-      {icon === "cloud" ? (
-        <path d="M7 18h9.5a4 4 0 0 0 .3-8 5.8 5.8 0 0 0-11.2 1.7A3.5 3.5 0 0 0 7 18Z" fill="currentColor" />
-      ) : null}
-      {icon === "fog" ? (
-        <>
-          <path d="M7 11.5h10a3.4 3.4 0 0 0 .2-6.8 4.9 4.9 0 0 0-9.4 1.5A2.9 2.9 0 0 0 7 11.5Z" fill="currentColor" />
-          <path d="M5 15.5h14M7 19h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-        </>
-      ) : null}
-      {icon === "rain" ? (
-        <>
-          <path d="M7 12h9.5a4 4 0 0 0 .3-8 5.8 5.8 0 0 0-11.2 1.7A3.5 3.5 0 0 0 7 12Z" fill="currentColor" />
-          <path d="M9 14.5 7.9 18M13 14.5 11.9 19M17 14.5 15.9 18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-        </>
-      ) : null}
-      {icon === "snow" ? (
-        <>
-          <path d="M7 11.5h9.5a4 4 0 0 0 .3-8 5.8 5.8 0 0 0-11.2 1.7A3.5 3.5 0 0 0 7 11.5Z" fill="currentColor" />
-          <path d="m9.5 14.7 1.4 1.4m0-1.4-1.4 1.4m3.1-1.4 1.4 1.4m0-1.4-1.4 1.4m3.1-1.4 1.4 1.4m0-1.4-1.4 1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        </>
-      ) : null}
-      {icon === "storm" ? (
-        <>
-          <path d="M7 11.5h9.5a4 4 0 0 0 .3-8 5.8 5.8 0 0 0-11.2 1.7A3.5 3.5 0 0 0 7 11.5Z" fill="currentColor" />
-          <path d="m12 13-2 4h2.2L11 21l4-5h-2.4l1.3-3Z" fill="currentColor" />
-        </>
-      ) : null}
-    </svg>
-  );
-}
-
 export default function CalendarPage() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -382,7 +220,6 @@ export default function CalendarPage() {
   const [editForm, setEditForm] = useState(INITIAL_EDIT_FORM);
   const [openDays, setOpenDays] = useState(() => getTodayOpenState());
   const [selectedDateKey, setSelectedDateKey] = useState(toDateKey(new Date()));
-  const [locationState, setLocationState] = useState(INITIAL_LOCATION_STATE);
   const [entryProgress, setEntryProgress] = useState(0);
   const [weekEntryProgress, setWeekEntryProgress] = useState(0);
   const entryRef = useRef(null);
@@ -404,133 +241,6 @@ export default function CalendarPage() {
 
   useEffect(() => {
     loadDashboard();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function resolveWeather(latitude, longitude) {
-      const fallbackLabel = `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
-      const mapUrl = buildMapEmbedUrl(latitude, longitude);
-
-      try {
-        const [weatherResult, placeResult] = await Promise.allSettled([
-          fetchWeatherBundle(latitude, longitude),
-          reverseGeocode(latitude, longitude)
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        if (weatherResult.status !== "fulfilled") {
-          setLocationState({
-            ...INITIAL_LOCATION_STATE,
-            status: "error",
-            placeLabel: fallbackLabel,
-            mapUrl,
-            message: "Hava durumu bilgisi su an alinamadi."
-          });
-          return;
-        }
-
-        const forecastByDay = buildForecastByDay(weatherResult.value);
-        const currentMeta = getWeatherMeta(
-          weatherResult.value.current?.weather_code ?? 0,
-          weatherResult.value.current?.is_day ?? 1
-        );
-
-        setLocationState({
-          status: "ready",
-          placeLabel:
-            placeResult.status === "fulfilled"
-              ? buildPlaceLabel(placeResult.value, fallbackLabel)
-              : fallbackLabel,
-          current: {
-            ...currentMeta,
-            code: weatherResult.value.current?.weather_code ?? 0,
-            isDay: weatherResult.value.current?.is_day ?? 1,
-            temp: `${Math.round(weatherResult.value.current?.temperature_2m ?? 0)}°`,
-            apparentTemp: `${Math.round(weatherResult.value.current?.apparent_temperature ?? 0)}°`,
-            wind: `${Math.round(weatherResult.value.current?.wind_speed_10m ?? 0)} km/h`
-          },
-          forecastByDay,
-          mapUrl,
-          message: ""
-        });
-      } catch {
-        if (!cancelled) {
-          setLocationState({
-            ...INITIAL_LOCATION_STATE,
-            status: "error",
-            message: "Konum servisleri su an yanit vermiyor."
-          });
-        }
-      }
-    }
-
-    async function requestLocation() {
-      if (!navigator.geolocation) {
-        setLocationState({
-          ...INITIAL_LOCATION_STATE,
-          status: "unsupported",
-          message: "Tarayici konum bilgisini desteklemiyor."
-        });
-        return;
-      }
-
-      if (!window.isSecureContext && !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
-        setLocationState({
-          ...INITIAL_LOCATION_STATE,
-          status: "error",
-          message: "Konum icin HTTPS veya localhost uzerinden acman gerekiyor."
-        });
-        return;
-      }
-
-      setLocationState((current) => ({
-        ...current,
-        status: "locating",
-        message: ""
-      }));
-
-      const attempt = (options) =>
-        new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, options);
-        });
-
-      try {
-        const position = await attempt({
-          enableHighAccuracy: false,
-          timeout: 18000,
-          maximumAge: 900000
-        }).catch(() =>
-          attempt({
-            enableHighAccuracy: true,
-            timeout: 25000,
-            maximumAge: 0
-          })
-        );
-
-        if (!cancelled) {
-          await resolveWeather(position.coords.latitude, position.coords.longitude);
-        }
-      } catch {
-        if (!cancelled) {
-          setLocationState({
-            ...INITIAL_LOCATION_STATE,
-            status: "error",
-            message: "Konum alinamadi. Tarayici izinlerini ve baglantiyi kontrol et."
-          });
-        }
-      }
-    }
-
-    requestLocation();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
@@ -612,19 +322,18 @@ export default function CalendarPage() {
       return {
         key,
         date,
-        weather: getWeatherSnapshot(date, locationState.forecastByDay),
         events: eventsByDay.get(key) ?? []
       };
     });
-  }, [eventsByDay, locationState.forecastByDay]);
+  }, [eventsByDay]);
 
   const monthGrid = useMemo(
     () =>
-      buildMonthGrid(eventsByDay, locationState.forecastByDay).map((day) => ({
+      buildMonthGrid(eventsByDay).map((day) => ({
         ...day,
         isSelected: day.key === selectedDateKey
       })),
-    [eventsByDay, locationState.forecastByDay, selectedDateKey]
+    [eventsByDay, selectedDateKey]
   );
 
   function toggleDay(dayKey) {
@@ -700,59 +409,6 @@ export default function CalendarPage() {
     } catch (nextError) {
       setError(nextError.message);
     }
-  }
-
-  function renderLocationPanel() {
-    if (locationState.status === "locating" || locationState.status === "idle") {
-      return <p className="muted-text">Konum aliniyor, hava durumu guncelleniyor...</p>;
-    }
-
-    if (locationState.status === "unsupported") {
-      return <p className="muted-text">{locationState.message}</p>;
-    }
-
-    if (locationState.status === "error") {
-      return (
-        <div className="calendar-location-weather">
-          <p className="muted-text">{locationState.message}</p>
-          <button className="secondary-button" type="button" onClick={() => window.location.reload()}>
-            Konumu Tekrar Dene
-          </button>
-        </div>
-      );
-    }
-
-    return (
-      <div className="calendar-location-weather">
-        <div className="calendar-location-weather__header">
-          <div className="calendar-location-weather__icon">
-            <WeatherIcon code={locationState.current.code} isDay={locationState.current.isDay} className="weather-icon--large" />
-          </div>
-          <div>
-            <p className="status-card__eyebrow">Konum ve Hava</p>
-            <h2>{locationState.placeLabel}</h2>
-            <p className="muted-text">
-              {locationState.current.label} · Hissedilen {locationState.current.apparentTemp}
-            </p>
-          </div>
-        </div>
-
-        <div className="calendar-location-weather__stats">
-          <article>
-            <span>Sicaklik</span>
-            <strong>{locationState.current.temp}</strong>
-          </article>
-          <article>
-            <span>Ruzgar</span>
-            <strong>{locationState.current.wind}</strong>
-          </article>
-          <article>
-            <span>{formatRelativeLabel(selectedDay?.date ?? new Date())}</span>
-            <strong>{selectedWeather.highLow ?? "-"}</strong>
-          </article>
-        </div>
-      </div>
-    );
   }
 
   function renderEventCard(event) {
@@ -934,7 +590,6 @@ export default function CalendarPage() {
   }
 
   const selectedDay = monthGrid.find((day) => day.key === selectedDateKey) ?? monthGrid.find((day) => day.isToday) ?? monthGrid[0];
-  const selectedWeather = selectedDay?.weather ?? getWeatherSnapshot(new Date(), locationState.forecastByDay);
   const selectedEvents = selectedDay?.events ?? [];
   const focusGridIndex = monthGrid.findIndex((day) => day.key === selectedDay?.key);
   const monthGridRows = Math.max(1, Math.ceil(monthGrid.length / 7));
@@ -965,7 +620,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <main className="shell">
+    <main className="shell shell--calendar">
       {loading ? (
         <section className="calendar-week-section">
           <article className="calendar-day-panel">Yukleniyor...</article>
@@ -984,19 +639,9 @@ export default function CalendarPage() {
                       <div className="calendar-entry__zoom-blackout" style={monthBlackoutStyle} aria-hidden="true" />
                       <div className="calendar-month-panel__header">
                         <div>
-                          <p className="status-card__eyebrow">Aylik Takvim</p>
                           <h1>{formatMonthTitle(new Date())}</h1>
                           <p className="calendar-month-panel__subhead">{formatDayHeader(selectedDay?.date ?? new Date())}</p>
                         </div>
-                        <div className="calendar-month-panel__summary">
-                          <span>{dashboard.upcoming_events.length} planli etkinlik</span>
-                          <span>{dashboard.pending_reminders.length} aktif reminder</span>
-                        </div>
-                      </div>
-
-                      <div className="calendar-entry__lead">
-                        <span className="calendar-entry__lead-label">Secili Gunun Odagi</span>
-                        <strong>{selectedWeather.label ?? "Takvim"} · {selectedWeather.temp ?? "-"}</strong>
                       </div>
 
                       <div className="calendar-month-panel__weekdays" aria-hidden="true">
@@ -1026,10 +671,6 @@ export default function CalendarPage() {
                                   day.events.length ? `${day.events.length} plan` : "plan yok"
                                 }`}
                               >
-                                <span className="calendar-month-day__weather">
-                                  <WeatherIcon code={day.weather.code} className="weather-icon--tiny" />
-                                  {day.weather.temp}
-                                </span>
                                 <span className="calendar-month-day__number">{day.date.getDate()}</span>
                                 {day.events.length ? (
                                   <span
@@ -1055,18 +696,7 @@ export default function CalendarPage() {
                             <p className="status-card__eyebrow">Secili Gunun Yapilacaklari</p>
                             <h2>{formatDayHeader(selectedDay?.date ?? new Date())}</h2>
                           </div>
-                          <div className="calendar-entry__today-weather">
-                            <WeatherIcon
-                              code={selectedWeather.code ?? 0}
-                              className="weather-icon--small"
-                            />
-                            <strong>{selectedWeather.temp ?? "-"}</strong>
-                          </div>
-                        </div>
-
-                        <div className="calendar-entry__today-kicker">
-                          <span>Secili Gunun Programi</span>
-                          <strong>{selectedEvents.length} kayit</strong>
+                          <strong className="calendar-entry__today-count">{selectedEvents.length} kayit</strong>
                         </div>
 
                         {selectedEvents.length ? (
@@ -1091,7 +721,6 @@ export default function CalendarPage() {
               <div className="accounts-panel__header">
                 <div>
                   <p className="status-card__eyebrow">1 Haftalik Program</p>
-                  <p className="accounts-panel__meta">Dun, bugun ve sonraki 5 gun</p>
                 </div>
               </div>
 
@@ -1117,13 +746,6 @@ export default function CalendarPage() {
                         ) : null}
                       </div>
                       <div className="calendar-day-panel__summary">
-                        <div className="calendar-day-panel__weather">
-                          <WeatherIcon code={day.weather.code} className="weather-icon--small" />
-                          <div className="calendar-day-panel__weather-copy">
-                            <span>{day.weather.short}</span>
-                            <small>{day.weather.highLow}</small>
-                          </div>
-                        </div>
                         <strong className="calendar-day-panel__count">{day.events.length} plan</strong>
                       </div>
                     </button>
@@ -1143,34 +765,6 @@ export default function CalendarPage() {
                 ))}
               </div>
             </section>
-          </section>
-
-          <section className="calendar-location-panel">
-            <div className="accounts-panel__header">
-              <div>
-                <p className="status-card__eyebrow">Secili Gunun Havasi</p>
-                <p className="accounts-panel__meta">
-                  {selectedWeather.label ?? "Durum"} · {selectedWeather.temp ?? "-"}
-                </p>
-              </div>
-            </div>
-
-            <div className="calendar-location-panel__grid">
-              {renderLocationPanel()}
-              <article className="calendar-location-map">
-                <p className="calendar-alert-card__eyebrow">Harita</p>
-                {locationState.mapUrl ? (
-                  <iframe
-                    className="calendar-location-map__frame"
-                    src={locationState.mapUrl}
-                    loading="lazy"
-                    title="Mevcut konum haritasi"
-                  />
-                ) : (
-                  <p className="muted-text">Konum izin verdiginde burada harita acilir.</p>
-                )}
-              </article>
-            </div>
           </section>
 
         </>

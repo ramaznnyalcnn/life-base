@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     app_api_token: str = Field(default="", alias="APP_API_TOKEN")
     default_owner_email: str = Field(default="owner@lifeos.local", alias="DEFAULT_OWNER_EMAIL")
     default_owner_name: str = Field(default="Life OS Owner", alias="DEFAULT_OWNER_NAME")
+    default_owner_password: str = Field(default="", alias="DEFAULT_OWNER_PASSWORD")
 
     database_url: str = Field(
         default="postgresql+psycopg://lifeos:lifeos@localhost:5432/lifeos",
