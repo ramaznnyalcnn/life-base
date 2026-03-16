@@ -32,7 +32,14 @@ def test_deploy_scripts_exist():
 def test_container_artifacts_exist():
     dockerfile = (REPO_ROOT / "backend" / "Dockerfile").read_text()
     compose_file = (REPO_ROOT / "infra" / "compose" / "backend-stack.yml").read_text()
+    prod_compose_file = (REPO_ROOT / "infra" / "compose" / "prod-stack.yml").read_text()
+    frontend_dockerfile = (REPO_ROOT / "frontend" / "Dockerfile").read_text()
+    frontend_nginx = (REPO_ROOT / "frontend" / "nginx.conf").read_text()
 
     assert "python:3.12-slim" in dockerfile
     assert "run_reminder_worker" in compose_file
     assert "postgres:16" in compose_file
+    assert "nginx:1.27-alpine" in frontend_dockerfile
+    assert "proxy_pass http://lifeos_api" in frontend_nginx
+    assert "service_completed_successfully" in prod_compose_file
+    assert "VITE_API_BASE_URL" in prod_compose_file
