@@ -4,6 +4,46 @@ import { clearStoredSession, getStoredAccessToken } from "../auth/session";
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
+function formatErrorDetail(detail) {
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const firstMessage = detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+        if (item && typeof item === "object") {
+          if (typeof item.msg === "string" && item.msg.trim()) {
+            return item.msg;
+          }
+          if (typeof item.message === "string" && item.message.trim()) {
+            return item.message;
+          }
+        }
+        return "";
+      })
+      .find(Boolean);
+
+    if (firstMessage) {
+      return firstMessage;
+    }
+  }
+
+  if (detail && typeof detail === "object") {
+    if (typeof detail.msg === "string" && detail.msg.trim()) {
+      return detail.msg;
+    }
+    if (typeof detail.message === "string" && detail.message.trim()) {
+      return detail.message;
+    }
+  }
+
+  return "";
+}
+
 export async function apiRequest(path, options = {}) {
   const accessToken = getStoredAccessToken();
   let response;
@@ -34,12 +74,13 @@ export async function apiRequest(path, options = {}) {
     if (response.status === 401 && accessToken) {
       clearStoredSession();
     }
-    const detail =
-      payload?.detail ??
+    const detail = formatErrorDetail(payload?.detail);
+    const message =
+      detail ||
       (response.status >= 500
         ? "Sunucu hatasi olustu. Backend logunu ve migration durumunu kontrol edin."
         : "Beklenmeyen bir hata olustu.");
-    throw new Error(detail);
+    throw new Error(message);
   }
 
   return payload;

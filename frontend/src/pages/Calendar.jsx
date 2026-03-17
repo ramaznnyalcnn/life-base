@@ -558,22 +558,25 @@ export default function CalendarPage() {
     );
   }
 
-  function renderTodaySpotlight(event) {
+  function renderTodayPlan(event) {
     const detail = getDisplayDescription(event);
 
     return (
-      <article className="calendar-entry__spotlight-card" key={`today-${event.id}`}>
-        <div className="calendar-entry__spotlight-time">
+      <article className="calendar-today-plan" key={`today-${event.id}`}>
+        <div className="calendar-today-plan__time">
           <span>{formatEventTimeLabel(event)}</span>
           <strong>
             {event.is_all_day
               ? formatDateWithoutTime(event.starts_at)
-              : new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(new Date(event.starts_at))}
+              : new Intl.DateTimeFormat("tr-TR", {
+                hour: "2-digit",
+                minute: "2-digit"
+              }).format(new Date(event.starts_at))}
           </strong>
         </div>
 
-        <div className="calendar-entry__spotlight-body">
-          <div className="calendar-entry__spotlight-header">
+        <div className="calendar-today-plan__body">
+          <div className="calendar-today-plan__header">
             <strong>{event.title}</strong>
             <span
               className={`calendar-agenda-card__pill ${
@@ -590,7 +593,8 @@ export default function CalendarPage() {
   }
 
   const selectedDay = monthGrid.find((day) => day.key === selectedDateKey) ?? monthGrid.find((day) => day.isToday) ?? monthGrid[0];
-  const selectedEvents = selectedDay?.events ?? [];
+  const todayEvents = eventsByDay.get(toDateKey(new Date())) ?? [];
+  const weeklyPlanCount = agendaDays.reduce((total, day) => total + day.events.length, 0);
   const focusGridIndex = monthGrid.findIndex((day) => day.key === selectedDay?.key);
   const monthGridRows = Math.max(1, Math.ceil(monthGrid.length / 7));
   const focusGridColumn = focusGridIndex >= 0 ? focusGridIndex % 7 : 3;
@@ -598,25 +602,27 @@ export default function CalendarPage() {
   const focusOriginX = ((focusGridColumn + 0.5) / 7) * 100;
   const focusOriginY = ((focusGridRow + 0.5) / monthGridRows) * 100;
   const entryZoomProgress = Math.min(1, entryProgress / 0.92);
-  const zoomBlackoutProgress = Math.min(1, Math.max(0, (entryZoomProgress - 0.22) / 0.58));
+  const entryFadeProgress = Math.min(1, Math.max(0, (entryZoomProgress - 0.08) / 0.44));
+  const weekRevealProgress = Math.min(1, Math.max(0, (weekEntryProgress - 0.38) / 0.62));
   const entrySceneStyle = {
-    transform: `translateY(${entryZoomProgress * -42}px) scale(${1 - entryZoomProgress * 0.04})`,
-    opacity: Math.max(0.05, 1 - entryZoomProgress * 0.95)
+    transform: `translateY(${entryFadeProgress * -12}px) scale(${1 - entryFadeProgress * 0.012})`,
+    opacity: Math.max(0, 1 - entryFadeProgress),
+    filter: `saturate(${1 - entryFadeProgress * 0.08})`
   };
   const calendarCameraStyle = {
     transformOrigin: `${focusOriginX}% ${focusOriginY}%`,
-    transform: `translateY(${entryZoomProgress * 72}px) scale(${1 + entryZoomProgress * 4.4})`
+    transform: `translateY(${entryFadeProgress * 12}px) scale(${1 + entryFadeProgress * 0.08})`
   };
   const monthGridStyle = {
     transformOrigin: `${focusOriginX}% ${focusOriginY}%`,
-    transform: `scale(${1 + entryZoomProgress * 0.12})`
+    transform: `scale(${1 + entryFadeProgress * 0.012})`
   };
   const monthBlackoutStyle = {
-    opacity: Math.min(1, 0.06 + zoomBlackoutProgress * 0.94)
+    opacity: 0
   };
   const weekShellStyle = {
-    opacity: Math.min(1, 0.08 + weekEntryProgress * 0.92),
-    transform: `translateY(${132 - weekEntryProgress * 132}px) scale(${0.78 + weekEntryProgress * 0.22})`
+    opacity: weekRevealProgress,
+    transform: `translateY(${72 - weekRevealProgress * 72}px) scale(${0.985 + weekRevealProgress * 0.015})`
   };
 
   return (
@@ -637,20 +643,17 @@ export default function CalendarPage() {
                   <section className="calendar-month-panel">
                     <div className="calendar-month-panel__content">
                       <div className="calendar-entry__zoom-blackout" style={monthBlackoutStyle} aria-hidden="true" />
-                      <div className="calendar-month-panel__header">
-                        <div>
-                          <h1>{formatMonthTitle(new Date())}</h1>
-                          <p className="calendar-month-panel__subhead">{formatDayHeader(selectedDay?.date ?? new Date())}</p>
-                        </div>
-                      </div>
-
                       <div className="calendar-month-panel__weekdays" aria-hidden="true">
                         {["Pzt", "Sal", "Car", "Per", "Cum", "Cmt", "Paz"].map((label) => (
                           <span key={label}>{label}</span>
                         ))}
                       </div>
 
-                      <div className="calendar-month-grid-frame">
+                      <div
+                        className="calendar-month-grid-frame"
+                        role="group"
+                        aria-label={`${formatMonthTitle(new Date())} takvimi`}
+                      >
                         <div className="calendar-month-grid-camera" style={calendarCameraStyle}>
                           <div className="calendar-month-grid" style={monthGridStyle}>
                             {monthGrid.map((day) => (
@@ -688,28 +691,25 @@ export default function CalendarPage() {
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <section className="calendar-entry__today-block">
-                      <article className="calendar-entry__today-shell">
-                        <div className="calendar-entry__today-header">
+
+                      <section className="calendar-today-panel" aria-label="Bugunun Programi">
+                        <div className="calendar-today-panel__header">
                           <div>
-                            <p className="status-card__eyebrow">Secili Gunun Yapilacaklari</p>
-                            <h2>{formatDayHeader(selectedDay?.date ?? new Date())}</h2>
+                            <p className="status-card__eyebrow">Bugunun Programi</p>
+                            <h2>{formatDayHeader(new Date())}</h2>
                           </div>
-                          <strong className="calendar-entry__today-count">{selectedEvents.length} kayit</strong>
+                          <strong className="calendar-today-panel__count">{todayEvents.length} plan</strong>
                         </div>
 
-                        {selectedEvents.length ? (
-                          <div className="calendar-entry__today-list">
-                            {selectedEvents.map((event) => renderTodaySpotlight(event))}
+                        {todayEvents.length ? (
+                          <div className="calendar-today-panel__list">
+                            {todayEvents.map((event) => renderTodayPlan(event))}
                           </div>
                         ) : (
-                          <div className="calendar-entry__today-empty">
-                            <strong>Secili gun icin plan yok</strong>
-                          </div>
+                          <p className="calendar-today-panel__empty">Bugun icin plan yok.</p>
                         )}
-                      </article>
-                    </section>
+                      </section>
+                    </div>
                   </section>
                 </div>
               </div>
@@ -718,10 +718,15 @@ export default function CalendarPage() {
 
           <section className="calendar-week-shell" ref={weekStageRef} style={weekShellStyle}>
             <section className="calendar-week-section">
-              <div className="accounts-panel__header">
+              <div className="calendar-week-section__header">
                 <div>
                   <p className="status-card__eyebrow">1 Haftalik Program</p>
+                  <h2>Yaklasan gunlerdeki akis</h2>
+                  <p className="calendar-week-section__subhead">
+                    Takvim secimini kaybetmeden, haftalik plana akici bir gecisle iniyorsun.
+                  </p>
                 </div>
+                <strong className="calendar-week-section__badge">{weeklyPlanCount} plan</strong>
               </div>
 
               <div className="calendar-day-stack">
