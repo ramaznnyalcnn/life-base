@@ -91,4 +91,22 @@ describe("api client", () => {
     await expect(apiRequest("/events")).rejects.toThrow("Kimlik dogrulamasi gerekiyor.");
     expect(clearStoredSession).toHaveBeenCalled();
   });
+
+  it("formats validation error arrays instead of showing object payloads", async () => {
+    fetch.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        detail: [
+          {
+            type: "value_error",
+            loc: ["body", "email"],
+            msg: "Gecerli bir e-posta girin."
+          }
+        ]
+      })
+    });
+
+    await expect(apiRequest("/auth/login")).rejects.toThrow("Gecerli bir e-posta girin.");
+  });
 });

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { createAccount, fetchAccounts, updateAccount } from "../api/accounts";
-import { fetchWalletSummary } from "../api/wallet";
+import { fetchCardStatements, fetchWalletSummary } from "../api/wallet";
+import CreditCard from "../components/CreditCard";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("tr-TR", {
@@ -9,6 +10,13 @@ function formatMoney(value) {
     currency: "TRY",
     maximumFractionDigits: 2
   }).format(Number(value ?? 0));
+}
+
+function formatShortDate(value) {
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "short"
+  }).format(new Date(value));
 }
 
 const INITIAL_FORM = {
@@ -50,6 +58,7 @@ function getAccountTypeLabel(type) {
 export default function ManagePage() {
   const [accounts, setAccounts] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [statements, setStatements] = useState([]);
   const [form, setForm] = useState(INITIAL_FORM);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,12 +70,14 @@ export default function ManagePage() {
     setError("");
 
     try {
-      const [accountsPayload, summaryPayload] = await Promise.all([
+      const [accountsPayload, summaryPayload, statementPayload] = await Promise.all([
         fetchAccounts(),
-        fetchWalletSummary()
+        fetchWalletSummary(),
+        fetchCardStatements()
       ]);
       setAccounts(accountsPayload);
       setSummary(summaryPayload);
+      setStatements(statementPayload);
     } catch (nextError) {
       setError(nextError.message);
     } finally {
@@ -142,6 +153,35 @@ export default function ManagePage() {
     }
   }
 
+  const creditAccounts = accounts.filter((account) => account.type === "credit_card");
+  const totalAvailableCredit = creditAccounts.reduce(
+    (total, account) => total + Number(account.available_credit ?? account.balance ?? 0),
+    0
+  );
+  const totalCardLimit = creditAccounts.reduce(
+    (total, account) => total + Number(account.credit_limit ?? 0),
+    0
+  );
+  const totalCardUsed = creditAccounts.reduce((total, account) => {
+    const available = Number(account.available_credit ?? account.balance ?? 0);
+    const limit = Number(account.credit_limit ?? 0);
+    return total + Number(account.used_credit ?? Math.max(limit - available, 0));
+  }, 0);
+  const statementTotal = statements.reduce(
+    (total, statement) => total + Number(statement.statement_amount ?? 0),
+    0
+  );
+  const monthlyPayments = statements.reduce(
+    (total, statement) => total + Number(statement.payment_activity ?? 0),
+    0
+  );
+  const urgentStatement =
+    [...statements]
+      .filter((statement) => statement.due_date)
+      .sort((left, right) => new Date(left.due_date).getTime() - new Date(right.due_date).getTime())[0] ??
+    null;
+  const statementByAccountId = new Map(statements.map((statement) => [statement.account_id, statement]));
+
   return (
     <main className="shell">
       <section className="hero-panel manage-hero-panel">
@@ -173,6 +213,109 @@ export default function ManagePage() {
           </article>
         </section>
       ) : null}
+
+      <section className="wallet-asset-stage manage-card-insights">
+        <div className="wallet-asset-stage__header">
+          <div>
+            <p className="status-card__eyebrow">Kart Yonetimi</p>
+            <h2>Kart odemeleri ve ekstre durumu</h2>
+          </div>
+          <span className="manage-section-header__badge">{creditAccounts.length} aktif kart</span>
+        </div>
+
+        <div className="wallet-snapshot-grid wallet-snapshot-grid--manage">
+          <article className="wallet-snapshot-card">
+            <p className="wallet-snapshot-card__label">Kart Odemeleri</p>
+            <strong>{formatMoney(monthlyPayments)}</strong>
+            <span>Kart odemeleri ana sayfadan alindi ve buraya tasindi.</span>
+          </article>
+          <article className="wallet-snapshot-card">
+            <p className="wallet-snapshot-card__label">Ekstrede</p>
+            <strong>{formatMoney(statementTotal)}</strong>
+            <span>Acik ekstre tutari toplami.</span>
+          </article>
+          <article className="wallet-snapshot-card">
+            <p className="wallet-snapshot-card__label">Kullanilabilir Limit</p>
+            <strong>{formatMoney(totalAvailableCredit)}</strong>
+            <span>
+              Toplam limit {formatMoney(totalCardLimit)} / Kart borcu {formatMoney(totalCardUsed)}
+            </span>
+          </article>
+          <article className="wallet-snapshot-card">
+            <p className="wallet-snapshot-card__label">Yaklasan Odeme</p>
+            <strong>{urgentStatement?.account_name ?? "Planlanan odeme yok"}</strong>
+            <span>
+              {urgentStatement
+                ? `${urgentStatement.due_date ? formatShortDate(urgentStatement.due_date) : "-"} tarihinde ${formatMoney(urgentStatement.statement_amount)}`
+                : "Aktif ekstre geldikce burada gorunur."}
+            </span>
+          </article>
+        </div>
+
+        <div className="account-list manage-card-insights__list">
+          {statements.length ? (
+            statements.map((statement) => (
+              <article className="account-card manage-account-card" key={statement.account_id}>
+                <div className="account-card__header">
+                  <div>
+                    <div className="manage-account-card__eyebrow-row">
+                      <span className="manage-account-card__type">Ekstre</span>
+                      <span className="manage-account-card__state manage-account-card__state--active">
+                        {statement.due_date ? `Son odeme ${formatShortDate(statement.due_date)}` : "Tarih yok"}
+                      </span>
+                    </div>
+                    <h3>{statement.account_name}</h3>
+                    <p>
+                      Donem {formatShortDate(statement.period_start)} - {formatShortDate(statement.period_end)}
+                    </p>
+                  </div>
+                  <strong>{formatMoney(statement.statement_amount)}</strong>
+                </div>
+                <div className="account-card__meta">
+                  <span>Odeme {formatMoney(statement.payment_activity)}</span>
+                  <span>Reset {formatShortDate(statement.auto_resets_at)}</span>
+                  <span>{statement.transaction_count} islem</span>
+                </div>
+              </article>
+            ))
+          ) : (
+            <article className="wallet-snapshot-card manage-card-insights__empty">
+              <p className="wallet-snapshot-card__label">Ekstre yok</p>
+              <strong>Aktif kredi karti ekstresi bulunmuyor.</strong>
+              <span>Kart ekledikce odeme ve donem bilgileri burada listelenecek.</span>
+            </article>
+          )}
+        </div>
+      </section>
+
+      <section className="wallet-asset-stage manage-card-details">
+        <div className="wallet-asset-stage__header">
+          <div>
+            <p className="status-card__eyebrow">Kart Bilgileri</p>
+            <h2>Detayli kart gorunumu ve hizli duzenleme</h2>
+          </div>
+          <span className="manage-section-header__badge">{creditAccounts.length} kart</span>
+        </div>
+
+        {creditAccounts.length ? (
+          <div className="credit-card-list manage-card-details__list">
+            {creditAccounts.map((account) => (
+              <CreditCard
+                key={account.id}
+                account={account}
+                statement={statementByAccountId.get(account.id) ?? null}
+                onEdit={startEditing}
+              />
+            ))}
+          </div>
+        ) : (
+          <article className="wallet-snapshot-card manage-card-insights__empty">
+            <p className="wallet-snapshot-card__label">Kart yok</p>
+            <strong>Detayli kart gorunumu icin once kart ekle.</strong>
+            <span>Kart eklediginde limit, ekstre ve odeme bilgileri burada acilacak.</span>
+          </article>
+        )}
+      </section>
 
       <section className="manage-layout">
         <section className="compose-panel manage-compose-panel">

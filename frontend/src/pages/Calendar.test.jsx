@@ -79,13 +79,16 @@ describe("CalendarPage", () => {
     const user = userEvent.setup();
     render(<CalendarPage />);
 
-    expect(await screen.findByRole("heading", { name: new Intl.DateTimeFormat("tr-TR", {
-      month: "long",
-      year: "numeric"
-    }).format(new Date()) })).toBeInTheDocument();
+    expect(await screen.findByRole("group", {
+      name: `${new Intl.DateTimeFormat("tr-TR", {
+        month: "long",
+        year: "numeric"
+      }).format(new Date())} takvimi`
+    })).toBeInTheDocument();
+    expect(screen.getByText("Bugunun Programi")).toBeInTheDocument();
     expect(screen.getByText("1 Haftalik Program")).toBeInTheDocument();
     expect(screen.queryByText("Aylik Takvim")).not.toBeInTheDocument();
-    expect(screen.queryByText("Secili Gunun Havasi")).not.toBeInTheDocument();
+    expect(screen.queryByText("Secili Gunun Yapilacaklari")).not.toBeInTheDocument();
 
     expect(screen.getAllByText("Disci Randevusu").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("button", { name: "Tamamla" }).length).toBeGreaterThanOrEqual(1);
@@ -153,8 +156,10 @@ describe("CalendarPage", () => {
     const user = userEvent.setup();
     render(<CalendarPage />);
 
-    expect(await screen.findByText("Secili Gunun Yapilacaklari")).toBeInTheDocument();
+    await screen.findByText("1 Haftalik Program");
+    expect(screen.getByText("Bugunun Programi")).toBeInTheDocument();
     expect(screen.getAllByText("Bugunku Plan").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Cuma Aksam Yemegi")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: monthButtonLabel(3, 1) }));
 

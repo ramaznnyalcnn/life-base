@@ -10,11 +10,12 @@ vi.mock("../api/accounts", () => ({
 }));
 
 vi.mock("../api/wallet", () => ({
-  fetchWalletSummary: vi.fn()
+  fetchWalletSummary: vi.fn(),
+  fetchCardStatements: vi.fn()
 }));
 
 import { createAccount, fetchAccounts, updateAccount } from "../api/accounts";
-import { fetchWalletSummary } from "../api/wallet";
+import { fetchCardStatements, fetchWalletSummary } from "../api/wallet";
 
 describe("ManagePage", () => {
   beforeEach(() => {
@@ -24,6 +25,19 @@ describe("ManagePage", () => {
       total_card_used: "4000.00",
       net_worth: "8000.00"
     });
+    fetchCardStatements.mockResolvedValue([
+      {
+        account_id: 1,
+        account_name: "Akbank Platinum",
+        period_start: "2026-02-21",
+        period_end: "2026-03-20",
+        due_date: "2026-04-05",
+        auto_resets_at: "2026-03-21T00:00:00+00:00",
+        statement_amount: "2500.00",
+        payment_activity: "500.00",
+        transaction_count: 3
+      }
+    ]);
     fetchAccounts.mockResolvedValue([
       {
         id: 1,
@@ -44,8 +58,12 @@ describe("ManagePage", () => {
     render(<ManagePage />);
 
     expect(await screen.findByText("Likit Para")).toBeInTheDocument();
+    expect(screen.getByText("Kart Odemeleri")).toBeInTheDocument();
+    expect(screen.getByText("Yaklasan Odeme")).toBeInTheDocument();
+    expect(screen.getAllByText("Kart Bilgileri").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: "Ayar" })).toBeInTheDocument();
     expect(screen.getByText("Hesaplar ve Kartlar")).toBeInTheDocument();
-    expect(screen.getByText("Akbank Platinum")).toBeInTheDocument();
+    expect(screen.getAllByText("Akbank Platinum").length).toBeGreaterThanOrEqual(1);
   });
 
   it("creates a new account", async () => {
