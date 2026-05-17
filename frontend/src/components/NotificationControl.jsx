@@ -84,7 +84,7 @@ export default function NotificationControl() {
       setStatus("working");
       setMessage("Test bildirimi gonderiliyor...");
       const result = await sendTestNotification({
-        title: "Life OS Test",
+        title: "life-base Test",
         body: "Bildirim hatti calisiyor.",
         url: "/"
       });

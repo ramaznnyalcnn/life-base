@@ -1,0 +1,44 @@
+- generic [active] [ref=e1] [box=0,0,1440,1463]:
+  - banner [ref=e2] [box=0,0,1440,74]:
+    - generic [ref=e3] [box=34,15,288,43]:
+      - generic [ref=e4] [box=34,16,42,42]: V
+      - generic [ref=e5] [box=88,15,234,43]:
+        - heading "Vintage Film Lab" [level=1] [ref=e6] [box=88,15,234,24]
+        - paragraph [ref=e7] [box=88,42,234,16]: Normal photos into finished film looks
+    - generic [ref=e8] [box=1276,18,130,38]:
+      - generic [ref=e9] [box=1287,27,21,20]: "23"
+      - generic [ref=e10] [box=1314,27,81,20]: references
+  - main [ref=e11] [box=10,74,1420,1389]:
+    - region "Editing controls" [ref=e12] [box=38,102,430,1333]:
+      - generic [ref=e13] [box=38,102,430,186]:
+        - generic [ref=e14] [box=57,121,34,34]: +
+        - strong [ref=e15] [box=57,165,392,20]: Drop photo here
+        - paragraph [ref=e16] [box=57,199,392,16]: Camera or gallery image
+        - generic [ref=e17] [box=57,227,392,42]
+      - generic [ref=e20] [box=38,300,430,711]:
+        - generic [ref=e21] [box=55,317,396,19]
+        - paragraph [ref=e24] [box=55,342,396,20]: Sun-worn warm fade with light film wear.
+        - generic [ref=e25] [box=55,374,396,620]
+      - generic [ref=e74] [box=38,1023,430,249]:
+        - generic [ref=e75] [box=55,1040,396,48]
+        - generic [ref=e80] [box=55,1102,396,97]
+        - button "Develop Film" [disabled] [ref=e90] [box=55,1213,396,42]
+      - group [ref=e91] [box=38,1284,430,59]:
+        - generic "Watermark" [ref=e92] [cursor=pointer] [box=55,1301,396,25]
+        - option "Bottom right" [selected] [box=0,0,0,0]
+        - option "Bottom left" [box=0,0,0,0]
+        - option "Top right" [box=0,0,0,0]
+        - option "Top left" [box=0,0,0,0]
+        - option "Bottom center" [box=0,0,0,0]
+      - generic [ref=e93] [box=38,1355,430,80]:
+        - generic [ref=e94] [box=55,1372,203,46]
+        - button "Build" [ref=e97] [cursor=pointer] [box=359,1374,92,42]
+    - region "Photo preview" [ref=e98] [box=494,102,908,1333]:
+      - generic [ref=e99] [box=494,102,908,72]:
+        - generic [ref=e100] [box=509,128,194,20]
+        - generic [ref=e102] [box=1140,117,247,42]
+      - generic [ref=e108] [box=857,748,182,20]: Upload a photo to begin
+      - generic [ref=e109] [box=494,1343,908,92]:
+        - generic [ref=e110] [box=509,1358,230,62]
+        - generic [ref=e113] [cursor=pointer] [box=751,1381,161,16]
+        - generic [ref=e116] [box=924,1368,463,42]

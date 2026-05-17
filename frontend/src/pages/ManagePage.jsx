@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { createAccount, fetchAccounts, updateAccount } from "../api/accounts";
 import { fetchCardStatements, fetchWalletSummary } from "../api/wallet";
 import CreditCard from "../components/CreditCard";
+import "../styles/manage.css";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("tr-TR", {
@@ -46,12 +47,8 @@ function normalizePayload(form) {
 }
 
 function getAccountTypeLabel(type) {
-  if (type === "credit_card") {
-    return "Kredi Karti";
-  }
-  if (type === "bank") {
-    return "Banka";
-  }
+  if (type === "credit_card") return "Kredi Karti";
+  if (type === "bank") return "Banka";
   return "Nakit";
 }
 
@@ -64,6 +61,17 @@ export default function ManagePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [showCompose, setShowCompose] = useState(false);
+  const [cardDragOffset, setCardDragOffset] = useState(0);
+  const dragOffsetRef = useRef(0);
+  const swipeStateRef = useRef({
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    isActive: false,
+    isHorizontal: false
+  });
 
   async function loadData() {
     setLoading(true);
@@ -97,6 +105,7 @@ export default function ManagePage() {
   }
 
   function startEditing(account) {
+    setShowCompose(true);
     setEditingId(account.id);
     setForm({
       name: account.name,
@@ -109,11 +118,16 @@ export default function ManagePage() {
       issuer: account.issuer ?? "",
       is_active: account.is_active
     });
+    // Scroll to form smoothly
+    setTimeout(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }, 100);
   }
 
   function resetForm() {
     setEditingId(null);
     setForm(INITIAL_FORM);
+    setShowCompose(false);
   }
 
   async function handleSubmit(event) {
@@ -152,340 +166,430 @@ export default function ManagePage() {
       setSaving(false);
     }
   }
-
+  
   const creditAccounts = accounts.filter((account) => account.type === "credit_card");
-  const totalAvailableCredit = creditAccounts.reduce(
-    (total, account) => total + Number(account.available_credit ?? account.balance ?? 0),
-    0
-  );
-  const totalCardLimit = creditAccounts.reduce(
-    (total, account) => total + Number(account.credit_limit ?? 0),
-    0
-  );
-  const totalCardUsed = creditAccounts.reduce((total, account) => {
-    const available = Number(account.available_credit ?? account.balance ?? 0);
-    const limit = Number(account.credit_limit ?? 0);
-    return total + Number(account.used_credit ?? Math.max(limit - available, 0));
-  }, 0);
-  const statementTotal = statements.reduce(
-    (total, statement) => total + Number(statement.statement_amount ?? 0),
-    0
-  );
-  const monthlyPayments = statements.reduce(
-    (total, statement) => total + Number(statement.payment_activity ?? 0),
-    0
-  );
-  const urgentStatement =
-    [...statements]
-      .filter((statement) => statement.due_date)
-      .sort((left, right) => new Date(left.due_date).getTime() - new Date(right.due_date).getTime())[0] ??
-    null;
+  const otherAccounts = accounts.filter((account) => account.type !== "credit_card");
   const statementByAccountId = new Map(statements.map((statement) => [statement.account_id, statement]));
+  
+  const activeCard = creditAccounts[activeCardIndex];
+  const activeStatement = activeCard ? statementByAccountId.get(activeCard.id) : null;
+
+  useEffect(() => {
+    if (!creditAccounts.length) {
+      setActiveCardIndex(0);
+      setCardDragOffset(0);
+      return;
+    }
+
+    if (activeCardIndex > creditAccounts.length - 1) {
+      setActiveCardIndex(creditAccounts.length - 1);
+    }
+  }, [activeCardIndex, creditAccounts.length]);
+
+  function selectCard(index) {
+    if (index < 0 || index >= creditAccounts.length) {
+      return;
+    }
+
+    setActiveCardIndex(index);
+  }
+
+  function resetSwipe() {
+    dragOffsetRef.current = 0;
+    swipeStateRef.current = {
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+      isActive: false,
+      isHorizontal: false
+    };
+    setCardDragOffset(0);
+  }
+
+  function startSwipeGesture(pointerId, clientX, clientY) {
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+      return;
+    }
+
+    swipeStateRef.current = {
+      pointerId,
+      startX: clientX,
+      startY: clientY,
+      isActive: true,
+      isHorizontal: false
+    };
+  }
+
+  function moveSwipeGesture(clientX, clientY, preventDefault) {
+    const swipeState = swipeStateRef.current;
+
+    if (!swipeState.isActive || !Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+      return;
+    }
+
+    const deltaX = clientX - swipeState.startX;
+    const deltaY = clientY - swipeState.startY;
+
+    if (!swipeState.isHorizontal) {
+      if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+        return;
+      }
+
+      if (Math.abs(deltaX) <= Math.abs(deltaY)) {
+        resetSwipe();
+        return;
+      }
+
+      swipeStateRef.current = {
+        ...swipeState,
+        isHorizontal: true
+      };
+    }
+
+    preventDefault?.();
+
+    const nextOffset = Math.max(-96, Math.min(96, deltaX));
+    dragOffsetRef.current = nextOffset;
+    setCardDragOffset(nextOffset);
+  }
+
+  function completeSwipeGesture() {
+    const swipeState = swipeStateRef.current;
+    const nextOffset = swipeState.isHorizontal ? dragOffsetRef.current : 0;
+
+    if (nextOffset <= -52) {
+      selectCard(activeCardIndex + 1);
+    } else if (nextOffset >= 52) {
+      selectCard(activeCardIndex - 1);
+    }
+
+    resetSwipe();
+  }
+
+  function handleCardPointerDown(event) {
+    if (creditAccounts.length <= 1) {
+      return;
+    }
+
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest("button, input, select, textarea, a, label")) {
+      return;
+    }
+
+    startSwipeGesture(event.pointerId, event.clientX, event.clientY);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function handleCardPointerMove(event) {
+    const swipeState = swipeStateRef.current;
+
+    if (!swipeState.isActive || swipeState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    moveSwipeGesture(event.clientX, event.clientY, () => event.preventDefault());
+  }
+
+  function handleCardPointerEnd(event) {
+    const swipeState = swipeStateRef.current;
+
+    if (!swipeState.isActive || swipeState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    completeSwipeGesture();
+  }
+
+  function handleCardPointerCancel(event) {
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    resetSwipe();
+  }
+
+  function handleCardTouchStart(event) {
+    if (creditAccounts.length <= 1) {
+      return;
+    }
+
+    if (event.target.closest("button, input, select, textarea, a, label")) {
+      return;
+    }
+
+    const touch = event.touches[0];
+
+    if (!touch) {
+      return;
+    }
+
+    startSwipeGesture("touch", touch.clientX, touch.clientY);
+  }
+
+  function handleCardTouchMove(event) {
+    const touch = event.touches[0];
+
+    if (!touch) {
+      return;
+    }
+
+    moveSwipeGesture(touch.clientX, touch.clientY, () => event.preventDefault());
+  }
+
+  function handleCardTouchEnd() {
+    completeSwipeGesture();
+  }
 
   return (
-    <main className="shell">
-      <section className="hero-panel manage-hero-panel">
-        <div className="hero-panel__copy">
-          <p className="hero-panel__eyebrow">Yonetim</p>
-          <h1>Hesap ve kart yonetimi</h1>
-          <p className="hero-panel__text">
-            Hesap ekle, kart ayarlarini duzenle ve aktif durumunu buradan yonet.
-          </p>
+    <main className="shell shell--wallet">
+      {/* Wallet Global Header */}
+      <div className="manage-glass-header">
+        <div className="manage-glass-header__copy">
+          <p className="manage-glass-header__eyebrow">Cuzdanim</p>
+          <h1 className="manage-glass-header__title">{summary ? formatMoney(summary.net_worth) : "---"}</h1>
         </div>
-      </section>
+        <div className="manage-glass-header__actions">
+          <button className="manage-fab-button" onClick={() => { setShowCompose(true); setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100); }}>
+            +
+          </button>
+        </div>
+      </div>
 
-      {loading ? <section className="wallet-grid"><article className="metric-card">Yukleniyor...</article></section> : null}
+      {loading && !accounts.length ? <section className="wallet-grid"><article className="metric-card">Yukleniyor...</article></section> : null}
       {error ? <p className="error-banner">{error}</p> : null}
 
-      {summary ? (
-        <section className="wallet-grid manage-summary-grid">
-          <article className="metric-card">
-            <p className="metric-card__label">Likit Para</p>
-            <p className="metric-card__value">{formatMoney(summary.liquid_balance)}</p>
-          </article>
-          <article className="metric-card metric-card--warning">
-            <p className="metric-card__label">Kart Borcu</p>
-            <p className="metric-card__value">{formatMoney(summary.total_card_used)}</p>
-          </article>
-          <article className="metric-card metric-card--accent manage-summary-grid__wide">
-            <p className="metric-card__label">Net Durum</p>
-            <p className="metric-card__value">{formatMoney(summary.net_worth)}</p>
-          </article>
-        </section>
-      ) : null}
-
-      <section className="wallet-asset-stage manage-card-insights">
-        <div className="wallet-asset-stage__header">
-          <div>
-            <p className="status-card__eyebrow">Kart Yonetimi</p>
-            <h2>Kart odemeleri ve ekstre durumu</h2>
-          </div>
-          <span className="manage-section-header__badge">{creditAccounts.length} aktif kart</span>
-        </div>
-
-        <div className="wallet-snapshot-grid wallet-snapshot-grid--manage">
-          <article className="wallet-snapshot-card">
-            <p className="wallet-snapshot-card__label">Kart Odemeleri</p>
-            <strong>{formatMoney(monthlyPayments)}</strong>
-            <span>Kart odemeleri ana sayfadan alindi ve buraya tasindi.</span>
-          </article>
-          <article className="wallet-snapshot-card">
-            <p className="wallet-snapshot-card__label">Ekstrede</p>
-            <strong>{formatMoney(statementTotal)}</strong>
-            <span>Acik ekstre tutari toplami.</span>
-          </article>
-          <article className="wallet-snapshot-card">
-            <p className="wallet-snapshot-card__label">Kullanilabilir Limit</p>
-            <strong>{formatMoney(totalAvailableCredit)}</strong>
-            <span>
-              Toplam limit {formatMoney(totalCardLimit)} / Kart borcu {formatMoney(totalCardUsed)}
-            </span>
-          </article>
-          <article className="wallet-snapshot-card">
-            <p className="wallet-snapshot-card__label">Yaklasan Odeme</p>
-            <strong>{urgentStatement?.account_name ?? "Planlanan odeme yok"}</strong>
-            <span>
-              {urgentStatement
-                ? `${urgentStatement.due_date ? formatShortDate(urgentStatement.due_date) : "-"} tarihinde ${formatMoney(urgentStatement.statement_amount)}`
-                : "Aktif ekstre geldikce burada gorunur."}
-            </span>
-          </article>
-        </div>
-
-        <div className="account-list manage-card-insights__list">
-          {statements.length ? (
-            statements.map((statement) => (
-              <article className="account-card manage-account-card" key={statement.account_id}>
-                <div className="account-card__header">
-                  <div>
-                    <div className="manage-account-card__eyebrow-row">
-                      <span className="manage-account-card__type">Ekstre</span>
-                      <span className="manage-account-card__state manage-account-card__state--active">
-                        {statement.due_date ? `Son odeme ${formatShortDate(statement.due_date)}` : "Tarih yok"}
-                      </span>
-                    </div>
-                    <h3>{statement.account_name}</h3>
-                    <p>
-                      Donem {formatShortDate(statement.period_start)} - {formatShortDate(statement.period_end)}
-                    </p>
-                  </div>
-                  <strong>{formatMoney(statement.statement_amount)}</strong>
+      <div className="manage-viewport">
+        {/* The Horizontal Carousel */}
+        {creditAccounts.length > 0 ? (
+          <section className="manage-carousel-stage">
+            <div className="manage-focused-card-shell">
+              {creditAccounts.length > 1 ? (
+                <div className="manage-carousel-nav">
+                  <button
+                    className="manage-carousel-nav-btn"
+                    type="button"
+                    onClick={() => selectCard(activeCardIndex - 1)}
+                    disabled={activeCardIndex === 0}
+                  >
+                    Onceki Kart
+                  </button>
+                  <button
+                    className="manage-carousel-nav-btn"
+                    type="button"
+                    onClick={() => selectCard(activeCardIndex + 1)}
+                    disabled={activeCardIndex === creditAccounts.length - 1}
+                  >
+                    Sonraki Kart
+                  </button>
                 </div>
-                <div className="account-card__meta">
-                  <span>Odeme {formatMoney(statement.payment_activity)}</span>
-                  <span>Reset {formatShortDate(statement.auto_resets_at)}</span>
-                  <span>{statement.transaction_count} islem</span>
+              ) : null}
+
+              <div
+                className="manage-focused-card"
+                data-dragging={cardDragOffset !== 0}
+                onPointerDown={handleCardPointerDown}
+                onPointerMove={handleCardPointerMove}
+                onPointerUp={handleCardPointerEnd}
+                onPointerCancel={handleCardPointerCancel}
+                onTouchStart={handleCardTouchStart}
+                onTouchMove={handleCardTouchMove}
+                onTouchEnd={handleCardTouchEnd}
+                style={{
+                  transform: `translateX(${cardDragOffset}px)`,
+                  opacity: 1 - Math.min(0.22, Math.abs(cardDragOffset) / 320)
+                }}
+              >
+                <CreditCard
+                  account={activeCard}
+                  statement={activeStatement}
+                  onEdit={startEditing}
+                />
+              </div>
+
+              {creditAccounts.length > 1 ? (
+                <div className="manage-carousel-dots" aria-label="Kart Secici">
+                  {creditAccounts.map((account, idx) => (
+                    <button
+                      key={account.id}
+                      className={`manage-carousel-dot ${idx === activeCardIndex ? "active" : ""}`}
+                      type="button"
+                      aria-label={`${account.name} kartini sec`}
+                      aria-pressed={idx === activeCardIndex}
+                      onClick={() => selectCard(idx)}
+                    />
+                  ))}
                 </div>
-              </article>
-            ))
-          ) : (
-            <article className="wallet-snapshot-card manage-card-insights__empty">
-              <p className="wallet-snapshot-card__label">Ekstre yok</p>
-              <strong>Aktif kredi karti ekstresi bulunmuyor.</strong>
-              <span>Kart ekledikce odeme ve donem bilgileri burada listelenecek.</span>
-            </article>
-          )}
-        </div>
-      </section>
-
-      <section className="wallet-asset-stage manage-card-details">
-        <div className="wallet-asset-stage__header">
-          <div>
-            <p className="status-card__eyebrow">Kart Bilgileri</p>
-            <h2>Detayli kart gorunumu ve hizli duzenleme</h2>
-          </div>
-          <span className="manage-section-header__badge">{creditAccounts.length} kart</span>
-        </div>
-
-        {creditAccounts.length ? (
-          <div className="credit-card-list manage-card-details__list">
-            {creditAccounts.map((account) => (
-              <CreditCard
-                key={account.id}
-                account={account}
-                statement={statementByAccountId.get(account.id) ?? null}
-                onEdit={startEditing}
-              />
-            ))}
-          </div>
+              ) : null}
+            </div>
+          </section>
         ) : (
-          <article className="wallet-snapshot-card manage-card-insights__empty">
-            <p className="wallet-snapshot-card__label">Kart yok</p>
-            <strong>Detayli kart gorunumu icin once kart ekle.</strong>
-            <span>Kart eklediginde limit, ekstre ve odeme bilgileri burada acilacak.</span>
-          </article>
+          <section className="manage-carousel-stage">
+             <div className="manage-empty-card">
+               <strong>Kart Bulunmuyor</strong>
+               <span>Sisteme yeni bir kredi karti ekleyerek dijital cuzdaninizi olusturun.</span>
+             </div>
+          </section>
         )}
-      </section>
 
-      <section className="manage-layout">
-        <section className="compose-panel manage-compose-panel">
-          <div className="manage-section-header">
-            <div>
-              <p className="status-card__eyebrow">{editingId ? "Duzenleme" : "Yeni Hesap"}</p>
-              <h2>{editingId ? "Secili hesabi guncelle" : "Yeni hesap veya kart ekle"}</h2>
-            </div>
-            <span className="manage-section-header__badge">
-              {form.type === "credit_card" ? "Kart formu" : "Hesap formu"}
-            </span>
-          </div>
-          <form className="compose-form" onSubmit={handleSubmit}>
-            <div className="manage-form-grid">
-              <div className="manage-form-field">
-                <label className="compose-form__label" htmlFor="account-name">
-                  Ad
-                </label>
-                <input
-                  id="account-name"
-                  className="compose-form__input"
-                  value={form.name}
-                  onChange={(event) => handleChange("name", event.target.value)}
-                />
-              </div>
-
-              <div className="manage-form-field">
-                <label className="compose-form__label" htmlFor="account-type">
-                  Tur
-                </label>
-                <select
-                  id="account-type"
-                  className="compose-form__input"
-                  value={form.type}
-                  onChange={(event) => handleChange("type", event.target.value)}
-                >
-                  <option value="bank">Banka</option>
-                  <option value="cash">Nakit</option>
-                  <option value="credit_card">Kredi Karti</option>
-                </select>
-              </div>
-
-              <div className="manage-form-field">
-                <label className="compose-form__label" htmlFor="account-balance">
-                  Bakiye
-                </label>
-                <input
-                  id="account-balance"
-                  className="compose-form__input"
-                  inputMode="decimal"
-                  value={form.balance}
-                  onChange={(event) => handleChange("balance", event.target.value)}
-                />
-              </div>
-
-              <div className="manage-form-field">
-                <label className="compose-form__label" htmlFor="account-issuer">
-                  Kurum
-                </label>
-                <input
-                  id="account-issuer"
-                  className="compose-form__input"
-                  value={form.issuer}
-                  onChange={(event) => handleChange("issuer", event.target.value)}
-                />
-              </div>
-            </div>
-
-            {form.type === "credit_card" ? (
-              <div className="manage-form-grid manage-form-grid--credit">
-                <div className="manage-form-field">
-                  <label className="compose-form__label" htmlFor="account-limit">
-                    Toplam Limit
-                  </label>
-                  <input
-                    id="account-limit"
-                    className="compose-form__input"
-                    inputMode="decimal"
-                    value={form.credit_limit}
-                    onChange={(event) => handleChange("credit_limit", event.target.value)}
-                  />
-                </div>
-
-                <div className="manage-form-field">
-                  <label className="compose-form__label" htmlFor="account-statement">
-                    Kesim Gunu
-                  </label>
-                  <input
-                    id="account-statement"
-                    className="compose-form__input"
-                    inputMode="numeric"
-                    value={form.statement_day}
-                    onChange={(event) => handleChange("statement_day", event.target.value)}
-                  />
-                </div>
-
-                <div className="manage-form-field">
-                  <label className="compose-form__label" htmlFor="account-due">
-                    Son Odeme Gunu
-                  </label>
-                  <input
-                    id="account-due"
-                    className="compose-form__input"
-                    inputMode="numeric"
-                    value={form.due_day}
-                    onChange={(event) => handleChange("due_day", event.target.value)}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            <div className="event-actions">
-              <button className="primary-button" disabled={saving} type="submit">
-                {saving ? "Kaydediliyor..." : editingId ? "Guncelle" : "Hesap Ekle"}
-              </button>
-              <button className="ghost-button" type="button" onClick={resetForm}>
-                Temizle
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section className="accounts-panel manage-accounts-panel">
-          <div className="accounts-panel__header">
-            <div>
-              <p className="status-card__eyebrow">Hesaplar ve Kartlar</p>
-              <h2 className="manage-accounts-panel__title">Tum varliklar tek akista</h2>
-            </div>
-            <p className="accounts-panel__meta">{accounts.length} kayit</p>
-          </div>
-          <div className="account-list">
-            {accounts.map((account) => (
-              <article className="account-card manage-account-card" key={account.id}>
-                <div className="account-card__header">
-                  <div>
-                    <div className="manage-account-card__eyebrow-row">
-                      <span className="manage-account-card__type">{getAccountTypeLabel(account.type)}</span>
-                      <span className={`manage-account-card__state ${account.is_active ? "manage-account-card__state--active" : ""}`}>
-                        {account.is_active ? "Aktif" : "Pasif"}
-                      </span>
-                    </div>
-                    <h3>{account.name}</h3>
-                    <p>{account.issuer ?? "Kisisel hesap"}</p>
+        {/* Dynamic Card Insights */}
+        {activeCard ? (
+          <section className="manage-dynamic-insights">
+             <div className="manage-insights-grid">
+                <article className="manage-insight-pane">
+                  <span className="manage-insight-pane__label">Limit / Ekstre Paneli</span>
+                  <div className="manage-insight-pane__bars">
+                     <div className="manage-insight-pane__stat">
+                       <strong>Borc</strong>
+                       <span>{formatMoney(activeCard.used_credit ?? 0)}</span>
+                     </div>
+                     <div className="manage-insight-pane__stat">
+                       <strong>Ekstre</strong>
+                       <span>{activeStatement ? formatMoney(activeStatement.statement_amount) : "0,00 ₺"}</span>
+                     </div>
+                     <div className="manage-insight-pane__stat manage-insight-pane__stat--success">
+                       <strong>Kullanilabilir</strong>
+                       <span>{formatMoney(activeCard.available_credit ?? activeCard.balance ?? 0)}</span>
+                     </div>
                   </div>
-                  <strong>{formatMoney(account.balance)}</strong>
-                </div>
-                <div className="account-card__meta">
-                  <span>{account.currency}</span>
-                  {account.type === "credit_card" ? (
-                    <>
-                      <span>Limit {formatMoney(account.credit_limit)}</span>
-                      <span>Kesim {account.statement_day ?? "-"}</span>
-                      <span>Son Odeme {account.due_day ?? "-"}</span>
-                    </>
-                  ) : null}
-                </div>
-                <div className="event-actions">
-                  <button className="secondary-button" type="button" onClick={() => startEditing(account)}>
-                    Duzenle
+                </article>
+                <article className="manage-insight-actions">
+                  <button className="manage-action-btn" onClick={() => startEditing(activeCard)}>
+                    <div className="manage-action-icon" aria-hidden="true">AY</div>
+                    <span className="manage-action-label">Ayarlar</span>
                   </button>
-                  <button className="ghost-button" type="button" onClick={() => handleToggleActive(account)}>
-                    {account.is_active ? "Pasife Al" : "Aktif Et"}
+                  <button className="manage-action-btn" onClick={() => handleToggleActive(activeCard)}>
+                    <div className="manage-action-icon" aria-hidden="true">{activeCard.is_active ? "DN" : "AC"}</div>
+                    <span className="manage-action-label">{activeCard.is_active ? "Dondur" : "Ac"}</span>
                   </button>
-                </div>
-              </article>
-            ))}
-            {!accounts.length ? <p className="hero-panel__text">Hesap bulunmuyor.</p> : null}
-          </div>
+                </article>
+             </div>
+          </section>
+        ) : null}
+
+        {/* Existing Statements List */}
+        <section className="manage-list-section">
+           <h3 className="manage-list-title">Aktif Ekstreler</h3>
+           <div className="manage-list">
+             {activeCard && activeStatement ? (
+                  <div className="manage-list-item" key={activeStatement.account_id}>
+                    <div className="manage-list-icon manage-list-icon--statement" aria-hidden="true">EK</div>
+                    <div className="manage-list-content">
+                      <strong className="manage-list-primary">{activeStatement.account_name}</strong>
+                      <span className="manage-list-secondary">Donem {formatShortDate(activeStatement.period_start)} - {formatShortDate(activeStatement.period_end)}</span>
+                    </div>
+                    <div className="manage-list-trailing">
+                      <strong className="manage-list-amount">{formatMoney(activeStatement.statement_amount)}</strong>
+                      <span className="manage-list-date">{activeStatement.due_date ? `S.O. ${formatShortDate(activeStatement.due_date)}` : "Tarih Yok"}</span>
+                    </div>
+                  </div>
+             ) : (
+                <p className="manage-list-empty">
+                  {activeCard ? "Bu kart icin acik ekstre bulunmuyor." : "Acik ekstre bulunmuyor."}
+                </p>
+             )}
+           </div>
         </section>
-      </section>
+        
+        {/* Other Accounts List */}
+        <section className="manage-list-section">
+           <h3 className="manage-list-title">Diger Hesaplar</h3>
+           <div className="manage-list">
+             {otherAccounts.length ? (
+                otherAccounts.map(account => (
+                  <div className="manage-list-item" key={account.id} onClick={() => startEditing(account)}>
+                    <div className="manage-list-icon" aria-hidden="true">{account.type === "bank" ? "BK" : "HS"}</div>
+                    <div className="manage-list-content">
+                      <strong className="manage-list-primary">{account.name}</strong>
+                      <span className="manage-list-secondary">{getAccountTypeLabel(account.type)} {account.issuer ? `· ${account.issuer}` : ''}</span>
+                    </div>
+                    <div className="manage-list-trailing">
+                      <strong className="manage-list-amount">{formatMoney(account.balance)}</strong>
+                      <span className={`manage-list-date ${!account.is_active ? "inactive" : ""}`}>{account.is_active ? "Aktif" : "Pasif"}</span>
+                    </div>
+                  </div>
+                ))
+             ) : (
+                <p className="manage-list-empty">Diger hesap bulunmuyor.</p>
+             )}
+           </div>
+        </section>
+
+        {/* Drawer for Expanding Form */}
+        {showCompose ? (
+          <>
+            <div className="manage-drawer-backdrop" onClick={() => setShowCompose(false)}></div>
+            <section className="manage-drawer-form">
+              <div className="manage-drawer-indicator"></div>
+              <div className="manage-drawer-header">
+                 <h2>{editingId ? "Hesabi Duzenle" : "Yeni Hesap Ekle"}</h2>
+                 <button className="manage-drawer-close" onClick={resetForm}>Bitti</button>
+              </div>
+              
+              <form className="manage-compose-form" onSubmit={handleSubmit}>
+                <div className="manage-input-group">
+                  <input id="acc-name" className="manage-input" value={form.name} onChange={e => handleChange("name", e.target.value)} required placeholder=" " />
+                  <label htmlFor="acc-name" className="manage-floating-label">Hesap Adi</label>
+                </div>
+                
+                <div className="manage-input-group">
+                  <select id="acc-type" className="manage-input" value={form.type} onChange={e => handleChange("type", e.target.value)}>
+                     <option value="bank">Banka Hesabi</option>
+                     <option value="cash">Nakit Kasa</option>
+                     <option value="credit_card">Kredi Karti</option>
+                  </select>
+                  <label htmlFor="acc-type" className="manage-floating-label">Tur</label>
+                </div>
+
+                <div className="manage-input-row">
+                  <div className="manage-input-group">
+                    <input id="acc-bal" className="manage-input" inputMode="decimal" value={form.balance} onChange={e => handleChange("balance", e.target.value)} placeholder=" " />
+                    <label htmlFor="acc-bal" className="manage-floating-label">Guncel Bakiye (₺)</label>
+                  </div>
+                  <div className="manage-input-group">
+                    <input id="acc-iss" className="manage-input" value={form.issuer} onChange={e => handleChange("issuer", e.target.value)} placeholder=" " />
+                    <label htmlFor="acc-iss" className="manage-floating-label">Kurum (Ops.)</label>
+                  </div>
+                </div>
+
+                {form.type === "credit_card" ? (
+                  <>
+                    <div className="manage-input-group mt-1">
+                      <input id="acc-lim" className="manage-input" inputMode="decimal" value={form.credit_limit} onChange={e => handleChange("credit_limit", e.target.value)} placeholder=" " />
+                      <label htmlFor="acc-lim" className="manage-floating-label">Toplam Limit (₺)</label>
+                    </div>
+                    <div className="manage-input-row">
+                      <div className="manage-input-group">
+                        <select id="acc-st" className="manage-input manage-input--select" value={form.statement_day} onChange={e => handleChange("statement_day", e.target.value)}>
+                          <option value="">--</option>
+                          {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                        <label htmlFor="acc-st" className="manage-floating-label manage-floating-label--filled">Kesim Gunu</label>
+                      </div>
+                      <div className="manage-input-group">
+                        <select id="acc-due" className="manage-input manage-input--select" value={form.due_day} onChange={e => handleChange("due_day", e.target.value)}>
+                          <option value="">--</option>
+                          {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                        <label htmlFor="acc-due" className="manage-floating-label manage-floating-label--filled">Son Odeme Gunu</label>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                <button className="manage-submit-btn" disabled={saving} type="submit">
+                  {saving ? "Kaydediliyor..." : editingId ? "Degisiklikleri Kaydet" : "Sisteme Ekle"}
+                </button>
+              </form>
+            </section>
+          </>
+        ) : null}
+
+      </div>
     </main>
   );
 }

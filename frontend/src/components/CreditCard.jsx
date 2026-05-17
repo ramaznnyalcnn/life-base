@@ -37,7 +37,7 @@ export default function CreditCard({ account, statement, onEdit }) {
   const usedCredit = Number(account.used_credit ?? 0);
   const statementAmount = Number(statement?.statement_amount ?? 0);
   const limitAmount = Number(account.credit_limit ?? 0);
-  const issuerLabel = (account.issuer ?? "Life OS").toUpperCase();
+  const issuerLabel = (account.issuer ?? "life-base").toUpperCase();
 
   return (
     <article className={`credit-card credit-card--${theme}`}>
@@ -66,11 +66,9 @@ export default function CreditCard({ account, statement, onEdit }) {
           <span className="credit-card__face-badge">Kart</span>
           <div className="credit-card__brand-row">
             <div>
-              <span className="credit-card__label">Signature Edition</span>
               <strong className="credit-card__front-issuer">{issuerLabel}</strong>
             </div>
             <div className="credit-card__brand-side">
-              <span className="credit-card__brand-limit">Lifebase Select</span>
               <div className="credit-card__brand-mark" aria-hidden="true">
                 <span />
                 <span />
@@ -91,7 +89,7 @@ export default function CreditCard({ account, statement, onEdit }) {
           <div className="credit-card__back-header">
             <div>
               <span className="credit-card__label">Kart Bilgileri</span>
-              <strong className="credit-card__back-title">{account.issuer ?? "Life OS Card"}</strong>
+              <strong className="credit-card__back-title">{account.issuer ?? "life-base card"}</strong>
             </div>
             <span className="credit-card__back-code">{buildMaskedNumber(account.id).slice(-4)}</span>
           </div>

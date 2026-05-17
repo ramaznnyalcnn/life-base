@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchAccounts } from "../api/accounts";
 import {
@@ -6,6 +6,27 @@ import {
   fetchTransactions,
   updateTransaction
 } from "../api/transactions";
+
+const EXPENSE_CATEGORIES = [
+  "Market", "Yeme-İçme", "Kahve", "Fatura", "Abonelik",
+  "Ulaşım", "Yakıt", "Sağlık", "Eczane", "Kira",
+  "Eğlence", "Giyim", "Eğitim", "Elektronik",
+  "Kişisel Bakım", "Spor", "Diğer"
+];
+
+const INCOME_CATEGORIES = [
+  "Maaş", "Ek Gelir", "Serbest Çalışma", "Yatırım", "Prim", "Diğer Gelir"
+];
+
+const PAYMENT_CATEGORIES = [
+  "Kredi Kartı Ödemesi", "Borç Ödemesi", "Diğer Ödeme"
+];
+
+function getCategoryList(type) {
+  if (type === "income") return INCOME_CATEGORIES;
+  if (type === "payment") return PAYMENT_CATEGORIES;
+  return EXPENSE_CATEGORIES;
+}
 
 const CHART_COLORS = [
   "#7C9CFF",
@@ -43,6 +64,74 @@ const INITIAL_ANALYSIS_FILTERS = {
   dateFrom: "",
   dateTo: ""
 };
+
+const ANALYSIS_SEGMENT_OPTIONS = [
+  { id: "all", label: "Tum Zaman" },
+  { id: "month", label: "Bu Ay" },
+  { id: "quarter", label: "Son 90 Gun" },
+  { id: "year", label: "Bu Yil" }
+];
+
+const ANALYSIS_WHEEL_GESTURE_DIVISOR = 420;
+const ANALYSIS_TOUCH_GESTURE_DIVISOR = 240;
+
+/* Odometer Hook for Premium Transitions */
+function useOdometer(value, duration = 1200, resetKey = "") {
+  const [displayValue, setDisplayValue] = useState(0);
+  const startValue = useRef(0);
+  const startTime = useRef(null);
+  const frameId = useRef(null);
+  const previousResetKey = useRef(resetKey);
+  const currentValueRef = useRef(0);
+
+  useEffect(() => {
+    currentValueRef.current = displayValue;
+  }, [displayValue]);
+
+  useEffect(() => {
+    const targetValue = Number(value) || 0;
+    const shouldRestartFromZero = previousResetKey.current !== resetKey;
+    const originValue = shouldRestartFromZero ? 0 : currentValueRef.current;
+
+    previousResetKey.current = resetKey;
+    startValue.current = originValue;
+    setDisplayValue(originValue);
+
+    if (import.meta.env.MODE === "test") {
+      setDisplayValue(targetValue);
+      return undefined;
+    }
+
+    startTime.current = performance.now();
+
+    const animate = (time) => {
+      const elapsed = time - startTime.current;
+      const progress = Math.min(elapsed / duration, 1);
+
+      const easeOutExpo = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      const current = startValue.current + (targetValue - startValue.current) * easeOutExpo;
+
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        frameId.current = requestAnimationFrame(animate);
+      } else {
+        setDisplayValue(targetValue);
+      }
+    };
+
+    frameId.current = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(frameId.current);
+  }, [duration, resetKey, value]);
+
+  return displayValue;
+}
+
+function AnimatedMoney({ value, animationKey = "" }) {
+  const animatedValue = useOdometer(Number(value) || 0, 1200, animationKey);
+  return <>{formatMoney(animatedValue)}</>;
+}
 
 function formatMoney(value) {
   return new Intl.NumberFormat("tr-TR", {
@@ -170,32 +259,46 @@ function getCategoryAppearance(categoryName, type) {
   };
 }
 
-function buildTrendPath(values, width, height, padding, maxValue) {
-  if (!values.length) {
-    return "";
+function buildSmoothPath(values, width, height, padding, maxValue) {
+  if (!values.length) return "";
+  if (values.length === 1) {
+    const x = width / 2;
+    const y = height - padding - (maxValue ? (values[0] / maxValue) * (height - padding * 2) : 0);
+    return `M ${x} ${y}`;
   }
 
   const innerWidth = width - padding * 2;
   const innerHeight = height - padding * 2;
+  const stepX = innerWidth / (values.length - 1);
 
-  return values
-    .map((value, index) => {
-      const x = padding + (values.length === 1 ? innerWidth / 2 : (innerWidth / (values.length - 1)) * index);
-      const y = height - padding - (maxValue ? (value / maxValue) * innerHeight : 0);
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
+  const points = values.map((val, index) => {
+    const x = padding + index * stepX;
+    const y = height - padding - (maxValue ? (val / maxValue) * innerHeight : 0);
+    return { x, y };
+  });
+
+  return points.reduce((acc, point, index, array) => {
+    if (index === 0) return `M ${point.x} ${point.y}`;
+
+    // Simple cubic bezier: horizontal handles pointing halfway back/forward
+    const prev = array[index - 1];
+    const cpX1 = prev.x + (point.x - prev.x) / 2;
+    const cpY1 = prev.y;
+    const cpX2 = point.x - (point.x - prev.x) / 2;
+    const cpY2 = point.y;
+
+    return `${acc} C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${point.x} ${point.y}`;
+  }, "");
 }
 
-function buildAreaPath(values, width, height, padding, maxValue) {
+function buildSmoothAreaPath(values, width, height, padding, maxValue) {
   if (!values.length) {
     return "";
   }
 
-  const line = buildTrendPath(values, width, height, padding, maxValue);
+  const line = buildSmoothPath(values, width, height, padding, maxValue);
   const innerWidth = width - padding * 2;
-  const lastX =
-    padding + (values.length === 1 ? innerWidth / 2 : (innerWidth / (values.length - 1)) * (values.length - 1));
+  const lastX = padding + (values.length === 1 ? innerWidth / 2 : innerWidth);
 
   return `${line} L ${lastX} ${height - padding} L ${padding} ${height - padding} Z`;
 }
@@ -221,9 +324,9 @@ function TrendChart({ months }) {
     return <p className="muted-text">Trend grafigi icin yeterli veri yok.</p>;
   }
 
-  const width = 360;
-  const height = 220;
-  const padding = 22;
+  const width = 380;
+  const height = 240;
+  const padding = 24;
   const incomeValues = months.map((month) => month.income);
   const outgoingValues = months.map((month) => month.outgoing);
   const maxValue = Math.max(...incomeValues, ...outgoingValues, 1);
@@ -236,21 +339,47 @@ function TrendChart({ months }) {
         role="img"
         aria-label="Aylik gelir ve gider grafigi"
       >
+        <defs>
+          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--wf-expense)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="var(--wf-expense)" stopOpacity="0.0" />
+          </linearGradient>
+          <linearGradient id="lineIncomeGradient" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="var(--wf-income)" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="var(--wf-income)" stopOpacity="1" />
+          </linearGradient>
+          <linearGradient id="lineOutgoingGradient" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="var(--wf-expense)" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="var(--wf-expense)" stopOpacity="1" />
+          </linearGradient>
+          <filter id="neonGlowOutline" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        <rect x="0" y="0" width={width} height={height} fill="none" />
+
+        {/* Neon Grid Lines */}
         {[0.25, 0.5, 0.75, 1].map((step) => {
           const y = height - padding - (height - padding * 2) * step;
-          return <line key={step} x1={padding} x2={width - padding} y1={y} y2={y} className="history-trend-chart__grid" />;
+          return <line key={step} x1={padding} x2={width - padding} y1={y} y2={y} className="history-trend-chart__grid" style={{ strokeDasharray: "4 4", opacity: 0.15 }} />;
         })}
+
         <path
-          d={buildAreaPath(outgoingValues, width, height, padding, maxValue)}
+          d={buildSmoothAreaPath(outgoingValues, width, height, padding, maxValue)}
           className="history-trend-chart__area"
+          style={{ fill: "url(#areaGradient)" }}
         />
         <path
-          d={buildTrendPath(incomeValues, width, height, padding, maxValue)}
+          d={buildSmoothPath(incomeValues, width, height, padding, maxValue)}
           className="history-trend-chart__line history-trend-chart__line--income"
+          style={{ stroke: "url(#lineIncomeGradient)", filter: "url(#neonGlowOutline)" }}
         />
         <path
-          d={buildTrendPath(outgoingValues, width, height, padding, maxValue)}
+          d={buildSmoothPath(outgoingValues, width, height, padding, maxValue)}
           className="history-trend-chart__line history-trend-chart__line--outgoing"
+          style={{ stroke: "url(#lineOutgoingGradient)", filter: "url(#neonGlowOutline)" }}
         />
         {months.map((month, index) => {
           const innerWidth = width - padding * 2;
@@ -284,43 +413,62 @@ function TrendChart({ months }) {
   );
 }
 
-function DonutChart({ categories, totalOutgoing }) {
-  const donutSegments = categories.map((category, index) => ({
-    ...category,
-    share: totalOutgoing > 0 ? category.total / totalOutgoing : 0,
-    color: CHART_COLORS[index % CHART_COLORS.length]
-  }));
+function ActivityRings({ categories, totalOutgoing, animationKey }) {
+  const rings = categories.slice(0, 3).map((category, index) => {
+    const share = totalOutgoing > 0 ? category.total / totalOutgoing : 0;
+    const radius = 42 - index * 12; // 42, 30, 18
+    const circumference = 2 * Math.PI * radius;
+    // We animate dashoffset from circumference to the target dashoffset in CSS,
+    // so we set custom properties here
+
+    return {
+      ...category,
+      share,
+      color: CHART_COLORS[index % CHART_COLORS.length],
+      radius,
+      circumference,
+      dashoffset: Math.max(0, circumference * (1 - share))
+    };
+  });
 
   return (
-    <div className="history-donut">
-      <div
-        className="history-donut__ring"
-        style={{ background: buildDonutBackground(donutSegments) }}
-        aria-hidden="true"
-      >
-        <div className="history-donut__center">
-          <span>Toplam</span>
-          <strong>{formatMoney(totalOutgoing)}</strong>
+    <div className="analysis-rings">
+      <div className="analysis-rings__svg-wrapper">
+        <svg viewBox="0 0 100 100" className="analysis-rings__svg">
+          <defs>
+            <filter id="ringGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+          {rings.map((ring, i) => (
+            <g key={ring.key} className="analysis-rings__group">
+              <circle
+                cx="50" cy="50" r={ring.radius}
+                className="analysis-rings__track"
+                style={{ stroke: ring.color }}
+              />
+              <circle
+                cx="50" cy="50" r={ring.radius}
+                className="analysis-rings__progress"
+                style={{
+                  stroke: ring.color,
+                  strokeDasharray: ring.circumference,
+                  strokeDashoffset: ring.circumference, // Starts empty
+                  '--dash-target': ring.dashoffset,
+                  animation: `drawRing 1.8s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.15}s forwards`,
+                  filter: 'url(#ringGlow)'
+                }}
+              />
+            </g>
+          ))}
+        </svg>
+        <div className="analysis-rings__center">
+          <span className="analysis-rings__center-label">Toplam</span>
+          <strong className="analysis-rings__center-amount">
+            <AnimatedMoney value={totalOutgoing} animationKey={animationKey} />
+          </strong>
         </div>
-      </div>
-
-      <div className="history-donut__legend">
-        {donutSegments.length ? (
-          donutSegments.map((segment) => (
-            <article className="history-donut__legend-item" key={segment.key}>
-              <div className="history-donut__legend-main">
-                <i style={{ backgroundColor: segment.color }} />
-                <strong>{segment.label}</strong>
-              </div>
-              <div className="history-donut__legend-meta">
-                <span>{formatMoney(segment.total)}</span>
-                <span>%{Math.round(segment.share * 100)}</span>
-              </div>
-            </article>
-          ))
-        ) : (
-          <p className="muted-text">Kategori dagilimi icin harcama verisi yok.</p>
-        )}
       </div>
     </div>
   );
@@ -342,7 +490,14 @@ export default function HistoryPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [editForm, setEditForm] = useState(INITIAL_EDIT_FORM);
   const [analysisFilters, setAnalysisFilters] = useState(INITIAL_ANALYSIS_FILTERS);
-
+  const [activeAppTab, setActiveAppTab] = useState("overview"); // "overview" | "history"
+  const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
+  const [analysisTransitionProgress, setAnalysisTransitionProgress] = useState(0);
+  const analysisShellRef = useRef(null);
+  const overviewScrollRef = useRef(null);
+  const historyScrollRef = useRef(null);
+  const analysisGestureProgressRef = useRef(0);
+  const analysisTouchStartYRef = useRef(null);
   const accountMap = useMemo(
     () => new Map(accounts.map((account) => [account.id, account])),
     [accounts]
@@ -357,49 +512,7 @@ export default function HistoryPage() {
     [transactions]
   );
 
-  const filteredTransactions = useMemo(() => {
-    const now = new Date();
-    const segmentStart = (() => {
-      if (analysisFilters.segment === "month") {
-        return new Date(now.getFullYear(), now.getMonth(), 1);
-      }
-      if (analysisFilters.segment === "quarter") {
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
-      }
-      if (analysisFilters.segment === "year") {
-        return new Date(now.getFullYear(), 0, 1);
-      }
-      return null;
-    })();
-
-    const fromDate = analysisFilters.dateFrom ? startOfDay(analysisFilters.dateFrom) : null;
-    const toDate = analysisFilters.dateTo ? endOfDay(analysisFilters.dateTo) : null;
-    const selectedCategory = analysisFilters.category.trim()
-      ? normalizeKey(analysisFilters.category)
-      : "";
-
-    return transactions.filter((transaction) => {
-      const occurredAt = new Date(transaction.occurred_at);
-      const transactionCategory = normalizeKey(transaction.category_name);
-
-      if (segmentStart && occurredAt < segmentStart) {
-        return false;
-      }
-      if (fromDate && occurredAt < fromDate) {
-        return false;
-      }
-      if (toDate && occurredAt > toDate) {
-        return false;
-      }
-      if (selectedCategory && transactionCategory !== selectedCategory) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [analysisFilters, transactions]);
-
-  const historyOverview = useMemo(() => {
+  const calculateAnalysis = (txns) => {
     const monthMap = new Map();
     const yearMap = new Map();
     const categoryMap = new Map();
@@ -411,7 +524,7 @@ export default function HistoryPage() {
     let largestExpense = null;
     let expenseCount = 0;
 
-    for (const transaction of filteredTransactions) {
+    for (const transaction of txns) {
       const date = new Date(transaction.occurred_at);
       const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
       const monthDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
@@ -650,7 +763,52 @@ export default function HistoryPage() {
       },
       recommendations
     };
-  }, [filteredTransactions]);
+  };
+
+  const allTimeTransactions = useMemo(() => {
+    const fromDate = analysisFilters.dateFrom ? new Date(analysisFilters.dateFrom) : null;
+    const toDate = analysisFilters.dateTo ? new Date(analysisFilters.dateTo) : null;
+    const selectedCategory = analysisFilters.category.trim() ? analysisFilters.category.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") : "";
+
+    return transactions.filter((transaction) => {
+      const occurredAt = new Date(transaction.occurred_at);
+      const transactionCategory = (transaction.category_name || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+      if (fromDate && occurredAt < fromDate) return false;
+      if (toDate && occurredAt > toDate) return false;
+      if (selectedCategory && transactionCategory !== selectedCategory) return false;
+
+      return true;
+    });
+  }, [analysisFilters.category, analysisFilters.dateFrom, analysisFilters.dateTo, transactions]);
+
+  const currentMonthTransactions = useMemo(() => {
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return allTimeTransactions.filter(t => new Date(t.occurred_at) >= startOfCurrentMonth);
+  }, [allTimeTransactions]);
+
+  const comparisonTransactions = useMemo(() => {
+    const now = new Date();
+    const segmentStart = (() => {
+      if (analysisFilters.segment === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
+      if (analysisFilters.segment === "quarter") {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        d.setDate(d.getDate() - 90);
+        return d;
+      }
+      if (analysisFilters.segment === "year") return new Date(now.getFullYear(), 0, 1);
+      return null;
+    })();
+
+    return allTimeTransactions.filter(t => {
+      if (segmentStart && new Date(t.occurred_at) < segmentStart) return false;
+      return true;
+    });
+  }, [allTimeTransactions, analysisFilters.segment]);
+
+  const thisMonthData = useMemo(() => calculateAnalysis(currentMonthTransactions), [currentMonthTransactions]);
+  const comparisonData = useMemo(() => calculateAnalysis(comparisonTransactions), [comparisonTransactions]);
 
   async function loadData(nextFilters = filters) {
     setLoading(true);
@@ -673,6 +831,138 @@ export default function HistoryPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    analysisGestureProgressRef.current = analysisTransitionProgress;
+  }, [analysisTransitionProgress]);
+
+  useEffect(() => {
+    const shellNode = analysisShellRef.current;
+
+    if (!shellNode || loading) {
+      return undefined;
+    }
+
+    function applyGestureDelta(rawDelta) {
+      const next = Math.max(0, Math.min(1, analysisGestureProgressRef.current + rawDelta));
+      analysisGestureProgressRef.current = next;
+      setAnalysisTransitionProgress(next);
+      setActiveAppTab(next >= 0.5 ? "history" : "overview");
+    }
+
+    function shouldAllowHistoryScroll(deltaY) {
+      const detailNode = historyScrollRef.current;
+
+      if (!detailNode || analysisGestureProgressRef.current < 0.98) {
+        return false;
+      }
+
+      const atTop = detailNode.scrollTop <= 0;
+      const atBottom = detailNode.scrollTop + detailNode.clientHeight >= detailNode.scrollHeight - 1;
+
+      if (deltaY > 0) {
+        return !atBottom;
+      }
+
+      if (deltaY < 0) {
+        return !atTop;
+      }
+
+      return false;
+    }
+
+    function shouldAllowOverviewScroll(deltaY) {
+      const overviewNode = overviewScrollRef.current;
+
+      if (!overviewNode || analysisGestureProgressRef.current > 0.02) {
+        return false;
+      }
+
+      const canScroll = overviewNode.scrollHeight > overviewNode.clientHeight + 1;
+
+      if (!canScroll) {
+        return false;
+      }
+
+      const atTop = overviewNode.scrollTop <= 0;
+      const atBottom =
+        overviewNode.scrollTop + overviewNode.clientHeight >= overviewNode.scrollHeight - 1;
+
+      if (deltaY > 0) {
+        return !atBottom;
+      }
+
+      if (deltaY < 0) {
+        return !atTop;
+      }
+
+      return false;
+    }
+
+    function handleWheel(event) {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+        return;
+      }
+
+      if (shouldAllowOverviewScroll(event.deltaY)) {
+        return;
+      }
+
+      if (shouldAllowHistoryScroll(event.deltaY)) {
+        return;
+      }
+
+      event.preventDefault();
+      applyGestureDelta(event.deltaY / ANALYSIS_WHEEL_GESTURE_DIVISOR);
+    }
+
+    function handleTouchStart(event) {
+      analysisTouchStartYRef.current = event.touches[0]?.clientY ?? null;
+    }
+
+    function handleTouchMove(event) {
+      if (analysisTouchStartYRef.current == null) {
+        return;
+      }
+
+      const currentY = event.touches[0]?.clientY ?? analysisTouchStartYRef.current;
+      const deltaY = analysisTouchStartYRef.current - currentY;
+
+      if (Math.abs(deltaY) < 2) {
+        return;
+      }
+
+      if (shouldAllowOverviewScroll(deltaY)) {
+        analysisTouchStartYRef.current = currentY;
+        return;
+      }
+
+      if (shouldAllowHistoryScroll(deltaY)) {
+        analysisTouchStartYRef.current = currentY;
+        return;
+      }
+
+      event.preventDefault();
+      applyGestureDelta(deltaY / ANALYSIS_TOUCH_GESTURE_DIVISOR);
+      analysisTouchStartYRef.current = currentY;
+    }
+
+    function handleTouchEnd() {
+      analysisTouchStartYRef.current = null;
+    }
+
+    shellNode.addEventListener("wheel", handleWheel, { passive: false });
+    shellNode.addEventListener("touchstart", handleTouchStart, { passive: true });
+    shellNode.addEventListener("touchmove", handleTouchMove, { passive: false });
+    shellNode.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      shellNode.removeEventListener("wheel", handleWheel);
+      shellNode.removeEventListener("touchstart", handleTouchStart);
+      shellNode.removeEventListener("touchmove", handleTouchMove);
+      shellNode.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [loading]);
 
   function handleFilterChange(field, value) {
     setFilters((current) => ({
@@ -748,157 +1038,143 @@ export default function HistoryPage() {
     }
   }
 
-  return (
-    <main className="shell">
-      <section className="accounts-panel history-hero-panel">
-        <div className="accounts-panel__header">
-          <div>
-            <p className="status-card__eyebrow">Analiz</p>
-            <h1 className="history-hero-panel__title">Finans Analizi</h1>
-            <p className="accounts-panel__meta">
-              Aylar, yillar ve kategori davranislarin tek bakista gorunsun.
-            </p>
+  const timelineGroups = useMemo(() => {
+    const groups = new Map();
+    for (const transaction of comparisonTransactions) {
+      const dateLabel = new Intl.DateTimeFormat("tr-TR", { 
+        day: "numeric", month: "long", year: "numeric", weekday: "long" 
+      }).format(new Date(transaction.occurred_at));
+      
+      if (!groups.has(dateLabel)) {
+        groups.set(dateLabel, []);
+      }
+      groups.get(dateLabel).push(transaction);
+    }
+    return Array.from(groups.entries());
+  }, [comparisonTransactions]);
+
+  const selectedAnalysisSegment =
+    ANALYSIS_SEGMENT_OPTIONS.find((segment) => segment.id === analysisFilters.segment)?.label ??
+    ANALYSIS_SEGMENT_OPTIONS[0].label;
+  const analysisCounterAnimationKey = [
+    activeAppTab,
+    analysisFilters.segment,
+    analysisFilters.category || "all",
+    analysisFilters.dateFrom || "start",
+    analysisFilters.dateTo || "end",
+    thisMonthData.analysis.net,
+    thisMonthData.analysis.totalIncome,
+    thisMonthData.analysis.totalOutgoing,
+    thisMonthData.analysis.totalPayments
+  ].join("|");
+  const analysisOverviewZoomProgress = Math.min(1, analysisTransitionProgress / 0.54);
+  const analysisViewSwapProgress = Math.max(0, Math.min(1, (analysisTransitionProgress - 0.34) / 0.3));
+  const analysisDetailGrowProgress = Math.max(0, Math.min(1, (analysisTransitionProgress - 0.46) / 0.54));
+  const analysisOverviewSceneStyle = {
+    transform: `perspective(1200px) translateY(${analysisOverviewZoomProgress * -20}px) scale(${1 + analysisOverviewZoomProgress * 0.18}) rotateX(${analysisOverviewZoomProgress * -8}deg)`,
+    opacity: Math.max(0, 1 - analysisViewSwapProgress * 1.2),
+    filter: `saturate(${1 - analysisViewSwapProgress * 0.18}) blur(${analysisViewSwapProgress * 5}px)`,
+    pointerEvents: analysisTransitionProgress < 0.5 ? "auto" : "none"
+  };
+  const analysisDetailSceneStyle = {
+    opacity: Math.max(0, (analysisTransitionProgress - 0.28) / 0.5),
+    transformOrigin: "50% 18%",
+    transform: `perspective(1200px) translateY(${-28 + analysisDetailGrowProgress * 28}px) scale(${1.52 - analysisDetailGrowProgress * 0.52}) rotateX(${12 - analysisDetailGrowProgress * 12}deg)`,
+    filter: `blur(${(1 - analysisDetailGrowProgress) * 7}px)`,
+    pointerEvents: analysisTransitionProgress > 0.52 ? "auto" : "none"
+  };
+  const analysisGlowStyle = {
+    transform: `scale(${1 + analysisTransitionProgress * 0.08})`,
+    opacity: Math.sin(analysisTransitionProgress * Math.PI) * 0.5
+  };
+  const analysisCueStyle = {
+    opacity: Math.max(0, 1 - analysisTransitionProgress * 1.8),
+    transform: `translateY(${analysisTransitionProgress * 10}px)`
+  };
+  const activityRingsCard = (
+    <article className="history-chart-card" style={{ marginTop: "16px" }}>
+      <ActivityRings
+        categories={thisMonthData.donutCategories}
+        totalOutgoing={thisMonthData.analysis.totalOutgoing}
+        animationKey={analysisCounterAnimationKey}
+      />
+    </article>
+  );
+  const detailedAnalysisSection = (
+    <div className="analysis-detailed-content">
+      <div className="history-analysis-toolbar">
+        <div className="history-deep-filters">
+          <div className="history-filter-field">
+            <label className="compose-form__label" htmlFor="history-category-filter">
+              Kategori
+            </label>
+            <select
+              id="history-category-filter"
+              className="compose-form__input"
+              value={analysisFilters.category}
+              onChange={(event) => handleAnalysisFilterChange("category", event.target.value)}
+            >
+              <option value="">Tum kategoriler</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="history-hero-panel__badge-stack">
-            <span className="history-summary-pill">
-              {historyOverview.analysis.currentMonth?.label ?? "Bu ay"} · {filteredTransactions.length} kayit
-            </span>
-            <span className="history-summary-pill history-summary-pill--soft">
-              Net {formatMoney(historyOverview.analysis.net)}
-            </span>
+
+          <div className="history-filter-field">
+            <label className="compose-form__label" htmlFor="history-date-from">
+              Baslangic
+            </label>
+            <input
+              id="history-date-from"
+              className="compose-form__input"
+              type="date"
+              value={analysisFilters.dateFrom}
+              onChange={(event) => handleAnalysisFilterChange("dateFrom", event.target.value)}
+            />
+          </div>
+
+          <div className="history-filter-field">
+            <label className="compose-form__label" htmlFor="history-date-to">
+              Bitis
+            </label>
+            <input
+              id="history-date-to"
+              className="compose-form__input"
+              type="date"
+              value={analysisFilters.dateTo}
+              onChange={(event) => handleAnalysisFilterChange("dateTo", event.target.value)}
+            />
+          </div>
+
+          <div className="history-filter-field history-filter-field--action">
+            <span className="compose-form__label">Filtre</span>
+            <button className="ghost-button" type="button" onClick={resetAnalysisFilters}>
+              Sifirla
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <section className="history-analysis-grid" style={{ marginTop: "24px" }}>
+        <div style={{ padding: "0 20px", marginBottom: "16px" }}>
+          <p className="status-card__eyebrow" style={{ marginBottom: "8px" }}>Gecmisle Kiyasla</p>
+          <div className="history-segmented-control" role="tablist" aria-label="Analiz zaman carki">
+            {ANALYSIS_SEGMENT_OPTIONS.map((segment) => (
+              <button
+                key={segment.id}
+                className={`history-segmented-control__btn ${analysisFilters.segment === segment.id ? "active" : ""}`}
+                type="button"
+                onClick={() => handleAnalysisFilterChange("segment", segment.id)}
+              >
+                {segment.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="history-hero-layout">
-          <div className="history-hero-main">
-            <article className="history-metric-card history-metric-card--primary history-metric-card--hero">
-              <span>Toplam net durum</span>
-              <strong>{formatMoney(historyOverview.analysis.net)}</strong>
-              <p>
-                Gelir {formatMoney(historyOverview.analysis.totalIncome)} ·
-                Gider {formatMoney(historyOverview.analysis.totalOutgoing)}
-              </p>
-              {historyOverview.analysis.totalPayments > 0 ? (
-                <p>Kart odemeleri ayri izleniyor: {formatMoney(historyOverview.analysis.totalPayments)}</p>
-              ) : null}
-            </article>
-
-            <div className="history-analysis-toolbar">
-              <div className="history-segmented-control" role="tablist" aria-label="Analiz donemi">
-                {[
-                  { id: "all", label: "Tum Zaman" },
-                  { id: "month", label: "Bu Ay" },
-                  { id: "quarter", label: "Son 90 Gun" },
-                  { id: "year", label: "Bu Yil" }
-                ].map((segment) => (
-                  <button
-                    key={segment.id}
-                    className={`ghost-button ${analysisFilters.segment === segment.id ? "ghost-button--active" : ""}`}
-                    type="button"
-                    onClick={() => handleAnalysisFilterChange("segment", segment.id)}
-                  >
-                    {segment.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="history-deep-filters">
-                <div className="history-filter-field">
-                  <label className="compose-form__label" htmlFor="history-category-filter">
-                    Kategori
-                  </label>
-                  <select
-                    id="history-category-filter"
-                    className="compose-form__input"
-                    value={analysisFilters.category}
-                    onChange={(event) => handleAnalysisFilterChange("category", event.target.value)}
-                  >
-                    <option value="">Tum kategoriler</option>
-                    {categoryOptions.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="history-filter-field">
-                  <label className="compose-form__label" htmlFor="history-date-from">
-                    Baslangic
-                  </label>
-                  <input
-                    id="history-date-from"
-                    className="compose-form__input"
-                    type="date"
-                    value={analysisFilters.dateFrom}
-                    onChange={(event) => handleAnalysisFilterChange("dateFrom", event.target.value)}
-                  />
-                </div>
-
-                <div className="history-filter-field">
-                  <label className="compose-form__label" htmlFor="history-date-to">
-                    Bitis
-                  </label>
-                  <input
-                    id="history-date-to"
-                    className="compose-form__input"
-                    type="date"
-                    value={analysisFilters.dateTo}
-                    onChange={(event) => handleAnalysisFilterChange("dateTo", event.target.value)}
-                  />
-                </div>
-
-                <div className="history-filter-field history-filter-field--action">
-                  <span className="compose-form__label">Filtre</span>
-                  <button className="ghost-button" type="button" onClick={resetAnalysisFilters}>
-                    Sifirla
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="history-hero-grid">
-            <article className="history-metric-card">
-              <span>Bu ay degisim</span>
-              <strong>{formatPercent(historyOverview.analysis.monthlyChange)}</strong>
-              <p>
-                {historyOverview.analysis.currentMonth?.label ?? "Bu ay"} gideri onceki aya gore
-              </p>
-            </article>
-
-            <article className="history-metric-card">
-              <span>Tasarruf orani</span>
-              <strong>%{historyOverview.analysis.savingsRate.toFixed(0)}</strong>
-              <p>Gelire gore bosluk seviyesi</p>
-            </article>
-
-            <article className="history-metric-card">
-              <span>En yuksek kategori</span>
-              <strong>{historyOverview.analysis.topCategory?.label ?? "Veri yok"}</strong>
-              <p>
-                {historyOverview.analysis.topCategory
-                  ? formatMoney(historyOverview.analysis.topCategory.total)
-                  : "Harcama yok"}
-              </p>
-            </article>
-
-            <article className="history-metric-card">
-              <span>Ortalama cikis</span>
-              <strong>{formatMoney(historyOverview.analysis.averageExpense)}</strong>
-              <p>Islem basina ortalama gider seviyesi</p>
-            </article>
-
-            <article className="history-metric-card">
-              <span>Kart odemeleri</span>
-              <strong>{formatMoney(historyOverview.analysis.totalPayments)}</strong>
-              <p>Gider toplamindan ayri tutulur</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section className="history-analysis-grid">
         <article className="history-chart-card">
           <div className="history-chart-card__header">
             <div>
@@ -906,26 +1182,10 @@ export default function HistoryPage() {
               <h2>Gelir ve gider trendi</h2>
             </div>
             <span className="history-summary-pill history-summary-pill--soft">
-              Son {historyOverview.trendMonths.length || 0} ay
+              Son {comparisonData.trendMonths.length || 0} ay
             </span>
           </div>
-          <TrendChart months={historyOverview.trendMonths} />
-        </article>
-
-        <article className="history-chart-card">
-          <div className="history-chart-card__header">
-            <div>
-              <p className="status-card__eyebrow">Kategori Dagilimi</p>
-              <h2>Daire grafik ile cikislar</h2>
-            </div>
-            <span className="history-summary-pill history-summary-pill--soft">
-              En yogun kategoriler
-            </span>
-          </div>
-          <DonutChart
-            categories={historyOverview.donutCategories}
-            totalOutgoing={historyOverview.analysis.totalOutgoing}
-          />
+          <TrendChart months={comparisonData.trendMonths} />
         </article>
       </section>
 
@@ -942,487 +1202,376 @@ export default function HistoryPage() {
             <article className="history-split-bar-card">
               <div className="history-split-bar-card__head">
                 <span>Sabit giderler</span>
-                <strong>%{historyOverview.analysis.fixedRatio.toFixed(0)}</strong>
+                <strong>%{comparisonData.analysis.fixedRatio.toFixed(0)}</strong>
               </div>
               <div className="history-progress">
-                <span style={{ width: `${Math.min(historyOverview.analysis.fixedRatio, 100)}%` }} />
+                <span style={{ width: `${Math.min(comparisonData.analysis.fixedRatio, 100)}%` }} />
               </div>
-              <p>{formatMoney(historyOverview.analysis.fixedOutgoing)}</p>
+              <p>{formatMoney(comparisonData.analysis.fixedOutgoing)}</p>
             </article>
 
             <article className="history-split-bar-card">
               <div className="history-split-bar-card__head">
                 <span>Degisken giderler</span>
-                <strong>%{historyOverview.analysis.variableRatio.toFixed(0)}</strong>
+                <strong>%{comparisonData.analysis.variableRatio.toFixed(0)}</strong>
               </div>
               <div className="history-progress history-progress--variable">
-                <span style={{ width: `${Math.min(historyOverview.analysis.variableRatio, 100)}%` }} />
+                <span style={{ width: `${Math.min(comparisonData.analysis.variableRatio, 100)}%` }} />
               </div>
-              <p>{formatMoney(historyOverview.analysis.variableOutgoing)}</p>
+              <p>{formatMoney(comparisonData.analysis.variableOutgoing)}</p>
             </article>
           </div>
 
           <div className="history-insight-grid history-insight-grid--analysis">
             <article className="history-insight-card">
-              <span>En zor ay</span>
+              <span>En Zor Ay</span>
               <strong>
-                {historyOverview.analysis.worstMonth
-                  ? `${historyOverview.analysis.worstMonth.label} · ${formatMoney(historyOverview.analysis.worstMonth.net)}`
+                {comparisonData.analysis.worstMonth
+                  ? `${comparisonData.analysis.worstMonth.label} · ${formatMoney(comparisonData.analysis.worstMonth.net)}`
                   : "Veri yok"}
               </strong>
             </article>
             <article className="history-insight-card">
-              <span>En rahat ay</span>
+              <span>En Rahat Ay</span>
               <strong>
-                {historyOverview.analysis.bestMonth
-                  ? `${historyOverview.analysis.bestMonth.label} · ${formatMoney(historyOverview.analysis.bestMonth.net)}`
+                {comparisonData.analysis.bestMonth
+                  ? `${comparisonData.analysis.bestMonth.label} · ${formatMoney(comparisonData.analysis.bestMonth.net)}`
                   : "Veri yok"}
               </strong>
             </article>
             <article className="history-insight-card">
-              <span>En degisken kategori</span>
-              <strong>{historyOverview.analysis.volatileCategory?.label ?? "Veri yok"}</strong>
+              <span>En Degisken Kategori</span>
+              <strong>{comparisonData.analysis.volatileCategory?.label ?? "Veri yok"}</strong>
             </article>
             <article className="history-insight-card">
-              <span>En buyuk harcama</span>
+              <span>En Buyuk Harcama</span>
               <strong>
-                {historyOverview.analysis.largestExpense
-                  ? `${historyOverview.analysis.largestExpense.description} · ${formatMoney(historyOverview.analysis.largestExpense.amount)}`
+                {comparisonData.analysis.largestExpense
+                  ? `${comparisonData.analysis.largestExpense.description} · ${formatMoney(comparisonData.analysis.largestExpense.amount)}`
                   : "Harcama yok"}
               </strong>
             </article>
           </div>
         </article>
-
-        <article className="accounts-panel history-behavior-card">
-          <div className="accounts-panel__header">
-            <div>
-              <p className="status-card__eyebrow">Oneriler</p>
-              <p className="accounts-panel__meta">Fazla ve az harcama sinyallerin</p>
-            </div>
-          </div>
-
-          <div className="history-recommendation-list">
-            {historyOverview.recommendations.map((recommendation, index) => (
-              <article className="history-recommendation-card" key={recommendation}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <p>{recommendation}</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="history-year-grid">
-            {historyOverview.recentYears.length ? (
-              historyOverview.recentYears.map((year) => (
-                <article className="history-year-card" key={year.key}>
-                  <p className="history-year-card__title">{year.label}</p>
-                  <strong>{formatMoney(year.net)}</strong>
-                  <div className="history-year-card__meta">
-                    <span>Gelir {formatMoney(year.income)}</span>
-                    <span>Gider {formatMoney(year.outgoing)}</span>
-                    <span>{year.count} islem</span>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="muted-text">Yillik ozet icin veri yok.</p>
-            )}
-          </div>
-        </article>
       </section>
-
-      <section className="accounts-panel">
-        <div className="accounts-panel__header">
-          <div>
-            <p className="status-card__eyebrow">
-              {activeArchive === "years" ? "Yillik Arsiv" : "Aylik Arsiv"}
-            </p>
-            <p className="accounts-panel__meta">
-              {activeArchive === "years"
-                ? "Tum yillarin ozetleri ve eski analizler"
-                : "Tum aylarin ozetleri ve eski analizler"}
-            </p>
-          </div>
-          <div className="history-archive-switch">
-            <button
-              className={`ghost-button ${activeArchive === "months" ? "ghost-button--active" : ""}`}
-              type="button"
-              onClick={() => setActiveArchive("months")}
-            >
-              Aylar
-            </button>
-            <button
-              className={`ghost-button ${activeArchive === "years" ? "ghost-button--active" : ""}`}
-              type="button"
-              onClick={() => setActiveArchive("years")}
-            >
-              Yillar
-            </button>
-          </div>
-        </div>
-
-        <div className="history-archive-layout">
-          <div className="history-archive-list">
-            {(activeArchive === "years" ? historyOverview.allYears : historyOverview.allMonths).length ? (
-              (activeArchive === "years" ? historyOverview.allYears : historyOverview.allMonths).map((entry) => (
-                <article className="history-archive-row" key={entry.key}>
-                  <div>
-                    <strong>{entry.label}</strong>
-                    <p>Net {formatMoney(entry.net)}</p>
-                  </div>
-                  <div className="history-archive-row__meta">
-                    <span>Gelen {formatMoney(entry.income)}</span>
-                    <span>Giden {formatMoney(entry.outgoing)}</span>
-                    {"count" in entry ? <span>{entry.count} islem</span> : null}
-                  </div>
-                </article>
-              ))
-            ) : null}
-          </div>
-
-          <aside className="history-archive-aside">
-            <article className="history-archive-note">
-              <span>En yuksek harcama</span>
-              <strong>
-                {historyOverview.analysis.largestExpense
-                  ? `${historyOverview.analysis.largestExpense.description} · ${formatMoney(historyOverview.analysis.largestExpense.amount)}`
-                  : "Harcama yok"}
-              </strong>
-            </article>
-            <article className="history-archive-note">
-              <span>En iyi ay</span>
-              <strong>
-                {historyOverview.analysis.bestMonth
-                  ? `${historyOverview.analysis.bestMonth.label} · ${formatMoney(historyOverview.analysis.bestMonth.net)}`
-                  : "Veri yok"}
-              </strong>
-            </article>
-            <article className="history-archive-note">
-              <span>En zor ay</span>
-              <strong>
-                {historyOverview.analysis.worstMonth
-                  ? `${historyOverview.analysis.worstMonth.label} · ${formatMoney(historyOverview.analysis.worstMonth.net)}`
-                  : "Veri yok"}
-              </strong>
-            </article>
-            <article className="history-archive-note">
-              <span>Yillik degisim</span>
-              <strong>{formatPercent(historyOverview.analysis.yearlyChange)}</strong>
-            </article>
-          </aside>
-        </div>
-      </section>
-
-      <section className="accounts-panel">
-        <div className="accounts-panel__header">
-          <div>
-            <p className="status-card__eyebrow">Arama ve Filtre</p>
-            <p className="accounts-panel__meta">Islemleri asagidan tarayabilirsin</p>
-          </div>
+    </div>
+  );
+  const historyLayerContent = (
+    <>
+      <div className="analysis-search-wrapper">
+        <div className="analysis-search-bar">
+          <svg className="analysis-search-bar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="text"
+            className="analysis-search-bar__input"
+            placeholder="Kira, kahve, maas..."
+            value={filters.search}
+            onChange={(e) => {
+              handleFilterChange("search", e.target.value);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && applyFilters(e)}
+          />
           <button
-            className={`ghost-button ${searchOpen ? "ghost-button--active" : ""}`}
             type="button"
-            onClick={() => setSearchOpen((current) => !current)}
+            className={`analysis-search-bar__filter-btn ${filters.type || filters.accountId ? "active" : ""}`}
+            onClick={() => setSearchOpen((open) => !open)}
           >
-            {searchOpen ? "Aramayi Gizle" : "Arama"}
+            Filtre{filters.type || filters.accountId ? " •" : ""}
           </button>
         </div>
-        {searchOpen ? (
-          <form className="history-filters" onSubmit={applyFilters}>
-            <label className="compose-form__label" htmlFor="history-account">
-              Hesap
-            </label>
-            <select
-              id="history-account"
-              className="compose-form__input"
-              value={filters.accountId}
-              onChange={(event) => handleFilterChange("accountId", event.target.value)}
-            >
-              <option value="">Tum hesaplar</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
 
-            <label className="compose-form__label" htmlFor="history-type">
-              Tur
-            </label>
-            <select
-              id="history-type"
-              className="compose-form__input"
-              value={filters.type}
-              onChange={(event) => handleFilterChange("type", event.target.value)}
-            >
-              <option value="">Tum hareketler</option>
-              <option value="expense">Harcama</option>
-              <option value="income">Gelir</option>
-              <option value="payment">Odeme</option>
-            </select>
-
-            <label className="compose-form__label" htmlFor="history-search">
-              Ara
-            </label>
-            <input
-              id="history-search"
-              className="compose-form__input"
-              placeholder="Kahve, kira, maas"
-              value={filters.search}
-              onChange={(event) => handleFilterChange("search", event.target.value)}
-            />
-
-            <button className="primary-button" type="submit">
-              Uygula
-            </button>
-          </form>
-        ) : null}
-      </section>
-
-      {loading ? <section className="account-list"><article className="account-card">Yukleniyor...</article></section> : null}
-      {error ? <p className="error-banner">{error}</p> : null}
-
-      <section className="history-list">
-        {filteredTransactions.map((transaction) => {
-          const account = accountMap.get(transaction.account_id);
-          const isEditing = editingId === transaction.id;
-          const isShowingDetail = detailId === transaction.id;
-          const categoryAppearance = getCategoryAppearance(
-            transaction.category_name,
-            transaction.type
-          );
-
-          return (
-            <article className="transaction-card" key={transaction.id}>
-              <div className="transaction-card__header">
-                <div>
-                  <div className="transaction-card__topline">
-                    <strong>{transaction.description}</strong>
-                    <span className={`transaction-badge transaction-badge--${transaction.type}`}>
-                      {getTypeLabel(transaction.type)}
-                    </span>
-                  </div>
-                  <p>
-                    {account?.name ?? `Hesap #${transaction.account_id}`} · {formatDate(transaction.occurred_at)}
-                  </p>
-                </div>
-                <strong>{formatMoney(transaction.amount)}</strong>
+        {searchOpen && (
+          <form className="analysis-search-drawer" onSubmit={applyFilters}>
+            <div className="analysis-search-drawer__grid">
+              <div className="analysis-search-drawer__field">
+                <label>Hesap</label>
+                <select
+                  value={filters.accountId}
+                  onChange={(event) => handleFilterChange("accountId", event.target.value)}
+                >
+                  <option value="">Tum hesaplar</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>{account.name}</option>
+                  ))}
+                </select>
               </div>
+              <div className="analysis-search-drawer__field">
+                <label>Tur</label>
+                <select
+                  value={filters.type}
+                  onChange={(event) => handleFilterChange("type", event.target.value)}
+                >
+                  <option value="">Tum hareketler</option>
+                  <option value="expense">Harcama</option>
+                  <option value="income">Gelir</option>
+                  <option value="payment">Odeme</option>
+                </select>
+              </div>
+            </div>
+            <button className="primary-button" type="submit">Filtreyi Uygula</button>
+          </form>
+        )}
+      </div>
 
-              {!isEditing ? (
-                <div className="account-card__meta">
-                  {transaction.category_name ? (
-                    <span
-                      aria-label={`Kategori ${transaction.category_name}`}
-                      className={`category-chip category-chip--${categoryAppearance.tone}`}
-                    >
-                      <span className="category-chip__icon" aria-hidden="true">
-                        {categoryAppearance.icon}
-                      </span>
-                      <span>{categoryAppearance.label}</span>
-                    </span>
-                  ) : null}
-                  {transaction.note ? <span>Not {transaction.note}</span> : null}
-                </div>
-              ) : null}
+      <section className="analysis-timeline">
+        {timelineGroups.map(([dateLabel, groupTransactions]) => (
+          <div className="analysis-timeline__group" key={dateLabel}>
+            <div className="analysis-timeline__header">
+              <div className="analysis-timeline__bullet"></div>
+              <span>{dateLabel}</span>
+            </div>
+            <div className="analysis-timeline__items">
+              {groupTransactions.map((transaction) => {
+                const account = accountMap.get(transaction.account_id);
+                const isEditing = editingId === transaction.id;
+                const isShowingDetail = detailId === transaction.id;
+                const categoryAppearance = getCategoryAppearance(
+                  transaction.category_name,
+                  transaction.type
+                );
 
-              {!isEditing && isShowingDetail ? (
-                <section className="transaction-detail-card">
-                  <div className="transaction-detail-card__grid">
-                    <article className="transaction-detail-card__item">
-                      <span className="transaction-detail-card__label">Hesap</span>
-                      <strong>{account?.name ?? `Hesap #${transaction.account_id}`}</strong>
-                    </article>
-                    <article className="transaction-detail-card__item">
-                      <span className="transaction-detail-card__label">Tur</span>
-                      <strong>{getTypeLabel(transaction.type)}</strong>
-                    </article>
-                    <article className="transaction-detail-card__item">
-                      <span className="transaction-detail-card__label">Kategori</span>
-                      <strong>{transaction.category_name ?? "Yok"}</strong>
-                    </article>
-                    <article className="transaction-detail-card__item">
-                      <span className="transaction-detail-card__label">Zaman</span>
-                      <strong>{formatDate(transaction.occurred_at)}</strong>
-                    </article>
-                    <article className="transaction-detail-card__item">
-                      <span className="transaction-detail-card__label">Ekstre Ayi</span>
-                      <strong>{formatStatementMonth(transaction.statement_month)}</strong>
-                    </article>
-                    <article className="transaction-detail-card__item">
-                      <span className="transaction-detail-card__label">Not</span>
-                      <strong>{transaction.note ?? "Yok"}</strong>
-                    </article>
-                  </div>
-                </section>
-              ) : null}
+                return (
+                  <article className="transaction-card" key={transaction.id}>
+                    <div className="transaction-card__header">
+                      <div>
+                        <div className="transaction-card__topline">
+                          <strong>{transaction.description}</strong>
+                          <span className={`transaction-badge transaction-badge--${transaction.type}`}>
+                            {getTypeLabel(transaction.type)}
+                          </span>
+                        </div>
+                        <p>
+                          {account?.name ?? `Hesap #${transaction.account_id}`} · {formatDate(transaction.occurred_at)}
+                        </p>
+                      </div>
+                      <strong>{formatMoney(transaction.amount)}</strong>
+                    </div>
 
-              {isEditing ? (
-                <div className="transaction-editor">
-                  <label className="compose-form__label" htmlFor={`transaction-account-${transaction.id}`}>
-                    Hesap
-                  </label>
-                  <select
-                    id={`transaction-account-${transaction.id}`}
-                    className="compose-form__input"
-                    value={editForm.account_id}
-                    onChange={(event) =>
-                      setEditForm((current) => ({
-                        ...current,
-                        account_id: event.target.value
-                      }))
-                    }
-                  >
-                    {accounts.map((nextAccount) => (
-                      <option key={nextAccount.id} value={nextAccount.id}>
-                        {nextAccount.name}
-                      </option>
-                    ))}
-                  </select>
+                    {!isEditing ? (
+                      <div className="account-card__meta">
+                        {transaction.category_name ? (
+                          <span
+                            aria-label={`Kategori ${transaction.category_name}`}
+                            className={`category-chip category-chip--${categoryAppearance.tone}`}
+                          >
+                            <span className="category-chip__icon" aria-hidden="true">
+                              {categoryAppearance.icon}
+                            </span>
+                            <span>{categoryAppearance.label}</span>
+                          </span>
+                        ) : null}
+                        {transaction.note ? <span>Not {transaction.note}</span> : null}
+                      </div>
+                    ) : null}
 
-                  <label className="compose-form__label" htmlFor={`transaction-category-${transaction.id}`}>
-                    Kategori
-                  </label>
-                  <input
-                    id={`transaction-category-${transaction.id}`}
-                    className="compose-form__input"
-                    value={editForm.category_name}
-                    onChange={(event) =>
-                      setEditForm((current) => ({
-                        ...current,
-                        category_name: event.target.value
-                      }))
-                    }
-                  />
+                    {!isEditing && isShowingDetail ? (
+                      <section className="transaction-detail-card">
+                        <div className="transaction-detail-card__grid">
+                          <article className="transaction-detail-card__item">
+                            <span className="transaction-detail-card__label">Hesap</span>
+                            <strong>{account?.name ?? `Hesap #${transaction.account_id}`}</strong>
+                          </article>
+                          <article className="transaction-detail-card__item">
+                            <span className="transaction-detail-card__label">Tur</span>
+                            <strong>{getTypeLabel(transaction.type)}</strong>
+                          </article>
+                          <article className="transaction-detail-card__item">
+                            <span className="transaction-detail-card__label">Kategori</span>
+                            <strong>{transaction.category_name ?? "Yok"}</strong>
+                          </article>
+                          <article className="transaction-detail-card__item">
+                            <span className="transaction-detail-card__label">Zaman</span>
+                            <strong>{formatDate(transaction.occurred_at)}</strong>
+                          </article>
+                          <article className="transaction-detail-card__item">
+                            <span className="transaction-detail-card__label">Ekstre Ayi</span>
+                            <strong>{formatStatementMonth(transaction.statement_month)}</strong>
+                          </article>
+                          <article className="transaction-detail-card__item">
+                            <span className="transaction-detail-card__label">Not</span>
+                            <strong>{transaction.note ?? "Yok"}</strong>
+                          </article>
+                        </div>
+                      </section>
+                    ) : null}
 
-                  <label className="compose-form__label" htmlFor={`transaction-type-${transaction.id}`}>
-                    Tur
-                  </label>
-                  <select
-                    id={`transaction-type-${transaction.id}`}
-                    className="compose-form__input"
-                    value={editForm.type}
-                    onChange={(event) =>
-                      setEditForm((current) => ({
-                        ...current,
-                        type: event.target.value
-                      }))
-                    }
-                  >
-                    <option value="expense">Harcama</option>
-                    <option value="income">Gelir</option>
-                    <option value="payment">Odeme</option>
-                  </select>
+                    {isEditing ? (
+                      <div className="transaction-editor">
+                        <label className="compose-form__label" htmlFor={`transaction-account-${transaction.id}`}>
+                          Hesap
+                        </label>
+                        <select
+                          id={`transaction-account-${transaction.id}`}
+                          className="compose-form__input"
+                          value={editForm.account_id}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              account_id: event.target.value
+                            }))
+                          }
+                        >
+                          {accounts.map((nextAccount) => (
+                            <option key={nextAccount.id} value={nextAccount.id}>
+                              {nextAccount.name}
+                            </option>
+                          ))}
+                        </select>
 
-                  <label className="compose-form__label" htmlFor={`transaction-amount-${transaction.id}`}>
-                    Tutar
-                  </label>
-                  <input
-                    id={`transaction-amount-${transaction.id}`}
-                    className="compose-form__input"
-                    inputMode="decimal"
-                    value={editForm.amount}
-                    onChange={(event) =>
-                      setEditForm((current) => ({
-                        ...current,
-                        amount: event.target.value
-                      }))
-                    }
-                  />
+                        <label className="compose-form__label" htmlFor={`transaction-category-${transaction.id}`}>
+                          Kategori
+                        </label>
+                        <select
+                          id={`transaction-category-${transaction.id}`}
+                          className="compose-form__input"
+                          value={editForm.category_name}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              category_name: event.target.value
+                            }))
+                          }
+                        >
+                          <option value="">Seç...</option>
+                          {getCategoryList(editForm.type).map((cat) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
 
-                  <label className="compose-form__label" htmlFor={`transaction-description-${transaction.id}`}>
-                    Aciklama
-                  </label>
-                  <input
-                    id={`transaction-description-${transaction.id}`}
-                    className="compose-form__input"
-                    value={editForm.description}
-                    onChange={(event) =>
-                      setEditForm((current) => ({
-                        ...current,
-                        description: event.target.value
-                      }))
-                    }
-                  />
+                        <label className="compose-form__label" htmlFor={`transaction-type-${transaction.id}`}>
+                          Tur
+                        </label>
+                        <select
+                          id={`transaction-type-${transaction.id}`}
+                          className="compose-form__input"
+                          value={editForm.type}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              type: event.target.value
+                            }))
+                          }
+                        >
+                          <option value="expense">Harcama</option>
+                          <option value="income">Gelir</option>
+                          <option value="payment">Odeme</option>
+                        </select>
 
-                  <label className="compose-form__label" htmlFor={`transaction-note-${transaction.id}`}>
-                    Not
-                  </label>
-                  <input
-                    id={`transaction-note-${transaction.id}`}
-                    className="compose-form__input"
-                    value={editForm.note}
-                    onChange={(event) =>
-                      setEditForm((current) => ({
-                        ...current,
-                        note: event.target.value
-                      }))
-                    }
-                  />
+                        <label className="compose-form__label" htmlFor={`transaction-amount-${transaction.id}`}>
+                          Tutar
+                        </label>
+                        <input
+                          id={`transaction-amount-${transaction.id}`}
+                          className="compose-form__input"
+                          inputMode="decimal"
+                          value={editForm.amount}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              amount: event.target.value
+                            }))
+                          }
+                        />
 
-                  <label className="compose-form__label" htmlFor={`transaction-date-${transaction.id}`}>
-                    Zaman
-                  </label>
-                  <input
-                    id={`transaction-date-${transaction.id}`}
-                    className="compose-form__input"
-                    type="datetime-local"
-                    value={editForm.occurred_at}
-                    onChange={(event) =>
-                      setEditForm((current) => ({
-                        ...current,
-                        occurred_at: event.target.value
-                      }))
-                    }
-                  />
+                        <label className="compose-form__label" htmlFor={`transaction-description-${transaction.id}`}>
+                          Aciklama
+                        </label>
+                        <input
+                          id={`transaction-description-${transaction.id}`}
+                          className="compose-form__input"
+                          value={editForm.description}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              description: event.target.value
+                            }))
+                          }
+                        />
 
-                  <div className="event-actions">
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      onClick={() => handleSave(transaction.id)}
-                    >
-                      Kaydet
-                    </button>
-                    <button className="ghost-button" type="button" onClick={cancelEditing}>
-                      Vazgec
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+                        <label className="compose-form__label" htmlFor={`transaction-note-${transaction.id}`}>
+                          Not
+                        </label>
+                        <input
+                          id={`transaction-note-${transaction.id}`}
+                          className="compose-form__input"
+                          value={editForm.note}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              note: event.target.value
+                            }))
+                          }
+                        />
 
-              {!isEditing ? (
-                <div className="transaction-card__actions">
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() =>
-                      setDetailId((current) => (current === transaction.id ? null : transaction.id))
-                    }
-                  >
-                    {isShowingDetail ? "Detayi Gizle" : "Detay"}
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => startEditing(transaction)}
-                  >
-                    Duzenle
-                  </button>
-                  <button
-                    className="ghost-button ghost-button--danger"
-                    type="button"
-                    onClick={() => handleDelete(transaction.id)}
-                  >
-                    Sil
-                  </button>
-                </div>
-              ) : null}
-            </article>
-          );
-        })}
+                        <label className="compose-form__label" htmlFor={`transaction-date-${transaction.id}`}>
+                          Zaman
+                        </label>
+                        <input
+                          id={`transaction-date-${transaction.id}`}
+                          className="compose-form__input"
+                          type="datetime-local"
+                          value={editForm.occurred_at}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              occurred_at: event.target.value
+                            }))
+                          }
+                        />
 
-        {!loading && !filteredTransactions.length ? (
+                        <div className="event-actions">
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() => handleSave(transaction.id)}
+                          >
+                            Kaydet
+                          </button>
+                          <button className="ghost-button" type="button" onClick={cancelEditing}>
+                            Vazgec
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {!isEditing ? (
+                      <div className="transaction-card__actions">
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() =>
+                            setDetailId((current) => (current === transaction.id ? null : transaction.id))
+                          }
+                        >
+                          {isShowingDetail ? "Detayi Gizle" : "Detay"}
+                        </button>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => startEditing(transaction)}
+                        >
+                          Duzenle
+                        </button>
+                        <button
+                          className="ghost-button ghost-button--danger"
+                          type="button"
+                          onClick={() => handleDelete(transaction.id)}
+                        >
+                          Sil
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {!loading && !comparisonTransactions.length ? (
           <article className="history-empty-state">
             <span className="status-card__eyebrow">Bos Gorunum</span>
             <strong>Bu filtrelerle islem bulunamadi</strong>
@@ -1430,6 +1579,145 @@ export default function HistoryPage() {
           </article>
         ) : null}
       </section>
+
+      <section className="analysis-collapsible-section">
+        <button
+          className="secondary-button analysis-collapsible-toggle"
+          type="button"
+          aria-expanded={showDetailedAnalysis}
+          onClick={() => setShowDetailedAnalysis((current) => !current)}
+        >
+          {showDetailedAnalysis ? "Grafikleri Gizle" : "Detayli Analiz & Grafikleri Goster"}
+          <span
+            className="analysis-collapsible-toggle__chevron"
+            aria-hidden="true"
+            style={{ transform: showDetailedAnalysis ? "rotate(180deg)" : "rotate(0deg)" }}
+          >
+            ▼
+          </span>
+        </button>
+
+        {showDetailedAnalysis ? (
+          <div className="analysis-collapsible-content slide-in-top" style={{ marginTop: "24px" }}>
+            {detailedAnalysisSection}
+          </div>
+        ) : null}
+      </section>
+    </>
+  );
+
+  return (
+    <main className="shell">
+      {loading && !comparisonTransactions.length ? (
+        <section className="account-list">
+          <article className="account-card">Yukleniyor...</article>
+        </section>
+      ) : (
+        <div className="history-tab-overview slide-in-bottom" data-scene={activeAppTab}>
+          <div className="analysis-scroll-shell" ref={analysisShellRef}>
+            <div className="analysis-scroll-stage">
+              <div className="analysis-scroll-stage__glow" aria-hidden="true" style={analysisGlowStyle} />
+
+              <section
+                className="analysis-scroll-layer analysis-scroll-layer--overview"
+                style={analysisOverviewSceneStyle}
+              >
+                <div className="analysis-overview-shell" ref={overviewScrollRef}>
+                  <section className="accounts-panel history-hero-panel">
+                    <div className="history-hero-layout" style={{ marginTop: "12px" }}>
+                      <div className="history-hero-main">
+                        <article className="analysis-odometer-card">
+                          <span className="analysis-odometer-card__label">Toplam Net Durum</span>
+                          <strong className="analysis-odometer-card__amount">
+                            <AnimatedMoney value={thisMonthData.analysis.net} animationKey={analysisCounterAnimationKey} />
+                          </strong>
+                          <div className="analysis-odometer-card__meta">
+                            <span className="analysis-odometer-card__income">
+                              Gelir <AnimatedMoney value={thisMonthData.analysis.totalIncome} animationKey={analysisCounterAnimationKey} />
+                            </span>
+                            <span className="analysis-odometer-card__separator">·</span>
+                            <span className="analysis-odometer-card__outgoing">
+                              Gider <AnimatedMoney value={thisMonthData.analysis.totalOutgoing} animationKey={analysisCounterAnimationKey} />
+                            </span>
+                          </div>
+                          {thisMonthData.analysis.totalPayments > 0 ? (
+                            <p className="analysis-odometer-card__note">
+                              Kart odemeleri yansitilmiyor: <AnimatedMoney value={thisMonthData.analysis.totalPayments} animationKey={analysisCounterAnimationKey} />
+                            </p>
+                          ) : null}
+                        </article>
+                        {activityRingsCard}
+                      </div>
+                      <div className="history-hero-grid">
+                        <article className="history-metric-card">
+                          <span>Aylik Degisim</span>
+                          <strong>{formatPercent(thisMonthData.analysis.monthlyChange)}</strong>
+                          <p>Onceki aya kiyasla</p>
+                        </article>
+
+                        <article className="history-metric-card">
+                          <span>Tasarruf Orani</span>
+                          <strong>%{thisMonthData.analysis.savingsRate.toFixed(0)}</strong>
+                          <p>Kalan paranin orani</p>
+                        </article>
+
+                        <article className="history-metric-card">
+                          <span>Top Kategori</span>
+                          <strong>{thisMonthData.analysis.topCategory?.label ?? "Veri yok"}</strong>
+                          <p>
+                            {thisMonthData.analysis.topCategory
+                              ? formatMoney(thisMonthData.analysis.topCategory.total)
+                              : "Harcama yok"}
+                          </p>
+                        </article>
+
+                        <article className="history-metric-card">
+                          <span>Islem Basina</span>
+                          <strong>{formatMoney(thisMonthData.analysis.averageExpense)}</strong>
+                          <p>Tekil harcama ucreti</p>
+                        </article>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="analysis-stories-section">
+                    <div className="accounts-panel__header" style={{ padding: "0 20px" }}>
+                      <div>
+                        <p className="status-card__eyebrow">Zeka Onerileri</p>
+                        <p className="accounts-panel__meta">Finansal sinyallerin</p>
+                      </div>
+                    </div>
+
+                    <div className="analysis-story-list">
+                      {comparisonData.recommendations.map((recommendation, index) => {
+                        const types = ["warning", "success", "info", "danger"];
+                        const tone = types[Math.min(index, types.length - 1)];
+
+                        return (
+                          <article className={`analysis-story-card analysis-story-card--${tone}`} key={recommendation}>
+                            <div className="analysis-story-card__icon">
+                              {tone === "warning" ? "💡" : tone === "danger" ? "🚨" : tone === "success" ? "🚀" : "✨"}
+                            </div>
+                            <p>{recommendation}</p>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </div>
+              </section>
+
+              <section className="analysis-scroll-layer analysis-scroll-layer--detail" style={analysisDetailSceneStyle}>
+                <div className="analysis-detail-shell" ref={historyScrollRef}>
+                  {historyLayerContent}
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error ? <p className="error-banner">{error}</p> : null}
     </main>
   );
 }

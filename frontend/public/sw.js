@@ -1,4 +1,4 @@
-const CACHE_NAME = "lifeos-shell-v2";
+const CACHE_NAME = "life-base-shell-v3";
 const APP_SHELL = ["/", "/manifest.json", "/icons/icon-192.svg", "/icons/icon-512.svg"];
 
 self.addEventListener("install", (event) => {
@@ -47,7 +47,7 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("push", (event) => {
   const payload = event.data ? event.data.json() : {};
-  const title = payload.title ?? "Life OS";
+  const title = payload.title ?? "life-base";
   const options = {
     body: payload.body ?? "Yeni bir hatirlatman var.",
     icon: "/icons/icon-192.svg",

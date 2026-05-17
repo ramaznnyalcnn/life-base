@@ -1,307 +1,493 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { clarifyAI, executeAI } from "../api/ai";
-import StatusCard from "../components/StatusCard";
+import { fetchAccounts } from "../api/accounts";
+import { createEvent, createRecurringEvent } from "../api/events";
+import { createTransaction } from "../api/transactions";
 
-const AI_TEMPLATES = [
-  {
-    id: "weekly-routine",
-    title: "Haftalik Rutin",
-    description: "Tekrarlayan spor, ders veya calisma planlari icin.",
-    prompt: "Haftada 3 gun pazartesi carsamba cuma spor rutini ekle"
-  },
-  {
-    id: "bill-payment",
-    title: "Odeme Hatirlaticisi",
-    description: "Kart, fatura veya kira odemesi gibi kayitlar icin.",
-    prompt: "Her ayin 28'inde kredi karti odemesi icin hatirlatici ekle"
-  },
-  {
-    id: "income-expense",
-    title: "Gelir / Gider",
-    description: "Finansal hareketleri AI ile hizli kaydetmek icin.",
-    prompt: "Bugun 860 tl market gideri ekle, hesabim enpara"
-  },
-  {
-    id: "appointment",
-    title: "Randevu",
-    description: "Tek seferlik toplantilar ve randevular icin.",
-    prompt: "Yarin saat 14:30 disci randevusu ekle"
-  }
+const EXPENSE_CATEGORIES = [
+  "Market", "Yeme-İçme", "Kahve", "Fatura", "Abonelik",
+  "Ulaşım", "Yakıt", "Sağlık", "Eczane", "Kira",
+  "Eğlence", "Giyim", "Eğitim", "Elektronik",
+  "Kişisel Bakım", "Spor", "Diğer"
 ];
 
-const INITIAL_OPTIONS = {
-  category: "",
-  account: "",
-  recurrence: "",
-  reminder: "",
-  important: false
-};
+const INCOME_CATEGORIES = [
+  "Maaş", "Ek Gelir", "Serbest Çalışma", "Yatırım", "Prim", "Diğer Gelir"
+];
 
-function buildContextMessage(baseMessage, options) {
-  const extras = [];
+const PAYMENT_CATEGORIES = [
+  "Kredi Kartı Ödemesi", "Borç Ödemesi", "Diğer Ödeme"
+];
 
-  if (options.category.trim()) {
-    extras.push(`Kategori tercihi: ${options.category.trim()}`);
-  }
+const REMINDER_OPTIONS = [
+  { label: "Hatırlatma yok", value: "" },
+  { label: "15 dk önce", value: "15" },
+  { label: "30 dk önce", value: "30" },
+  { label: "1 saat önce", value: "60" },
+  { label: "1 gün önce", value: "1440" }
+];
 
-  if (options.account.trim()) {
-    extras.push(`Hesap veya kart tercihi: ${options.account.trim()}`);
-  }
+const WEEKDAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
-  if (options.recurrence.trim()) {
-    extras.push(`Tekrar tercihi: ${options.recurrence.trim()}`);
-  }
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const nowTimeStr = () => new Date().toTimeString().slice(0, 5);
 
-  if (options.reminder.trim()) {
-    extras.push(`Hatirlatma tercihi: ${options.reminder.trim()}`);
-  }
-
-  if (options.important) {
-    extras.push("Kaydi onemli olarak isaretle.");
-  }
-
-  if (!extras.length) {
-    return baseMessage;
-  }
-
-  return `${baseMessage}\n\nEk tercihler:\n- ${extras.join("\n- ")}`;
+function getCategoryList(type) {
+  if (type === "income") return INCOME_CATEGORIES;
+  if (type === "payment") return PAYMENT_CATEGORIES;
+  return EXPENSE_CATEGORIES;
 }
 
-export default function AddPage() {
-  const [message, setMessage] = useState("");
-  const [clarification, setClarification] = useState("");
-  const [lastMessage, setLastMessage] = useState("");
-  const [result, setResult] = useState(null);
+function SuccessBanner({ message, onDismiss }) {
+  return (
+    <div className="add-success-banner">
+      <span>{message}</span>
+      <button type="button" className="ghost-button" onClick={onDismiss}>×</button>
+    </div>
+  );
+}
+
+function FormField({ label, htmlFor, children }) {
+  return (
+    <div className="add-field">
+      <label className="compose-form__label" htmlFor={htmlFor}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function TransactionForm({ accounts }) {
+  const [type, setType] = useState("expense");
+  const [form, setForm] = useState({
+    amount: "", account_id: "", category_name: "",
+    occurred_at: todayStr(), description: "", note: ""
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showOptions, setShowOptions] = useState(false);
-  const [options, setOptions] = useState(INITIAL_OPTIONS);
+  const [success, setSuccess] = useState("");
 
-  function resetComposer() {
-    setMessage("");
-    setClarification("");
-    setLastMessage("");
-    setOptions(INITIAL_OPTIONS);
-    setShowOptions(false);
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function updateOption(field, value) {
-    setOptions((current) => ({
-      ...current,
-      [field]: value
-    }));
+  function handleTypeChange(nextType) {
+    setType(nextType);
+    setForm((prev) => ({ ...prev, category_name: "" }));
   }
 
-  async function handleExecute(event) {
-    event.preventDefault();
-    if (!message.trim()) {
-      return;
-    }
-
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.amount || !form.account_id || !form.description.trim()) return;
     setLoading(true);
     setError("");
-
     try {
-      const enrichedMessage = buildContextMessage(message.trim(), options);
-      const nextResult = await executeAI(enrichedMessage);
-      setLastMessage(enrichedMessage);
-      setResult(nextResult);
-      setClarification("");
-    } catch (nextError) {
-      setError(nextError.message);
+      await createTransaction({
+        account_id: Number(form.account_id),
+        type,
+        amount: form.amount,
+        category_name: form.category_name || null,
+        description: form.description.trim(),
+        note: form.note.trim() || null,
+        occurred_at: new Date(form.occurred_at).toISOString()
+      });
+      setSuccess("İşlem kaydedildi.");
+      setForm({ amount: "", account_id: "", category_name: "", occurred_at: todayStr(), description: "", note: "" });
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleClarify(event) {
-    event.preventDefault();
-    if (!clarification.trim() || !lastMessage) {
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const nextResult = await clarifyAI(lastMessage, clarification.trim());
-      setResult(nextResult);
-      if (nextResult.status === "completed") {
-        resetComposer();
-      }
-    } catch (nextError) {
-      setError(nextError.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function applyTemplate(template) {
-    setMessage(template.prompt);
-    setError("");
-  }
-
-  const needsInput = result?.status === "needs_input";
-  const activeOptionCount = Object.values(options).filter(Boolean).length;
+  const categories = getCategoryList(type);
+  const typeLabels = { expense: "Gider", income: "Gelir", payment: "Ödeme" };
 
   return (
-    <main className="shell">
-      <section className="compose-panel add-ai-panel">
-        <div className="add-ai-panel__header">
-          <div />
+    <form className="add-form" onSubmit={handleSubmit}>
+      {success ? <SuccessBanner message={success} onDismiss={() => setSuccess("")} /> : null}
+
+      <div className="add-type-row">
+        {["expense", "income", "payment"].map((t) => (
           <button
-            className={`ghost-button ${showOptions ? "ghost-button--active" : ""}`}
+            key={t}
             type="button"
-            onClick={() => setShowOptions((current) => !current)}
+            className={`add-type-chip ${type === t ? "add-type-chip--active add-type-chip--" + t : ""}`}
+            onClick={() => handleTypeChange(t)}
           >
-            {showOptions ? "Opsiyonlari gizle" : "Opsiyonel alanlar"}
+            {typeLabels[t]}
           </button>
-        </div>
+        ))}
+      </div>
 
-        <form className="compose-form" onSubmit={handleExecute}>
-          <label className="compose-form__label" htmlFor="message">
-            Mesaj
-          </label>
-          <textarea
-            id="message"
-            className="compose-form__textarea"
-            placeholder="Ornek: haftada 3 gun pazartesi carsamba cuma spor rutini ekle"
-            rows={5}
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
+      <div className="add-form-grid">
+        <FormField label="Tutar (₺)" htmlFor="tx-amount">
+          <input
+            id="tx-amount"
+            className="compose-form__input"
+            type="number"
+            min="0.01"
+            step="0.01"
+            inputMode="decimal"
+            placeholder="0,00"
+            value={form.amount}
+            onChange={(e) => update("amount", e.target.value)}
+            required
           />
+        </FormField>
 
-          {showOptions ? (
-            <section className="add-ai-options">
-              <div className="add-ai-options__header">
-                <div>
-                  <p className="status-card__eyebrow">Opsiyonel</p>
-                  <h3>AI'a ek baglam ver</h3>
-                </div>
-                {activeOptionCount ? <span className="status-chip">{activeOptionCount} aktif tercih</span> : null}
-              </div>
+        <FormField label="Tarih" htmlFor="tx-date">
+          <input
+            id="tx-date"
+            className="compose-form__input"
+            type="date"
+            value={form.occurred_at}
+            onChange={(e) => update("occurred_at", e.target.value)}
+            required
+          />
+        </FormField>
 
-              <div className="add-ai-options__grid">
-                <label className="compose-form__label" htmlFor="ai-category">
-                  Kategori
-                </label>
-                <input
-                  id="ai-category"
-                  className="compose-form__input"
-                  placeholder="Ornek: spor, market, abonelik"
-                  value={options.category}
-                  onChange={(event) => updateOption("category", event.target.value)}
-                />
+        <FormField label="Hesap" htmlFor="tx-account">
+          <select
+            id="tx-account"
+            className="compose-form__input compose-form__select"
+            value={form.account_id}
+            onChange={(e) => update("account_id", e.target.value)}
+            required
+          >
+            <option value="">Hesap seç...</option>
+            {accounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>{acc.name}</option>
+            ))}
+          </select>
+        </FormField>
 
-                <label className="compose-form__label" htmlFor="ai-account">
-                  Hesap / Kart
-                </label>
-                <input
-                  id="ai-account"
-                  className="compose-form__input"
-                  placeholder="Ornek: enpara, garanti bonus"
-                  value={options.account}
-                  onChange={(event) => updateOption("account", event.target.value)}
-                />
+        <FormField label="Kategori" htmlFor="tx-category">
+          <select
+            id="tx-category"
+            className="compose-form__input compose-form__select"
+            value={form.category_name}
+            onChange={(e) => update("category_name", e.target.value)}
+          >
+            <option value="">Seçiniz...</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </FormField>
 
-                <label className="compose-form__label" htmlFor="ai-recurrence">
-                  Tekrar tercihi
-                </label>
-                <input
-                  id="ai-recurrence"
-                  className="compose-form__input"
-                  placeholder="Ornek: her cuma, ayda bir, 3 ay boyunca"
-                  value={options.recurrence}
-                  onChange={(event) => updateOption("recurrence", event.target.value)}
-                />
+        <FormField label="Açıklama" htmlFor="tx-desc">
+          <input
+            id="tx-desc"
+            className="compose-form__input"
+            type="text"
+            placeholder="Kısa açıklama"
+            value={form.description}
+            onChange={(e) => update("description", e.target.value)}
+            required
+          />
+        </FormField>
 
-                <label className="compose-form__label" htmlFor="ai-reminder">
-                  Hatirlatma
-                </label>
-                <input
-                  id="ai-reminder"
-                  className="compose-form__input"
-                  placeholder="Ornek: 1 gun once, 2 saat once"
-                  value={options.reminder}
-                  onChange={(event) => updateOption("reminder", event.target.value)}
-                />
-              </div>
+        <FormField label="Not (isteğe bağlı)" htmlFor="tx-note">
+          <input
+            id="tx-note"
+            className="compose-form__input"
+            type="text"
+            placeholder="Ek bilgi"
+            value={form.note}
+            onChange={(e) => update("note", e.target.value)}
+          />
+        </FormField>
+      </div>
 
-              <label className="calendar-planner__checkbox add-ai-options__check">
-                <input
-                  checked={options.important}
-                  type="checkbox"
-                  onChange={(event) => updateOption("important", event.target.checked)}
-                />
-                <span>Onemli olarak isaretle</span>
-              </label>
-            </section>
-          ) : null}
+      {error ? <p className="error-banner">{error}</p> : null}
 
-          <div className="add-ai-panel__actions">
-            <button className="primary-button" disabled={loading} type="submit">
-              {loading ? "Isleniyor..." : "AI ile isle"}
-            </button>
+      <div className="add-form-actions">
+        <button className="primary-button" type="submit" disabled={loading}>
+          {loading ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+        <button className="ghost-button" type="button"
+          onClick={() => { setForm({ amount: "", account_id: "", category_name: "", occurred_at: todayStr(), description: "", note: "" }); setError(""); setSuccess(""); }}>
+          Temizle
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function EventForm() {
+  const [form, setForm] = useState({
+    title: "", date: todayStr(), time: nowTimeStr(), reminder: "", is_important: false
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      await createEvent({
+        title: form.title.trim(),
+        starts_at: new Date(`${form.date}T${form.time || "09:00"}`).toISOString(),
+        is_important: form.is_important,
+        reminder_offsets_minutes: form.reminder ? [Number(form.reminder)] : null
+      });
+      setSuccess("Etkinlik eklendi.");
+      setForm({ title: "", date: todayStr(), time: nowTimeStr(), reminder: "", is_important: false });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form className="add-form" onSubmit={handleSubmit}>
+      {success ? <SuccessBanner message={success} onDismiss={() => setSuccess("")} /> : null}
+
+      <div className="add-form-grid">
+        <FormField label="Başlık" htmlFor="ev-title">
+          <input
+            id="ev-title"
+            className="compose-form__input"
+            type="text"
+            placeholder="Etkinlik adı"
+            value={form.title}
+            onChange={(e) => update("title", e.target.value)}
+            required
+          />
+        </FormField>
+
+        <FormField label="Tarih" htmlFor="ev-date">
+          <input
+            id="ev-date"
+            className="compose-form__input"
+            type="date"
+            value={form.date}
+            onChange={(e) => update("date", e.target.value)}
+            required
+          />
+        </FormField>
+
+        <FormField label="Saat" htmlFor="ev-time">
+          <input
+            id="ev-time"
+            className="compose-form__input"
+            type="time"
+            value={form.time}
+            onChange={(e) => update("time", e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Hatırlatma" htmlFor="ev-reminder">
+          <select
+            id="ev-reminder"
+            className="compose-form__input compose-form__select"
+            value={form.reminder}
+            onChange={(e) => update("reminder", e.target.value)}
+          >
+            {REMINDER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </FormField>
+      </div>
+
+      <label className="add-checkbox-row">
+        <input
+          type="checkbox"
+          checked={form.is_important}
+          onChange={(e) => update("is_important", e.target.checked)}
+        />
+        <span>Önemli olarak işaretle</span>
+      </label>
+
+      {error ? <p className="error-banner">{error}</p> : null}
+
+      <div className="add-form-actions">
+        <button className="primary-button" type="submit" disabled={loading}>
+          {loading ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+        <button className="ghost-button" type="button"
+          onClick={() => { setForm({ title: "", date: todayStr(), time: nowTimeStr(), reminder: "", is_important: false }); setError(""); setSuccess(""); }}>
+          Temizle
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function RoutineForm() {
+  const [form, setForm] = useState({
+    title: "", weekdays: [], interval_weeks: 1, starts_on: todayStr(), start_time: ""
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function toggleWeekday(day) {
+    setForm((prev) => {
+      const next = prev.weekdays.includes(day)
+        ? prev.weekdays.filter((d) => d !== day)
+        : [...prev.weekdays, day];
+      return { ...prev, weekdays: next };
+    });
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.title.trim() || form.weekdays.length === 0) return;
+    setLoading(true);
+    setError("");
+    try {
+      await createRecurringEvent({
+        title: form.title.trim(),
+        weekdays: form.weekdays,
+        interval_weeks: Number(form.interval_weeks),
+        starts_on: form.starts_on,
+        start_time: form.start_time || null
+      });
+      setSuccess("Rutin oluşturuldu.");
+      setForm({ title: "", weekdays: [], interval_weeks: 1, starts_on: todayStr(), start_time: "" });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form className="add-form" onSubmit={handleSubmit}>
+      {success ? <SuccessBanner message={success} onDismiss={() => setSuccess("")} /> : null}
+
+      <div className="add-form-grid">
+        <FormField label="Başlık" htmlFor="rt-title">
+          <input
+            id="rt-title"
+            className="compose-form__input"
+            type="text"
+            placeholder="Rutin adı (örn. Spor)"
+            value={form.title}
+            onChange={(e) => update("title", e.target.value)}
+            required
+          />
+        </FormField>
+
+        <FormField label="Başlangıç Tarihi" htmlFor="rt-start">
+          <input
+            id="rt-start"
+            className="compose-form__input"
+            type="date"
+            value={form.starts_on}
+            onChange={(e) => update("starts_on", e.target.value)}
+            required
+          />
+        </FormField>
+
+        <FormField label="Saat (isteğe bağlı)" htmlFor="rt-time">
+          <input
+            id="rt-time"
+            className="compose-form__input"
+            type="time"
+            value={form.start_time}
+            onChange={(e) => update("start_time", e.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Her kaç haftada bir?" htmlFor="rt-interval">
+          <select
+            id="rt-interval"
+            className="compose-form__input compose-form__select"
+            value={form.interval_weeks}
+            onChange={(e) => update("interval_weeks", e.target.value)}
+          >
+            {[1, 2, 3, 4].map((n) => (
+              <option key={n} value={n}>{n === 1 ? "Her hafta" : `${n} haftada bir`}</option>
+            ))}
+          </select>
+        </FormField>
+      </div>
+
+      <div className="add-field">
+        <p className="compose-form__label">Hangi günler?</p>
+        <div className="add-weekday-picker">
+          {WEEKDAY_LABELS.map((label, i) => (
             <button
-              className="ghost-button"
+              key={i}
               type="button"
-              onClick={resetComposer}
-              disabled={loading && !message.trim()}
+              className={`add-weekday-btn ${form.weekdays.includes(i) ? "add-weekday-btn--active" : ""}`}
+              onClick={() => toggleWeekday(i)}
             >
-              Temizle
-            </button>
-          </div>
-        </form>
-
-        {error ? <p className="error-banner">{error}</p> : null}
-        <StatusCard result={result} />
-
-        {needsInput ? (
-          <form className="clarify-form" onSubmit={handleClarify}>
-            <div className="add-ai-panel__header">
-              <div>
-                <p className="status-card__eyebrow">AI Sorusu</p>
-                <h2>Eksik bilgiyi tamamla</h2>
-              </div>
-            </div>
-            <label className="compose-form__label" htmlFor="clarification">
-              Ek bilgi
-            </label>
-            <input
-              id="clarification"
-              className="compose-form__input"
-              placeholder="Ornek: sali-cumartesi tum gun, enpara, 500 tl"
-              value={clarification}
-              onChange={(event) => setClarification(event.target.value)}
-            />
-            <button className="secondary-button" disabled={loading} type="submit">
-              {loading ? "Tamamlaniyor..." : "Bilgiyi gonder"}
-            </button>
-          </form>
-        ) : null}
-      </section>
-
-      <section className="compose-panel add-template-panel">
-        <div className="add-ai-panel__header">
-          <div />
-        </div>
-
-        <div className="add-template-grid">
-          {AI_TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              className="add-template-card"
-              type="button"
-              onClick={() => applyTemplate(template)}
-            >
-              <span className="add-template-card__eyebrow">AI Prompt</span>
-              <strong>{template.title}</strong>
-              <p>{template.description}</p>
-              <span className="add-template-card__prompt">{template.prompt}</span>
+              {label}
             </button>
           ))}
         </div>
+      </div>
+
+      {error ? <p className="error-banner">{error}</p> : null}
+
+      <div className="add-form-actions">
+        <button className="primary-button" type="submit" disabled={loading || form.weekdays.length === 0}>
+          {loading ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+        <button className="ghost-button" type="button"
+          onClick={() => { setForm({ title: "", weekdays: [], interval_weeks: 1, starts_on: todayStr(), start_time: "" }); setError(""); setSuccess(""); }}>
+          Temizle
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const TABS = [
+  { id: "transaction", label: "İşlem", icon: "₺" },
+  { id: "event", label: "Etkinlik", icon: "◎" },
+  { id: "routine", label: "Rutin", icon: "↻" }
+];
+
+export default function AddPage() {
+  const [activeTab, setActiveTab] = useState("transaction");
+  const [accounts, setAccounts] = useState([]);
+
+  useEffect(() => {
+    fetchAccounts().then(setAccounts).catch(() => {});
+  }, []);
+
+  return (
+    <main className="shell shell--add">
+      <section className="add-hero-panel">
+        <div className="add-page-header">
+          <p className="status-card__eyebrow">Ekle</p>
+          <h1 className="add-page-title">Ne ekleyelim?</h1>
+        </div>
+
+        <div className="add-tab-bar">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`add-tab-btn ${activeTab === tab.id ? "add-tab-btn--active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="add-tab-icon">{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "transaction" && <TransactionForm accounts={accounts} />}
+        {activeTab === "event" && <EventForm />}
+        {activeTab === "routine" && <RoutineForm />}
       </section>
     </main>
   );

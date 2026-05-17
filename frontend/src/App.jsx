@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { fetchBackendHealth, fetchCurrentUser } from "./api/auth";
 import { clearStoredSession, getStoredSession, SESSION_EVENT_NAME, setStoredSession } from "./auth/session";
+import { useTheme } from "./hooks/useTheme";
 import AddPage from "./pages/AddPage";
 import CalendarPage from "./pages/Calendar";
 import HistoryPage from "./pages/HistoryPage";
@@ -12,11 +13,11 @@ import WalletPage from "./pages/Wallet";
 import { enablePushNotifications } from "./notifications";
 
 const NAV_ITEMS = [
-  { id: "wallet", label: "Cuzdan", badge: "💳", page: WalletPage },
+  { id: "wallet", label: "Cuzdan", badge: "💵", page: WalletPage },
   { id: "calendar", label: "Takvim", badge: "🗓", page: CalendarPage },
   { id: "add", label: "Ekle", badge: "✚", page: AddPage },
   { id: "history", label: "Gecmis", badge: "🧾", page: HistoryPage },
-  { id: "manage", label: "Yonet", badge: "◌", page: ManagePage },
+  { id: "manage", label: "Yonet", badge: "💳", page: ManagePage },
   { id: "settings", label: "Ayarlar", badge: "⚙", page: SettingsPage }
 ];
 
@@ -24,6 +25,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("wallet");
   const [session, setSession] = useState(() => getStoredSession());
   const [authReady, setAuthReady] = useState(false);
+  useTheme();
   const [requiresLogin, setRequiresLogin] = useState(true);
   const [bootError, setBootError] = useState("");
   const [isDockSliding, setIsDockSliding] = useState(false);
@@ -42,7 +44,7 @@ export default function App() {
           return;
         }
 
-        const secureMode = !health?.mode?.single_user;
+        const secureMode = health?.mode?.single_user === false;
         setRequiresLogin(secureMode);
         setBootError("");
 
@@ -178,7 +180,7 @@ export default function App() {
     return (
       <main className="shell shell--auth">
         <section className="compose-panel auth-panel">
-          <p className="status-card__eyebrow">Life Base</p>
+          <p className="status-card__eyebrow">life-base</p>
           <h1>Hazirlaniyor...</h1>
         </section>
       </main>
@@ -199,7 +201,7 @@ export default function App() {
 
   return (
     <div className="app-frame">
-      <div className="app-content">
+      <div className="app-content" id="main-scroll-container">
         <div className="app-content__page">
           <ActivePage
             onNavigate={setActiveTab}

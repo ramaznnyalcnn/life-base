@@ -1,5 +1,12 @@
 import { apiRequest } from "./client";
 
+export function createRecurringEvent(payload) {
+  return apiRequest("/recurring-events", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export function fetchCalendarDashboard(includePast = false) {
   const search = new URLSearchParams({
     include_past: includePast ? "true" : "false"

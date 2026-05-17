@@ -33,7 +33,7 @@ function renderAssetCard(account) {
         <div className="wallet-flip-card__face wallet-flip-card__face--front">
           <div className="wallet-flip-card__topline">
             <span className="wallet-flip-card__chip">{chip.label}</span>
-            <span className="wallet-flip-card__issuer">{account.issuer ?? "Life Base"}</span>
+            <span className="wallet-flip-card__issuer">{account.issuer ?? "life-base"}</span>
           </div>
           <strong>{account.name}</strong>
           <span className="wallet-flip-card__amount">{availableValue}</span>
@@ -148,7 +148,7 @@ export default function WalletPage({ onNavigate }) {
 
           <WalletAssetSection
             eyebrow="Kartlar"
-            title="Kartlarini izle"
+            title="Kartlar"
             actionLabel="Kart Yonet"
             items={creditAccounts}
             emptyTitle="Kart yok"
@@ -158,7 +158,7 @@ export default function WalletPage({ onNavigate }) {
 
           <WalletAssetSection
             eyebrow="Hesaplar"
-            title="Hesaplarini izle"
+            title="Hesaplar"
             actionLabel="Hesap Yonet"
             items={otherAccounts}
             emptyTitle="Hesap yok"

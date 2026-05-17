@@ -1,0 +1,114 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: V
+      - generic [ref=e5]:
+        - heading "Vintage Film Lab" [level=1] [ref=e6]
+        - paragraph [ref=e7]: Normal photos into finished film looks
+    - generic [ref=e8]:
+      - generic [ref=e9]: "23"
+      - generic [ref=e10]: references
+  - main [ref=e11]:
+    - region "Editing controls" [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e14]: +
+        - strong [ref=e15]: Drop photo here
+        - paragraph [ref=e16]: Camera or gallery image
+        - generic [ref=e17]:
+          - button "Camera" [ref=e18] [cursor=pointer]
+          - button "Gallery" [ref=e19] [cursor=pointer]
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: Preset
+          - strong [ref=e23]: 1970s — Faded
+        - paragraph [ref=e24]: Sun-worn warm fade with light film wear.
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]: Era
+            - generic [ref=e28]:
+              - button "1950s — Kodachrome kodachrome" [ref=e29] [cursor=pointer]:
+                - generic [ref=e30]: 1950s — Kodachrome
+                - generic [ref=e31]: kodachrome
+              - button "1960s — Classic classic" [ref=e32] [cursor=pointer]:
+                - generic [ref=e33]: 1960s — Classic
+                - generic [ref=e34]: classic
+              - button "1970s — Faded faded" [ref=e35] [cursor=pointer]:
+                - generic [ref=e36]: 1970s — Faded
+                - generic [ref=e37]: faded
+              - button "1980s — Vibrant flash" [ref=e38] [cursor=pointer]:
+                - generic [ref=e39]: 1980s — Vibrant
+                - generic [ref=e40]: flash
+              - button "90s Polaroid instant" [ref=e41] [cursor=pointer]:
+                - generic [ref=e42]: 90s Polaroid
+                - generic [ref=e43]: instant
+              - button "2000s — Digital digicam" [ref=e44] [cursor=pointer]:
+                - generic [ref=e45]: 2000s — Digital
+                - generic [ref=e46]: digicam
+          - generic [ref=e47]:
+            - generic [ref=e48]: Cinematic
+            - button "Cinematic cinema" [ref=e50] [cursor=pointer]:
+              - generic [ref=e51]: Cinematic
+              - generic [ref=e52]: cinema
+          - generic [ref=e53]:
+            - generic [ref=e54]: Experimental
+            - generic [ref=e55]:
+              - button "Lo-Fi lo-fi" [ref=e56] [cursor=pointer]:
+                - generic [ref=e57]: Lo-Fi
+                - generic [ref=e58]: lo-fi
+              - button "Cross Process color pop" [ref=e59] [cursor=pointer]:
+                - generic [ref=e60]: Cross Process
+                - generic [ref=e61]: color pop
+              - button "Lomography toy camera" [ref=e62] [cursor=pointer]:
+                - generic [ref=e63]: Lomography
+                - generic [ref=e64]: toy camera
+              - button "VHS tape" [ref=e65] [cursor=pointer]:
+                - generic [ref=e66]: VHS
+                - generic [ref=e67]: tape
+          - generic [ref=e68]:
+            - generic [ref=e69]: My Style
+            - button "✦ my_vintage custom" [ref=e71] [cursor=pointer]:
+              - generic [ref=e72]: ✦ my_vintage
+              - generic [ref=e73]: custom
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - generic [ref=e77]: Intensity
+            - generic [ref=e78]: 82%
+          - slider "Intensity" [ref=e79]: "82"
+        - button "Develop Film" [disabled] [ref=e80]
+      - group [ref=e81]:
+        - generic "Watermark" [ref=e82] [cursor=pointer]
+        - option "Bottom right" [selected]
+        - option "Bottom left"
+        - option "Top right"
+        - option "Top left"
+        - option "Bottom center"
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - strong [ref=e85]: My Style
+          - paragraph [ref=e86]: Train from the reference folder.
+        - button "Build" [ref=e87] [cursor=pointer]
+    - region "Photo preview" [ref=e88]:
+      - generic [ref=e89]:
+        - generic [ref=e90]:
+          - text: Preview
+          - strong [ref=e91]: No photo selected
+        - generic [ref=e92]:
+          - button "Compare" [ref=e93] [cursor=pointer]
+          - button "After" [ref=e94] [cursor=pointer]
+          - button "Before" [ref=e95] [cursor=pointer]
+      - generic [ref=e98]: Upload a photo to begin
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - generic [ref=e101]: Output
+          - combobox "Output" [ref=e102]:
+            - option "High JPEG 95"
+            - option "Standard JPEG 92" [selected]
+            - option "Small JPEG 80"
+            - option "Lossless PNG"
+        - generic [ref=e103] [cursor=pointer]:
+          - checkbox "Preserve original size" [ref=e104]
+          - generic [ref=e105]: Preserve original size
+        - generic [ref=e106]:
+          - button "Save Photo" [disabled] [ref=e107]
+          - button "All Filters ZIP" [disabled] [ref=e108]
