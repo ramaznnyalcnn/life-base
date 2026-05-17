@@ -15,6 +15,15 @@ from app.schemas.ai import (
 from app.schemas.ai_execution import AIClarificationRequest, AIExecutionResponse, AIExecutionStatus
 from app.schemas.calendar import CalendarDashboard, CalendarReminderItem
 from app.schemas.event import EventCreate, EventRead, EventUpdate, ReminderCreate, ReminderRead
+from app.schemas.medication import (
+    MedicationCreate,
+    MedicationDashboard,
+    MedicationDoseItem,
+    MedicationDoseSnooze,
+    MedicationDoseTaken,
+    MedicationRead,
+    MedicationUpdate,
+)
 from app.schemas.notification import (
     PushDispatchResult,
     PushMessageRequest,
@@ -59,6 +68,13 @@ __all__ = [
     "EventUpdate",
     "ReminderCreate",
     "ReminderRead",
+    "MedicationCreate",
+    "MedicationDashboard",
+    "MedicationDoseItem",
+    "MedicationDoseSnooze",
+    "MedicationDoseTaken",
+    "MedicationRead",
+    "MedicationUpdate",
     "RecurringEventCreate",
     "RecurringEventRead",
     "PushPublicConfig",

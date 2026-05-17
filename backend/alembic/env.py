@@ -10,6 +10,7 @@ from app.db.base import Base
 import app.models.account  # noqa: F401
 import app.models.auth  # noqa: F401
 import app.models.event  # noqa: F401
+import app.models.medication  # noqa: F401
 import app.models.notification  # noqa: F401
 import app.models.transfer  # noqa: F401
 import app.models.transaction  # noqa: F401

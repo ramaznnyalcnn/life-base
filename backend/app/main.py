@@ -14,7 +14,9 @@ from app.api.routes import (
     accounts_router,
     auth_router,
     events_router,
+    medications_router,
     notifications_router,
+    recurring_events_router,
     transfers_router,
     transactions_router,
     wallet_router,
@@ -67,6 +69,8 @@ app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(ai_router, prefix=settings.api_v1_prefix)
 app.include_router(accounts_router, prefix=settings.api_v1_prefix)
 app.include_router(events_router, prefix=settings.api_v1_prefix)
+app.include_router(medications_router, prefix=settings.api_v1_prefix)
+app.include_router(recurring_events_router, prefix=settings.api_v1_prefix)
 app.include_router(notifications_router, prefix=settings.api_v1_prefix)
 app.include_router(transfers_router, prefix=settings.api_v1_prefix)
 app.include_router(transactions_router, prefix=settings.api_v1_prefix)

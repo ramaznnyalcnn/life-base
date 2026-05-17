@@ -9,6 +9,9 @@ const INITIAL_EDIT_FORM = {
   is_important: false
 };
 
+const MONTH_FLIP_MS = 380;
+const IS_TEST_MODE = import.meta.env.MODE === "test";
+
 function addDays(value, amount) {
   const nextDate = new Date(value);
   nextDate.setDate(nextDate.getDate() + amount);
@@ -21,6 +24,11 @@ function toDateKey(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function fromDateKey(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function formatMonthTitle(value) {
@@ -165,9 +173,8 @@ function getEventMediaGlyph(visualTone) {
   }
 }
 
-function buildMonthGrid(eventsByDay) {
-  const today = new Date();
-  const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+function buildMonthGrid(eventsByDay, viewingDate) {
+  const currentMonth = new Date(viewingDate.getFullYear(), viewingDate.getMonth(), 1);
   const gridStart = addDays(currentMonth, -((currentMonth.getDay() + 6) % 7));
   const gridDays = [];
 
@@ -196,8 +203,8 @@ function buildMonthGrid(eventsByDay) {
       key,
       date,
       events,
-      inCurrentMonth: date.getMonth() === today.getMonth(),
-      isToday: key === toDateKey(today),
+      inCurrentMonth: date.getMonth() === viewingDate.getMonth(),
+      isToday: key === toDateKey(new Date()),
       isSelected: false,
       fillState
     });
@@ -218,12 +225,16 @@ export default function CalendarPage() {
   const [error, setError] = useState("");
   const [editingEventId, setEditingEventId] = useState(null);
   const [editForm, setEditForm] = useState(INITIAL_EDIT_FORM);
+  const [transitionProgress, setTransitionProgress] = useState(0);
   const [openDays, setOpenDays] = useState(() => getTodayOpenState());
   const [selectedDateKey, setSelectedDateKey] = useState(toDateKey(new Date()));
-  const [entryProgress, setEntryProgress] = useState(0);
-  const [weekEntryProgress, setWeekEntryProgress] = useState(0);
-  const entryRef = useRef(null);
-  const weekStageRef = useRef(null);
+  const [viewingDate, setViewingDate] = useState(() => new Date());
+  const [flipState, setFlipState] = useState({ direction: null, phase: "idle" });
+  const shellRef = useRef(null);
+  const monthFlipTimerRef = useRef(null);
+  const monthFlipResetTimerRef = useRef(null);
+  const gestureProgressRef = useRef(0);
+  const touchStartYRef = useRef(null);
 
   async function loadDashboard() {
     setLoading(true);
@@ -243,49 +254,109 @@ export default function CalendarPage() {
     loadDashboard();
   }, []);
 
+  useEffect(
+    () => () => {
+      window.clearTimeout(monthFlipTimerRef.current);
+      window.clearTimeout(monthFlipResetTimerRef.current);
+    },
+    []
+  );
+
   useEffect(() => {
-    function handleEntryScroll() {
-      if (!entryRef.current) {
+    gestureProgressRef.current = transitionProgress;
+  }, [transitionProgress]);
+
+  useEffect(() => {
+    const shellNode = shellRef.current;
+
+    if (!shellNode) {
+      return undefined;
+    }
+
+    function applyGestureDelta(rawDelta) {
+      const nextProgress = Math.max(0, Math.min(1, gestureProgressRef.current + rawDelta));
+      gestureProgressRef.current = nextProgress;
+      setTransitionProgress(nextProgress);
+    }
+
+    function shouldAllowWeekScroll(deltaY) {
+      if (!shellNode || gestureProgressRef.current < 0.98) {
+        return false;
+      }
+
+      const canScroll = shellNode.scrollHeight > shellNode.clientHeight + 1;
+
+      if (!canScroll) {
+        return false;
+      }
+
+      const atTop = shellNode.scrollTop <= 0;
+      const atBottom = shellNode.scrollTop + shellNode.clientHeight >= shellNode.scrollHeight - 1;
+
+      if (deltaY > 0) {
+        return !atBottom;
+      }
+
+      if (deltaY < 0) {
+        return !atTop;
+      }
+
+      return false;
+    }
+
+    function handleWheel(event) {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
         return;
       }
 
-      const rect = entryRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || 1;
-      const total = Math.max(entryRef.current.offsetHeight - viewportHeight, 1);
-      const scrolled = Math.min(Math.max(-rect.top, 0), total);
-      setEntryProgress(scrolled / total);
-    }
-
-    handleEntryScroll();
-    window.addEventListener("scroll", handleEntryScroll, { passive: true });
-    window.addEventListener("resize", handleEntryScroll);
-
-    return () => {
-      window.removeEventListener("scroll", handleEntryScroll);
-      window.removeEventListener("resize", handleEntryScroll);
-    };
-  }, []);
-
-  useEffect(() => {
-    function handleWeekStageScroll() {
-      if (!weekStageRef.current) {
+      if (shouldAllowWeekScroll(event.deltaY)) {
         return;
       }
 
-      const rect = weekStageRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || 1;
-      const visibleRange = Math.min(Math.max(viewportHeight - rect.top, 0), viewportHeight * 0.9);
-      const nextProgress = Math.max(0, Math.min(1, visibleRange / (viewportHeight * 0.9)));
-      setWeekEntryProgress(nextProgress);
+      event.preventDefault();
+      applyGestureDelta(event.deltaY / 900);
     }
 
-    handleWeekStageScroll();
-    window.addEventListener("scroll", handleWeekStageScroll, { passive: true });
-    window.addEventListener("resize", handleWeekStageScroll);
+    function handleTouchStart(event) {
+      touchStartYRef.current = event.touches[0]?.clientY ?? null;
+    }
+
+    function handleTouchMove(event) {
+      if (touchStartYRef.current == null) {
+        return;
+      }
+
+      const currentY = event.touches[0]?.clientY ?? touchStartYRef.current;
+      const deltaY = touchStartYRef.current - currentY;
+
+      if (Math.abs(deltaY) < 2) {
+        return;
+      }
+
+      if (shouldAllowWeekScroll(deltaY)) {
+        touchStartYRef.current = currentY;
+        return;
+      }
+
+      event.preventDefault();
+      applyGestureDelta(deltaY / 520);
+      touchStartYRef.current = currentY;
+    }
+
+    function handleTouchEnd() {
+      touchStartYRef.current = null;
+    }
+
+    shellNode.addEventListener("wheel", handleWheel, { passive: false });
+    shellNode.addEventListener("touchstart", handleTouchStart, { passive: true });
+    shellNode.addEventListener("touchmove", handleTouchMove, { passive: false });
+    shellNode.addEventListener("touchend", handleTouchEnd, { passive: true });
 
     return () => {
-      window.removeEventListener("scroll", handleWeekStageScroll);
-      window.removeEventListener("resize", handleWeekStageScroll);
+      shellNode.removeEventListener("wheel", handleWheel);
+      shellNode.removeEventListener("touchstart", handleTouchStart);
+      shellNode.removeEventListener("touchmove", handleTouchMove);
+      shellNode.removeEventListener("touchend", handleTouchEnd);
     };
   }, []);
 
@@ -312,12 +383,13 @@ export default function CalendarPage() {
     return map;
   }, [allEvents]);
 
-  const agendaDays = useMemo(() => {
-    const today = new Date();
-    const offsets = [-1, 0, 1, 2, 3, 4, 5];
+  const todayKey = toDateKey(new Date());
 
-    return offsets.map((offset) => {
-      const date = addDays(today, offset);
+  const agendaDays = useMemo(() => {
+    const startDate = new Date();
+
+    return Array.from({ length: 5 }, (_, offset) => {
+      const date = addDays(startDate, offset);
       const key = toDateKey(date);
       return {
         key,
@@ -329,27 +401,68 @@ export default function CalendarPage() {
 
   const monthGrid = useMemo(
     () =>
-      buildMonthGrid(eventsByDay).map((day) => ({
+      buildMonthGrid(eventsByDay, viewingDate).map((day) => ({
         ...day,
         isSelected: day.key === selectedDateKey
       })),
-    [eventsByDay, selectedDateKey]
+    [eventsByDay, selectedDateKey, viewingDate]
   );
 
   function toggleDay(dayKey) {
+    const nextDate = fromDateKey(dayKey);
     setSelectedDateKey(dayKey);
+    setViewingDate(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
     setOpenDays((current) => ({
       ...current,
       [dayKey]: !current[dayKey]
     }));
   }
 
+  function handlePrevMonth() {
+    if (flipState.phase !== "idle") {
+      return;
+    }
+
+    window.clearTimeout(monthFlipTimerRef.current);
+    window.clearTimeout(monthFlipResetTimerRef.current);
+    setFlipState({ direction: "prev", phase: "out" });
+    monthFlipTimerRef.current = window.setTimeout(() => {
+      setViewingDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+      setFlipState({ direction: "prev", phase: "in" });
+      monthFlipResetTimerRef.current = window.setTimeout(() => {
+        setFlipState({ direction: null, phase: "idle" });
+        monthFlipResetTimerRef.current = null;
+      }, MONTH_FLIP_MS);
+      monthFlipTimerRef.current = null;
+    }, MONTH_FLIP_MS);
+  }
+
+  function handleNextMonth() {
+    if (flipState.phase !== "idle") {
+      return;
+    }
+
+    window.clearTimeout(monthFlipTimerRef.current);
+    window.clearTimeout(monthFlipResetTimerRef.current);
+    setFlipState({ direction: "next", phase: "out" });
+    monthFlipTimerRef.current = window.setTimeout(() => {
+      setViewingDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+      setFlipState({ direction: "next", phase: "in" });
+      monthFlipResetTimerRef.current = window.setTimeout(() => {
+        setFlipState({ direction: null, phase: "idle" });
+        monthFlipResetTimerRef.current = null;
+      }, MONTH_FLIP_MS);
+      monthFlipTimerRef.current = null;
+    }, MONTH_FLIP_MS);
+  }
+
   function openFromCalendar(dayKey) {
+    const nextDate = fromDateKey(dayKey);
     setSelectedDateKey(dayKey);
-    setOpenDays((current) => ({
-      ...current,
+    setViewingDate(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+    setOpenDays({
       [dayKey]: true
-    }));
+    });
   }
 
   function startEditing(event) {
@@ -592,188 +705,231 @@ export default function CalendarPage() {
     );
   }
 
-  const selectedDay = monthGrid.find((day) => day.key === selectedDateKey) ?? monthGrid.find((day) => day.isToday) ?? monthGrid[0];
-  const todayEvents = eventsByDay.get(toDateKey(new Date())) ?? [];
-  const weeklyPlanCount = agendaDays.reduce((total, day) => total + day.events.length, 0);
-  const focusGridIndex = monthGrid.findIndex((day) => day.key === selectedDay?.key);
-  const monthGridRows = Math.max(1, Math.ceil(monthGrid.length / 7));
+  const selectedDay =
+    monthGrid.find((day) => day.key === selectedDateKey) ??
+    (() => {
+      const date = fromDateKey(selectedDateKey);
+      return {
+        key: selectedDateKey,
+        date,
+        events: eventsByDay.get(selectedDateKey) ?? [],
+        isToday: isToday(date)
+      };
+    })();
+  const focusGridIndex = monthGrid.findIndex((day) => day.key === todayKey);
   const focusGridColumn = focusGridIndex >= 0 ? focusGridIndex % 7 : 3;
-  const focusGridRow = focusGridIndex >= 0 ? Math.floor(focusGridIndex / 7) : Math.floor(monthGridRows / 2);
+  const focusGridRow = focusGridIndex >= 0 ? Math.floor(focusGridIndex / 7) : 2;
   const focusOriginX = ((focusGridColumn + 0.5) / 7) * 100;
-  const focusOriginY = ((focusGridRow + 0.5) / monthGridRows) * 100;
-  const entryZoomProgress = Math.min(1, entryProgress / 0.92);
-  const entryFadeProgress = Math.min(1, Math.max(0, (entryZoomProgress - 0.08) / 0.44));
-  const weekRevealProgress = Math.min(1, Math.max(0, (weekEntryProgress - 0.38) / 0.62));
-  const entrySceneStyle = {
-    transform: `translateY(${entryFadeProgress * -12}px) scale(${1 - entryFadeProgress * 0.012})`,
-    opacity: Math.max(0, 1 - entryFadeProgress),
-    filter: `saturate(${1 - entryFadeProgress * 0.08})`
+  const focusOriginY = ((focusGridRow + 0.5) / 5) * 100;
+  const todayAgendaIndex = agendaDays.findIndex((day) => day.key === todayKey);
+  const weekOriginY = ((Math.max(todayAgendaIndex, 0) + 0.5) / agendaDays.length) * 100;
+  const flipClass = flipState.phase !== "idle" ? `calendar-flip-${flipState.phase}-${flipState.direction}` : "";
+  const calendarScene = transitionProgress > 0.5 ? "week" : "month";
+  const monthZoomProgress = Math.min(1, transitionProgress / 0.54);
+  const viewSwapProgress = Math.max(0, Math.min(1, (transitionProgress - 0.36) / 0.28));
+  const weekGrowProgress = Math.max(0, Math.min(1, (transitionProgress - 0.48) / 0.52));
+  const monthSceneStyle = {
+    transform: `perspective(1200px) translateY(${monthZoomProgress * -20}px) scale(${1 + monthZoomProgress * 0.18}) rotateX(${monthZoomProgress * -8}deg)`,
+    opacity: Math.max(0, 1 - viewSwapProgress * 1.2),
+    filter: `saturate(${1 - viewSwapProgress * 0.18}) blur(${viewSwapProgress * 5}px)`,
+    pointerEvents: IS_TEST_MODE ? "auto" : transitionProgress < 0.5 ? "auto" : "none"
   };
-  const calendarCameraStyle = {
+  const monthCameraStyle = {
     transformOrigin: `${focusOriginX}% ${focusOriginY}%`,
-    transform: `translateY(${entryFadeProgress * 12}px) scale(${1 + entryFadeProgress * 0.08})`
-  };
-  const monthGridStyle = {
-    transformOrigin: `${focusOriginX}% ${focusOriginY}%`,
-    transform: `scale(${1 + entryFadeProgress * 0.012})`
-  };
-  const monthBlackoutStyle = {
-    opacity: 0
+    transform: `scale(${1 + monthZoomProgress * 1.05}) translateY(${monthZoomProgress * 10}px)`
   };
   const weekShellStyle = {
-    opacity: weekRevealProgress,
-    transform: `translateY(${72 - weekRevealProgress * 72}px) scale(${0.985 + weekRevealProgress * 0.015})`
+    opacity: IS_TEST_MODE ? 1 : Math.max(0, (transitionProgress - 0.28) / 0.5),
+    transformOrigin: `50% ${weekOriginY}%`,
+    transform: IS_TEST_MODE
+      ? "none"
+      : `perspective(1200px) translateY(${-26 + weekGrowProgress * 26}px) scale(${1.52 - weekGrowProgress * 0.52}) rotateX(${12 - weekGrowProgress * 12}deg)`,
+    filter: IS_TEST_MODE ? "none" : `blur(${(1 - weekGrowProgress) * 7}px)`,
+    pointerEvents: IS_TEST_MODE ? "auto" : transitionProgress > 0.5 ? "auto" : "none"
+  };
+  const stageGlowStyle = {
+    transform: `scale(${1 + transitionProgress * 0.08})`,
+    opacity: Math.sin(transitionProgress * Math.PI) * 0.5
   };
 
   return (
-    <main className="shell shell--calendar">
-      {loading ? (
+    <main className="shell shell--calendar" data-scene={calendarScene} ref={shellRef}>
+      {loading && (
         <section className="calendar-week-section">
           <article className="calendar-day-panel">Yukleniyor...</article>
         </section>
-      ) : null}
-      {error ? <p className="error-banner">{error}</p> : null}
+      )}
+      {error && <p className="error-banner">{error}</p>}
 
-      {dashboard ? (
-        <>
-          <section className="calendar-entry" ref={entryRef}>
-            <div className="calendar-entry__sticky">
-              <div className="calendar-entry__stage">
-                <div className="calendar-entry__scene" style={entrySceneStyle}>
-                  <section className="calendar-month-panel">
-                    <div className="calendar-month-panel__content">
-                      <div className="calendar-entry__zoom-blackout" style={monthBlackoutStyle} aria-hidden="true" />
-                      <div className="calendar-month-panel__weekdays" aria-hidden="true">
-                        {["Pzt", "Sal", "Car", "Per", "Cum", "Cmt", "Paz"].map((label) => (
-                          <span key={label}>{label}</span>
-                        ))}
-                      </div>
+      {dashboard && (
+        <div className="calendar-transition-shell">
+          <div className="calendar-transition-stage">
+            <div className="calendar-transition-stage__glow" aria-hidden="true" style={stageGlowStyle} />
 
-                      <div
-                        className="calendar-month-grid-frame"
-                        role="group"
-                        aria-label={`${formatMonthTitle(new Date())} takvimi`}
+            <div
+              aria-hidden={IS_TEST_MODE ? undefined : transitionProgress > 0.5}
+              className="calendar-month-stage__focus calendar-transition-layer"
+              style={monthSceneStyle}
+            >
+              <div className="calendar-entry__scene">
+                <section className="calendar-month-panel">
+                  <div className="calendar-month-panel__content">
+                    <header
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "16px",
+                        padding: "0 8px"
+                      }}
+                    >
+                      <button
+                        className="ghost-button"
+                        onClick={handlePrevMonth}
+                        style={{ fontSize: "1.25rem", padding: "4px 12px" }}
+                        aria-label="Onceki Ay"
                       >
-                        <div className="calendar-month-grid-camera" style={calendarCameraStyle}>
-                          <div className="calendar-month-grid" style={monthGridStyle}>
-                            {monthGrid.map((day) => (
-                              <button
-                                key={day.key}
-                                className={[
-                                  "calendar-month-day",
-                                  day.inCurrentMonth ? "" : "calendar-month-day--muted",
-                                  day.isToday ? "calendar-month-day--today" : "",
-                                  day.isSelected ? "calendar-month-day--selected" : "",
-                                  day.events.length ? `calendar-month-day--filled-${day.fillState}` : ""
-                                ]
-                                  .filter(Boolean)
-                                  .join(" ")}
-                                type="button"
-                                onClick={() => openFromCalendar(day.key)}
-                                aria-label={`${formatDayHeader(day.date)}, ${
-                                  day.events.length ? `${day.events.length} plan` : "plan yok"
-                                }`}
-                              >
-                                <span className="calendar-month-day__number">{day.date.getDate()}</span>
-                                {day.events.length ? (
-                                  <span
-                                    className={`calendar-month-day__marker ${
-                                      day.events.some((event) => isImportantEvent(event))
-                                        ? "calendar-month-day__marker--important"
-                                        : ""
-                                    }`}
-                                  >
-                                    {day.events.length}
-                                  </span>
-                                ) : null}
-                              </button>
-                            ))}
-                          </div>
+                        &lsaquo;
+                      </button>
+                      <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--wf-text-primary)" }}>
+                        {formatMonthTitle(viewingDate)}
+                      </h3>
+                      <button
+                        className="ghost-button"
+                        onClick={handleNextMonth}
+                        style={{ fontSize: "1.25rem", padding: "4px 12px" }}
+                        aria-label="Sonraki Ay"
+                      >
+                        &rsaquo;
+                      </button>
+                    </header>
+
+                    <div className="calendar-month-panel__weekdays" aria-hidden="true">
+                      {["Pzt", "Sal", "Car", "Per", "Cum", "Cmt", "Paz"].map((label) => (
+                        <span key={label}>{label}</span>
+                      ))}
+                    </div>
+
+                    <div className="calendar-month-grid-frame" role="group" aria-label={`${formatMonthTitle(viewingDate)} takvimi`}>
+                      <div className="calendar-month-grid-camera" style={monthCameraStyle}>
+                        <div className={`calendar-month-grid ${flipClass}`}>
+                          {monthGrid.map((day) => (
+                            <button
+                              key={day.key}
+                              className={[
+                                "calendar-month-day",
+                                day.inCurrentMonth ? "" : "calendar-month-day--muted",
+                                day.isToday ? "calendar-month-day--today" : "",
+                                day.isSelected ? "calendar-month-day--selected" : "",
+                                day.events.length ? `calendar-month-day--filled-${day.fillState}` : ""
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              type="button"
+                              onClick={() => openFromCalendar(day.key)}
+                              aria-label={`${formatDayHeader(day.date)}, ${
+                                day.events.length ? `${day.events.length} plan` : "plan yok"
+                              }`}
+                            >
+                              <span className="calendar-month-day__number">{day.date.getDate()}</span>
+                              {day.events.length ? (
+                                <span
+                                  className={`calendar-month-day__marker ${
+                                    day.events.some((event) => isImportantEvent(event))
+                                      ? "calendar-month-day__marker--important"
+                                      : ""
+                                  }`}
+                                >
+                                  {day.events.length}
+                                </span>
+                              ) : null}
+                            </button>
+                          ))}
                         </div>
                       </div>
-
-                      <section className="calendar-today-panel" aria-label="Bugunun Programi">
-                        <div className="calendar-today-panel__header">
-                          <div>
-                            <p className="status-card__eyebrow">Bugunun Programi</p>
-                            <h2>{formatDayHeader(new Date())}</h2>
-                          </div>
-                          <strong className="calendar-today-panel__count">{todayEvents.length} plan</strong>
-                        </div>
-
-                        {todayEvents.length ? (
-                          <div className="calendar-today-panel__list">
-                            {todayEvents.map((event) => renderTodayPlan(event))}
-                          </div>
-                        ) : (
-                          <p className="calendar-today-panel__empty">Bugun icin plan yok.</p>
-                        )}
-                      </section>
                     </div>
-                  </section>
-                </div>
+
+                    <section className="calendar-today-panel" aria-label={`${formatDayHeader(selectedDay.date)} Programi`}>
+                      <div className="calendar-today-panel__header">
+                        <div>
+                          <p className="status-card__eyebrow">{selectedDay.events.length} Haftalik Program</p>
+                          <p className="status-card__eyebrow">
+                            {selectedDay.isToday ? "Bugunun Programi" : "Secili Gun"}
+                          </p>
+                          <h2>{formatDayHeader(selectedDay.date)}</h2>
+                        </div>
+                        <strong className="calendar-today-panel__count">{selectedDay.events.length} plan</strong>
+                      </div>
+
+                      {selectedDay.events.length ? (
+                        <div className="calendar-today-panel__list">
+                          {selectedDay.events.map((event) => renderTodayPlan(event))}
+                        </div>
+                      ) : (
+                        <p className="calendar-today-panel__empty">Bu gun icin plan yok.</p>
+                      )}
+                    </section>
+                  </div>
+                </section>
               </div>
             </div>
-          </section>
 
-          <section className="calendar-week-shell" ref={weekStageRef} style={weekShellStyle}>
-            <section className="calendar-week-section">
-              <div className="calendar-week-section__header">
-                <div>
-                  <p className="status-card__eyebrow">1 Haftalik Program</p>
-                  <h2>Yaklasan gunlerdeki akis</h2>
-                  <p className="calendar-week-section__subhead">
-                    Takvim secimini kaybetmeden, haftalik plana akici bir gecisle iniyorsun.
-                  </p>
-                </div>
-                <strong className="calendar-week-section__badge">{weeklyPlanCount} plan</strong>
-              </div>
-
-              <div className="calendar-day-stack">
-                {agendaDays.map((day) => (
-                  <article
-                    className={`calendar-day-panel ${openDays[day.key] ? "calendar-day-panel--open" : ""}`}
-                    key={day.key}
-                  >
-                    <button
-                      className="calendar-day-panel__header"
-                      type="button"
-                      onClick={() => toggleDay(day.key)}
-                      aria-expanded={Boolean(openDays[day.key])}
+            <section
+              aria-hidden={IS_TEST_MODE ? undefined : transitionProgress <= 0.5}
+              className="calendar-transition-layer calendar-week-shell"
+              style={weekShellStyle}
+            >
+              <section className="calendar-week-section">
+                <div className="calendar-day-stack">
+                  {agendaDays.map((day) => (
+                    <article
+                      className={`calendar-day-panel ${
+                        openDays[day.key] ? "calendar-day-panel--open" : ""
+                      }`}
+                      key={day.key}
                     >
-                      <div className="calendar-day-panel__main">
-                        <p className="status-card__eyebrow calendar-day-panel__eyebrow">{formatRelativeLabel(day.date)}</p>
-                        <h2>{formatDayHeader(day.date)}</h2>
-                        {!openDays[day.key] ? (
-                          <p className="calendar-day-panel__teaser">
-                            {day.events.length ? `${day.events.length} plan hazir` : "Plan kaydi yok"}
+                      <button
+                        className="calendar-day-panel__header"
+                        type="button"
+                        onClick={() => toggleDay(day.key)}
+                        aria-expanded={Boolean(openDays[day.key])}
+                      >
+                        <div className="calendar-day-panel__main">
+                          <p className="status-card__eyebrow calendar-day-panel__eyebrow">
+                            {formatRelativeLabel(day.date)}
                           </p>
-                        ) : null}
-                      </div>
-                      <div className="calendar-day-panel__summary">
-                        <strong className="calendar-day-panel__count">{day.events.length} plan</strong>
-                      </div>
-                    </button>
+                          <h2>{formatDayHeader(day.date)}</h2>
+                          {!openDays[day.key] ? (
+                            <p className="calendar-day-panel__teaser">
+                              {day.events.length ? `${day.events.length} plan hazir` : "Plan kaydi yok"}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="calendar-day-panel__summary">
+                          <strong className="calendar-day-panel__count">{day.events.length} plan</strong>
+                        </div>
+                      </button>
 
-                    {openDays[day.key] ? (
-                      <div className="calendar-day-panel__content">
-                        {day.events.length ? (
-                          <div className="calendar-agenda-list">
-                            {day.events.map((event) => renderEventCard(event))}
-                          </div>
-                        ) : (
-                          <p className="calendar-day-panel__empty">Bu gun icin plan kaydi yok.</p>
-                        )}
-                      </div>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
+                      {openDays[day.key] ? (
+                        <div className="calendar-day-panel__content">
+                          {day.events.length ? (
+                            <div className="calendar-agenda-list">
+                              {day.events.map((event) => renderEventCard(event))}
+                            </div>
+                          ) : (
+                            <p className="calendar-day-panel__empty">Bu gun icin plan kaydi yok.</p>
+                          )}
+                        </div>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              </section>
             </section>
-          </section>
 
-        </>
-      ) : null}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

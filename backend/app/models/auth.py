@@ -28,6 +28,7 @@ class User(TimestampMixin, Base):
     transactions = relationship("Transaction", back_populates="user")
     transfers = relationship("Transfer", back_populates="user")
     events = relationship("Event", back_populates="user")
+    medications = relationship("Medication", back_populates="user")
     push_subscriptions = relationship("PushSubscription", back_populates="user")
 
 

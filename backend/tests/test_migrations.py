@@ -16,6 +16,7 @@ def test_alembic_files_exist():
     assert (base / "versions" / "20260313_0005_event_importance.py").exists()
     assert (base / "versions" / "20260314_0006_transfers.py").exists()
     assert (base / "versions" / "20260316_0009_user_passwords_and_admins.py").exists()
+    assert (base / "versions" / "20260517_0010_medication_reminders.py").exists()
 
 
 def test_initial_migration_contains_core_tables():
@@ -77,3 +78,14 @@ def test_user_password_migration_contains_password_and_admin_fields():
 
     assert "password_hash" in migration
     assert "is_admin" in migration
+
+
+def test_medication_migration_contains_schedule_and_dose_tables():
+    migration = (
+        REPO_ROOT / "backend" / "alembic" / "versions" / "20260517_0010_medication_reminders.py"
+    ).read_text()
+
+    assert "medications" in migration
+    assert "medication_dose_logs" in migration
+    assert "dose_times" in migration
+    assert "snoozed_until" in migration

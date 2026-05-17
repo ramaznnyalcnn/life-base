@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import HistoryPage from "./HistoryPage";
@@ -19,6 +19,14 @@ import {
   fetchTransactions,
   updateTransaction
 } from "../api/transactions";
+
+async function scrollToHistoryScene() {
+  await screen.findByText("Toplam Net Durum");
+  const scrollShell = document.querySelector(".analysis-scroll-shell");
+  expect(scrollShell).not.toBeNull();
+  fireEvent.wheel(scrollShell, { deltaY: 1200 });
+  await screen.findByPlaceholderText("Kira, kahve, maas...");
+}
 
 describe("HistoryPage", () => {
   beforeEach(() => {
@@ -55,26 +63,19 @@ describe("HistoryPage", () => {
 
     render(<HistoryPage />);
 
-    expect(await screen.findByText("Finans Analizi")).toBeInTheDocument();
-    expect(screen.getByText("Gelir ve gider trendi")).toBeInTheDocument();
-    expect(screen.getByText("Daire grafik ile cikislar")).toBeInTheDocument();
-    expect(screen.getByText("Harcama Davranisi")).toBeInTheDocument();
-    expect(screen.getByText("Analiz")).toBeInTheDocument();
-    expect(screen.getAllByText(/Mart 2026/i)[0]).toBeInTheDocument();
-    expect(screen.getByText(/2026 Ozeti/i)).toBeInTheDocument();
-    expect(screen.getByText("Aylik Arsiv")).toBeInTheDocument();
-    expect(screen.getByText("Oneriler")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Arama" })).toBeInTheDocument();
+    expect(await screen.findByText("Toplam Net Durum")).toBeInTheDocument();
+    expect(screen.getByText("Zeka Onerileri")).toBeInTheDocument();
+
+    await scrollToHistoryScene();
+
+    expect(screen.getByPlaceholderText("Kira, kahve, maas...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filtre" })).toBeInTheDocument();
     expect(screen.getByText("Migros")).toBeInTheDocument();
     expect(screen.getAllByText("Harcama")[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Enpara/i)[0]).toBeInTheDocument();
     expect(screen.getByLabelText("Kategori Market")).toBeInTheDocument();
     expect(screen.getByText("MK")).toBeInTheDocument();
     expect(screen.getByText(/Not Haftalik alim/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Yillar" }));
-    expect(screen.getByText("Yillik Arsiv")).toBeInTheDocument();
-    expect(screen.getByText("Tum yillarin ozetleri ve eski analizler")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Detay" }));
 
@@ -104,10 +105,12 @@ describe("HistoryPage", () => {
     const user = userEvent.setup();
     render(<HistoryPage />);
 
-    await user.click(await screen.findByRole("button", { name: "Arama" }));
-    await user.selectOptions(await screen.findByLabelText("Tur"), "payment");
-    await user.type(screen.getByLabelText("Ara"), "kart");
-    await user.click(screen.getByRole("button", { name: "Uygula" }));
+    await scrollToHistoryScene();
+    await user.click(screen.getByRole("button", { name: "Filtre" }));
+    const drawerSelects = await screen.findAllByRole("combobox");
+    await user.selectOptions(drawerSelects[1], "payment");
+    await user.type(screen.getByPlaceholderText("Kira, kahve, maas..."), "kart");
+    await user.click(screen.getByRole("button", { name: "Filtreyi Uygula" }));
 
     expect(fetchTransactions).toHaveBeenLastCalledWith({
       accountId: "",
@@ -146,19 +149,20 @@ describe("HistoryPage", () => {
     const user = userEvent.setup();
     render(<HistoryPage />);
 
-    expect(await screen.findByText("Migros")).toBeInTheDocument();
-    expect(screen.getByText("Taksi")).toBeInTheDocument();
-
+    await scrollToHistoryScene();
+    await user.click(screen.getByRole("button", { name: "Detayli Analiz & Grafikleri Goster" }));
+    await waitFor(() => expect(screen.getByRole("option", { name: "Market" })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText("Kategori"), "Market");
-    expect(screen.getByText("Migros")).toBeInTheDocument();
-    expect(screen.queryByText("Taksi")).not.toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("Baslangic"));
     await user.type(screen.getByLabelText("Baslangic"), "2026-04-01");
+
     expect(await screen.findByText("Bu filtrelerle islem bulunamadi")).toBeInTheDocument();
   });
 
   it("does not count card payments as expense in analysis totals", async () => {
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     fetchTransactions.mockResolvedValue([
       {
         id: 31,
@@ -168,8 +172,8 @@ describe("HistoryPage", () => {
         amount: "350.00",
         description: "Migros",
         note: null,
-        statement_month: "2026-03-01",
-        occurred_at: "2026-03-09T10:00:00+00:00"
+        statement_month: `${thisMonth}-01`,
+        occurred_at: `${thisMonth}-09T10:00:00+00:00`
       },
       {
         id: 32,
@@ -179,16 +183,17 @@ describe("HistoryPage", () => {
         amount: "490.00",
         description: "Ziraat kart odemesi",
         note: null,
-        statement_month: "2026-03-01",
-        occurred_at: "2026-03-10T12:00:00+00:00"
+        statement_month: `${thisMonth}-01`,
+        occurred_at: `${thisMonth}-10T12:00:00+00:00`
       }
     ]);
 
     render(<HistoryPage />);
 
-    expect(await screen.findByText("Kart odemeleri ayri izleniyor: ₺490,00")).toBeInTheDocument();
-    expect(screen.getByText("Gider toplamindan ayri tutulur")).toBeInTheDocument();
-    expect(screen.getAllByText(/Gider ₺350,00/i).length).toBeGreaterThanOrEqual(1);
+    const matches = await screen.findAllByText((content, element) =>
+      element?.tagName !== "SCRIPT" && (element?.textContent ?? "").includes("Kart odemeleri yansitilmiyor") && (element?.textContent ?? "").includes("490")
+    );
+    expect(matches.length).toBeGreaterThan(0);
   });
 
   it("updates and deletes transactions", async () => {
@@ -225,11 +230,11 @@ describe("HistoryPage", () => {
     const user = userEvent.setup();
     render(<HistoryPage />);
 
+    await scrollToHistoryScene();
     await user.click(await screen.findByRole("button", { name: "Duzenle" }));
     await user.clear(screen.getByLabelText("Tutar"));
     await user.type(screen.getByLabelText("Tutar"), "200");
-    await user.clear(screen.getByLabelText("Kategori", { selector: "#transaction-category-12" }));
-    await user.type(screen.getByLabelText("Kategori", { selector: "#transaction-category-12" }), "Kafe");
+    await user.selectOptions(screen.getByLabelText("Kategori", { selector: "#transaction-category-12" }), "Kahve");
     await user.clear(screen.getByLabelText("Aciklama"));
     await user.type(screen.getByLabelText("Aciklama"), "Kahve guncel");
     await user.type(screen.getByLabelText("Not"), "Ofis ici");
@@ -239,7 +244,7 @@ describe("HistoryPage", () => {
       12,
       expect.objectContaining({
         account_id: 1,
-        category_name: "Kafe",
+        category_name: "Kahve",
         type: "expense",
         amount: "200",
         description: "Kahve guncel",

@@ -47,11 +47,15 @@ export default function LoginPage({ onAuthenticated, bootError = "" }) {
       <section className="compose-panel auth-panel">
         <div className="manage-section-header">
           <div>
-            <p className="status-card__eyebrow">Life Base</p>
+            <p className="status-card__eyebrow">life-base</p>
             <h1>Giris yap</h1>
           </div>
           <span className="manage-section-header__badge">Cok kullanicili erisim</span>
         </div>
+
+        <p className="accounts-panel__meta">
+          life-base, GitHub'da acik kaynak olarak gelisen life-base projesinin finans odakli arayuzudur.
+        </p>
 
         <form className="compose-form" onSubmit={handleSubmit}>
           <label className="compose-form__label" htmlFor="login-email">

@@ -1,7 +1,19 @@
 from sqlalchemy import create_engine, inspect
 
 from app.db.base import Base
-from app.models import AccessToken, Account, Category, Event, PushSubscription, Reminder, Transaction, Transfer, User
+from app.models import (
+    AccessToken,
+    Account,
+    Category,
+    Event,
+    Medication,
+    MedicationDoseLog,
+    PushSubscription,
+    Reminder,
+    Transaction,
+    Transfer,
+    User,
+)
 
 
 def test_all_core_tables_are_registered():
@@ -15,8 +27,11 @@ def test_all_core_tables_are_registered():
         "transactions",
         "events",
         "reminders",
+        "recurring_events",
         "transfers",
         "push_subscriptions",
+        "medications",
+        "medication_dose_logs",
     } <= tables
 
 
@@ -31,7 +46,10 @@ def test_metadata_can_create_schema():
         "accounts",
         "categories",
         "events",
+        "medication_dose_logs",
+        "medications",
         "push_subscriptions",
+        "recurring_events",
         "reminders",
         "transfers",
         "transactions",
@@ -61,6 +79,21 @@ def test_transaction_and_reminder_relationship_columns_exist():
     assert reminder_fk.target_fullname == "events.id"
     assert transfer_source_fk.target_fullname == "accounts.id"
     assert transfer_destination_fk.target_fullname == "accounts.id"
+
+
+def test_medication_model_supports_schedule_and_dose_logs():
+    medication_columns = Medication.__table__.columns
+    log_columns = MedicationDoseLog.__table__.columns
+    medication_fk = next(
+        fk for fk in MedicationDoseLog.__table__.foreign_keys if fk.parent.name == "medication_id"
+    )
+
+    assert "weekdays" in medication_columns
+    assert "dose_times" in medication_columns
+    assert "timezone" in medication_columns
+    assert "scheduled_for" in log_columns
+    assert "snoozed_until" in log_columns
+    assert medication_fk.target_fullname == "medications.id"
 
 
 def test_credit_card_cycle_fields_are_available():

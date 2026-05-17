@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
-from app.models import Account, Event, PushSubscription, Transaction, Transfer
+from app.models import Account, Event, Medication, PushSubscription, Transaction, Transfer
 from app.services.auth import ensure_default_user
 
 
@@ -31,7 +31,7 @@ def setup_database() -> Generator[sessionmaker, None, None]:
 
     def assign_default_owner(session: Session, flush_context, instances) -> None:
         for obj in session.new:
-            if isinstance(obj, (Account, Event, PushSubscription, Transaction, Transfer)) and obj.user_id is None:
+            if isinstance(obj, (Account, Event, Medication, PushSubscription, Transaction, Transfer)) and obj.user_id is None:
                 obj.user_id = default_user_id
 
     def override_get_db() -> Generator[Session, None, None]:

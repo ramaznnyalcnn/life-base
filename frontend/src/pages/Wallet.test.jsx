@@ -54,8 +54,8 @@ describe("WalletPage", () => {
     expect(await screen.findByText("Ana Toplam")).toBeInTheDocument();
     expect(screen.getByText("Gelir")).toBeInTheDocument();
     expect(screen.getByText("Gider")).toBeInTheDocument();
-    expect(screen.getByText("Kartlarini izle")).toBeInTheDocument();
-    expect(screen.getByText("Hesaplarini izle")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Kartlar" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Hesaplar" })).toBeInTheDocument();
     expect(screen.getAllByText("Akbank Platinum").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Enpara").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("₺5.000,00")).toBeInTheDocument();

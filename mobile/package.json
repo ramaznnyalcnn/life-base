@@ -1,0 +1,28 @@
+{
+  "name": "lifeos-mobile",
+  "version": "0.1.1",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "verify:config": "node scripts/verify-config.mjs",
+    "typecheck": "tsc --noEmit",
+    "build:apk": "eas build --platform android --profile preview",
+    "build:local-apk": "eas build --platform android --profile local --local"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~55.0.0",
+    "expo-notifications": "~55.0.22",
+    "expo-secure-store": "~55.0.13",
+    "react": "19.2.0",
+    "react-native": "^0.83.6",
+    "react-native-safe-area-context": "~5.6.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "babel-preset-expo": "^55.0.21",
+    "typescript": "~5.9.2"
+  }
+}

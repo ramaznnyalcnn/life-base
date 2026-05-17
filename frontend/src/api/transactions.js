@@ -1,5 +1,12 @@
 import { apiRequest } from "./client";
 
+export function createTransaction(payload) {
+  return apiRequest("/transactions", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export function fetchTransactions(filters = {}) {
   const search = new URLSearchParams();
 

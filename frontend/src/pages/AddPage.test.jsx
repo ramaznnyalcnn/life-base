@@ -1,146 +1,115 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import AddPage from "./AddPage";
 
-vi.mock("../api/ai", () => ({
-  executeAI: vi.fn(),
-  clarifyAI: vi.fn()
+vi.mock("../api/accounts", () => ({
+  fetchAccounts: vi.fn().mockResolvedValue([
+    { id: 1, name: "Enpara", type: "bank" },
+    { id: 2, name: "Bonus", type: "credit_card" }
+  ])
 }));
 
-import { clarifyAI, executeAI } from "../api/ai";
+vi.mock("../api/transactions", () => ({
+  createTransaction: vi.fn()
+}));
 
-const TEMPLATE_CASES = [
-  {
-    title: "Haftalik Rutin",
-    prompt: "Haftada 3 gun pazartesi carsamba cuma spor rutini ekle"
-  },
-  {
-    title: "Odeme Hatirlaticisi",
-    prompt: "Her ayin 28'inde kredi karti odemesi icin hatirlatici ekle"
-  },
-  {
-    title: "Gelir / Gider",
-    prompt: "Bugun 860 tl market gideri ekle, hesabim enpara"
-  },
-  {
-    title: "Randevu",
-    prompt: "Yarin saat 14:30 disci randevusu ekle"
-  }
-];
+vi.mock("../api/events", () => ({
+  createEvent: vi.fn(),
+  createRecurringEvent: vi.fn()
+}));
+
+import { createTransaction } from "../api/transactions";
+import { createEvent, createRecurringEvent } from "../api/events";
 
 describe("AddPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("fills composer from template and appends optional context to AI message", async () => {
-    executeAI.mockResolvedValue({
-      status: "completed",
-      assistant_message: "Kaydi hazirladim.",
-      follow_up_question: null,
-      missing_fields: [],
-      transaction_id: null,
-      event_id: 12
-    });
-
-    const user = userEvent.setup();
+  it("renders 3 tabs", async () => {
     render(<AddPage />);
-
-    await user.click(screen.getByRole("button", { name: /Haftalik Rutin/i }));
-    expect(screen.getByLabelText("Mesaj")).toHaveValue(
-      "Haftada 3 gun pazartesi carsamba cuma spor rutini ekle"
-    );
-
-    await user.click(screen.getByRole("button", { name: "Opsiyonel alanlar" }));
-    await user.type(screen.getByLabelText("Kategori"), "spor");
-    await user.type(screen.getByLabelText("Hesap / Kart"), "enpara");
-    await user.click(screen.getByRole("checkbox", { name: "Onemli olarak isaretle" }));
-    await user.click(screen.getByRole("button", { name: "AI ile isle" }));
-
-    expect(executeAI).toHaveBeenCalledWith(
-      expect.stringContaining("Haftada 3 gun pazartesi carsamba cuma spor rutini ekle")
-    );
-    expect(executeAI).toHaveBeenCalledWith(expect.stringContaining("Kategori tercihi: spor"));
-    expect(executeAI).toHaveBeenCalledWith(expect.stringContaining("Hesap veya kart tercihi: enpara"));
-    expect(executeAI).toHaveBeenCalledWith(expect.stringContaining("Kaydi onemli olarak isaretle."));
+    expect(await screen.findByRole("button", { name: /İşlem/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Etkinlik/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Rutin/ })).toBeInTheDocument();
   });
 
-  it("runs every template prompt through the composer", async () => {
-    executeAI.mockResolvedValue({
-      status: "completed",
-      assistant_message: "Kaydi hazirladim.",
-      follow_up_question: null,
-      missing_fields: [],
-      transaction_id: null,
-      event_id: 12
-    });
-
+  it("transaction tab submits with correct payload", async () => {
+    createTransaction.mockResolvedValue({ id: 1 });
     const user = userEvent.setup();
     render(<AddPage />);
 
-    for (const templateCase of TEMPLATE_CASES) {
-      executeAI.mockClear();
+    await screen.findByLabelText("Tutar (₺)");
 
-      await user.click(screen.getByRole("button", { name: new RegExp(templateCase.title, "i") }));
-      expect(screen.getByLabelText("Mesaj")).toHaveValue(templateCase.prompt);
+    await user.type(screen.getByLabelText("Tutar (₺)"), "150");
+    await user.selectOptions(screen.getByLabelText("Hesap"), "1");
+    await user.selectOptions(screen.getByLabelText("Kategori"), "Market");
+    await user.type(screen.getByLabelText("Açıklama"), "Test harcama");
 
-      await user.click(screen.getByRole("button", { name: "AI ile isle" }));
-      expect(executeAI).toHaveBeenCalledWith(templateCase.prompt);
-    }
+    await user.click(screen.getByRole("button", { name: "Kaydet" }));
+
+    await waitFor(() => {
+      expect(createTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          account_id: 1,
+          type: "expense",
+          amount: "150",
+          category_name: "Market",
+          description: "Test harcama"
+        })
+      );
+    });
   });
 
-  it("shows follow up question when backend needs more info", async () => {
-    executeAI.mockResolvedValue({
-      status: "needs_input",
-      assistant_message: "Ek bilgi gerekli.",
-      follow_up_question: "Bunu hangi hesap veya kart ile kaydedeyim?",
-      missing_fields: ["account_name"],
-      transaction_id: null,
-      event_id: null
-    });
-
+  it("switches to etkinlik tab and submits event", async () => {
+    createEvent.mockResolvedValue({ id: 5 });
     const user = userEvent.setup();
     render(<AddPage />);
 
-    await user.type(
-      screen.getByLabelText("Mesaj"),
-      "120 kahve"
-    );
-    await user.click(screen.getByRole("button", { name: "AI ile isle" }));
+    await user.click(await screen.findByRole("button", { name: /Etkinlik/ }));
+    await user.type(screen.getByLabelText("Başlık"), "Doktor randevusu");
+    await user.click(screen.getByRole("button", { name: "Kaydet" }));
 
-    expect(await screen.findByText("Bunu hangi hesap veya kart ile kaydedeyim?")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(createEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Doktor randevusu" })
+      );
+    });
   });
 
-  it("sends clarification and clears composer after completion", async () => {
-    executeAI.mockResolvedValue({
-      status: "needs_input",
-      assistant_message: "Ek bilgi gerekli.",
-      follow_up_question: "Bunu hangi hesap veya kart ile kaydedeyim?",
-      missing_fields: ["account_name"],
-      transaction_id: null,
-      event_id: null
-    });
-    clarifyAI.mockResolvedValue({
-      status: "completed",
-      assistant_message: "Kaydi tamamladim.",
-      follow_up_question: null,
-      missing_fields: [],
-      transaction_id: 42,
-      event_id: null
-    });
-
+  it("switches to rutin tab and submits recurring event", async () => {
+    createRecurringEvent.mockResolvedValue({ id: 3 });
     const user = userEvent.setup();
     render(<AddPage />);
 
-    const messageField = screen.getByLabelText("Mesaj");
-    await user.type(messageField, "120 kahve");
-    await user.click(screen.getByRole("button", { name: "AI ile isle" }));
+    await user.click(await screen.findByRole("button", { name: /Rutin/ }));
+    await user.type(screen.getByLabelText("Başlık"), "Spor");
+    await user.click(screen.getByRole("button", { name: "Pzt" }));
+    await user.click(screen.getByRole("button", { name: "Kaydet" }));
 
-    await user.type(screen.getByLabelText("Ek bilgi"), "enpara");
-    await user.click(screen.getByRole("button", { name: "Bilgiyi gonder" }));
+    await waitFor(() => {
+      expect(createRecurringEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Spor",
+          weekdays: [0]
+        })
+      );
+    });
+  });
 
-    expect(await screen.findByText("Kaydi tamamladim.")).toBeInTheDocument();
-    expect(messageField).toHaveValue("");
+  it("shows success banner after transaction save", async () => {
+    createTransaction.mockResolvedValue({ id: 1 });
+    const user = userEvent.setup();
+    render(<AddPage />);
+
+    await screen.findByLabelText("Tutar (₺)");
+
+    await user.type(screen.getByLabelText("Tutar (₺)"), "50");
+    await user.selectOptions(screen.getByLabelText("Hesap"), "1");
+    await user.type(screen.getByLabelText("Açıklama"), "Kahve");
+
+    await user.click(screen.getByRole("button", { name: "Kaydet" }));
+
+    expect(await screen.findByText("İşlem kaydedildi.")).toBeInTheDocument();
   });
 });

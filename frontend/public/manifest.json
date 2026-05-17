@@ -1,7 +1,7 @@
 {
-  "name": "Life OS",
-  "short_name": "Life OS",
-  "description": "Kisisel finans, takvim ve akilli kayit uygulamasi",
+  "name": "life-base",
+  "short_name": "life-base",
+  "description": "life-base'in GitHub'da acik kaynak gelistirilen kisisel finans, takvim ve akilli kayit uygulamasi",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#07111f",

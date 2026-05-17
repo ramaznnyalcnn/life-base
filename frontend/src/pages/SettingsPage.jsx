@@ -1,11 +1,15 @@
 import NotificationControl from "../components/NotificationControl";
+import { useTheme } from "../hooks/useTheme";
 
 export default function SettingsPage({ currentUser, onLogout }) {
+  const [theme, setTheme] = useTheme();
+
   return (
     <main className="shell">
       <section className="settings-panel">
         <div className="accounts-panel__header">
           <p className="status-card__eyebrow">Ayarlar</p>
+          <h1 className="wallet-overview-panel__value" style={{ fontSize: '2rem', marginBottom: '24px' }}>Tercihler</h1>
         </div>
         {currentUser ? (
           <section className="settings-panel__identity">
@@ -18,6 +22,42 @@ export default function SettingsPage({ currentUser, onLogout }) {
             </button>
           </section>
         ) : null}
+
+        <section className="wallet-asset-stage">
+          <div className="wallet-asset-stage__header">
+            <div>
+              <p className="status-card__eyebrow">Tema</p>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Görünümü Seç</h2>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
+            <button 
+              className={`wallet-flip-card ${theme === 'dark' ? 'theme-active' : ''}`}
+              onClick={() => setTheme('dark')}
+              style={{ flex: 1, padding: '16px', textAlign: 'center', opacity: theme === 'dark' ? 1 : 0.6, border: theme === 'dark' ? '1px solid var(--wf-accent)' : '' }}
+            >
+              <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '8px' }}>🌙</span>
+              <strong style={{ fontSize: '0.875rem', display: 'block', color: '#8ba4ff' }}>Uzay Siyahi</strong>
+            </button>
+            <button 
+              className={`wallet-flip-card ${theme === 'light' ? 'theme-active' : ''}`}
+              onClick={() => setTheme('light')}
+              style={{ flex: 1, padding: '16px', textAlign: 'center', opacity: theme === 'light' ? 1 : 0.6, border: theme === 'light' ? '1px solid var(--wf-accent)' : '' }}
+            >
+              <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '8px' }}>☀️</span>
+              <strong style={{ fontSize: '0.875rem', display: 'block', color: '#d38a1f' }}>Gunes Beyazi</strong>
+            </button>
+            <button 
+              className={`wallet-flip-card ${theme === 'zen' ? 'theme-active' : ''}`}
+              onClick={() => setTheme('zen')}
+              style={{ flex: 1, padding: '16px', textAlign: 'center', opacity: theme === 'zen' ? 1 : 0.6, border: theme === 'zen' ? '1px solid var(--wf-accent)' : '' }}
+            >
+              <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '8px' }}>🍃</span>
+              <strong style={{ fontSize: '0.875rem', display: 'block', color: '#6b8f64' }}>Zen Kum</strong>
+            </button>
+          </div>
+        </section>
+
         <NotificationControl />
         {currentUser?.is_admin ? (
           <section className="settings-users-panel">

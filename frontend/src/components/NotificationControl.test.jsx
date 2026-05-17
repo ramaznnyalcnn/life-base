@@ -151,7 +151,7 @@ describe("NotificationControl", () => {
     await user.click(await screen.findByRole("button", { name: "Test Gonder" }));
 
     expect(sendTestNotification).toHaveBeenCalledWith({
-      title: "Life OS Test",
+      title: "life-base Test",
       body: "Bildirim hatti calisiyor.",
       url: "/"
     });
