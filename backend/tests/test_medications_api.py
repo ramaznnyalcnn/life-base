@@ -4,6 +4,7 @@ from app.api.routes.medications import (
     create_medication_endpoint,
     delete_medication_endpoint,
     get_medication_notification_schedule,
+    get_medication_schedule,
     list_medications_endpoint,
     mark_medication_dose_taken_endpoint,
     snooze_medication_dose_endpoint,
@@ -109,7 +110,7 @@ def test_medication_dashboard_and_notification_schedule_handle_taken_and_snoozed
     assert schedule_after_taken == []
 
 
-def test_medication_routes_filter_by_device_id(db_session):
+def test_medication_routes_share_records_across_user_devices(db_session):
     create_medication_endpoint(
         MedicationCreate(
             name="Benim ilacim",
@@ -134,7 +135,36 @@ def test_medication_routes_filter_by_device_id(db_session):
     )
 
     rows = list_medications_endpoint(db_session, x_device_id="device-a")
-    assert [row.name for row in rows] == ["Benim ilacim"]
+    assert [row.name for row in rows] == ["Benim ilacim", "Diger cihaz ilaci"]
+
+
+def test_interval_medication_schedule_uses_start_date_cadence(db_session):
+    create_medication_endpoint(
+        MedicationCreate(
+            name="Iki gunde bir",
+            dosage="1 tablet",
+            schedule_mode="interval",
+            weekdays=[],
+            interval_days=2,
+            dose_times=[time(9, 0)],
+            starts_on=date(2026, 5, 17),
+            timezone="Europe/Istanbul",
+        ),
+        db_session,
+        x_device_id="device-a",
+    )
+
+    schedule = get_medication_schedule(
+        from_date=date(2026, 5, 17),
+        to_date=date(2026, 5, 22),
+        db=db_session,
+    )
+
+    assert [dose.scheduled_for.date().isoformat() for dose in schedule] == [
+        "2026-05-17",
+        "2026-05-19",
+        "2026-05-21",
+    ]
 
 
 def test_medication_endpoint_schedule_shape(db_session):
@@ -161,5 +191,6 @@ def test_medication_routes_are_registered_on_app():
     assert "/api/v1/medications" in paths
     assert "/api/v1/medications/dashboard" in paths
     assert "/api/v1/medications/notification-schedule" in paths
+    assert "/api/v1/medications/schedule" in paths
     assert "/api/v1/medications/{medication_id}/doses/taken" in paths
     assert "/api/v1/medications/{medication_id}/doses/snooze" in paths

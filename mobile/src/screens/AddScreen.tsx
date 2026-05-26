@@ -413,7 +413,9 @@ function MedicationForm({
   const [name, setName] = useState("");
   const [dosage, setDosage] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [scheduleMode, setScheduleMode] = useState<"weekdays" | "interval">("weekdays");
   const [weekdays, setWeekdays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  const [intervalDays, setIntervalDays] = useState("2");
   const [doseTimes, setDoseTimes] = useState("09:00");
   const [startsOn, setStartsOn] = useState(todayInput());
   const [endsOn, setEndsOn] = useState("");
@@ -428,8 +430,14 @@ function MedicationForm({
   }
 
   async function save() {
-    if (!name.trim() || !dosage.trim() || weekdays.length === 0) {
-      setError("Ilac adi, doz ve en az bir gun zorunlu.");
+    const parsedIntervalDays = Number(intervalDays);
+    if (
+      !name.trim()
+      || !dosage.trim()
+      || (scheduleMode === "weekdays" && weekdays.length === 0)
+      || (scheduleMode === "interval" && (!Number.isInteger(parsedIntervalDays) || parsedIntervalDays < 1))
+    ) {
+      setError("Ilac adi, doz ve gecerli program bilgisi zorunlu.");
       return;
     }
 
@@ -442,7 +450,9 @@ function MedicationForm({
         name: name.trim(),
         dosage: dosage.trim(),
         instructions: instructions.trim() || null,
-        weekdays,
+        schedule_mode: scheduleMode,
+        weekdays: scheduleMode === "weekdays" ? weekdays : [],
+        interval_days: scheduleMode === "interval" ? parsedIntervalDays : null,
         dose_times: parsedDoseTimes,
         starts_on: startsOn,
         ends_on: endsOn.trim() || null,
@@ -452,7 +462,9 @@ function MedicationForm({
       setName("");
       setDosage("");
       setInstructions("");
+      setScheduleMode("weekdays");
       setWeekdays([0, 1, 2, 3, 4, 5, 6]);
+      setIntervalDays("2");
       setDoseTimes("09:00");
       setEndsOn("");
       setMessage("Ilac hatirlaticisi kaydedildi.");
@@ -476,18 +488,40 @@ function MedicationForm({
         onChangeText={setInstructions}
         placeholder="Tok karnina, su ile"
       />
-      <Text style={[styles.fieldTitle, { color: palette.muted }]}>Gunler</Text>
-      <View style={styles.wrapRow}>
-        {WEEKDAYS.map((label, index) => (
-          <Chip
-            key={label}
-            palette={palette}
-            label={label}
-            active={weekdays.includes(index)}
-            onPress={() => toggleWeekday(index)}
-          />
-        ))}
-      </View>
+      <SegmentedControl
+        palette={palette}
+        value={scheduleMode}
+        onChange={setScheduleMode}
+        options={[
+          { value: "weekdays", label: "Belirli gunler" },
+          { value: "interval", label: "Her N gunde" }
+        ]}
+      />
+      {scheduleMode === "weekdays" ? (
+        <>
+          <Text style={[styles.fieldTitle, { color: palette.muted }]}>Gunler</Text>
+          <View style={styles.wrapRow}>
+            {WEEKDAYS.map((label, index) => (
+              <Chip
+                key={label}
+                palette={palette}
+                label={label}
+                active={weekdays.includes(index)}
+                onPress={() => toggleWeekday(index)}
+              />
+            ))}
+          </View>
+        </>
+      ) : (
+        <Field
+          palette={palette}
+          label="Kac gunde bir"
+          value={intervalDays}
+          onChangeText={setIntervalDays}
+          keyboardType="numeric"
+          placeholder="2"
+        />
+      )}
       <Field
         palette={palette}
         label="Saatler"

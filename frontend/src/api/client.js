@@ -49,6 +49,7 @@ export async function apiRequest(path, options = {}) {
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
         "X-Device-Id": getOrCreateDeviceId(),

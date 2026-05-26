@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 from pywebpush import WebPushException, webpush
 
 from app.core.config import Settings, get_settings
-from app.models import Event, PushSubscription, Reminder, ReminderChannel
+from app.models import Event, MedicationPushDelivery, PushSubscription, Reminder, ReminderChannel
 from app.schemas import PushDispatchResult, PushMessageRequest, PushSubscriptionCreate
 from app.services.auth import ensure_default_user
+from app.services.medications import build_due_medication_dose_items
 
 
 def _resolve_user_id(session: Session, user_id: int | None) -> int:
@@ -183,6 +184,76 @@ def send_push_message(
     )
 
 
+def _dispatch_due_medication_pushes(
+    session: Session,
+    *,
+    owner_id: int,
+    current_time: datetime,
+    limit: int,
+    gateway: WebPushGateway,
+    settings: Settings,
+) -> tuple[int, int, int, int]:
+    doses = build_due_medication_dose_items(
+        session,
+        user_id=owner_id,
+        now=current_time,
+        limit=limit,
+    )
+    subscriptions = list_push_subscriptions(session, user_id=owner_id)
+    sent_count = 0
+    failed_count = 0
+    deactivated_count = 0
+    delivered_dose_count = 0
+
+    for dose in doses:
+        dose_sent = False
+        for subscription in subscriptions:
+            delivered = session.scalar(
+                select(MedicationPushDelivery.id).where(
+                    MedicationPushDelivery.push_subscription_id == subscription.id,
+                    MedicationPushDelivery.medication_id == dose.medication_id,
+                    MedicationPushDelivery.scheduled_for == dose.scheduled_for,
+                    MedicationPushDelivery.notify_at == dose.notify_at,
+                )
+            )
+            if delivered is not None:
+                continue
+
+            try:
+                gateway.send(
+                    subscription,
+                    {
+                        "title": dose.medication_name,
+                        "body": f"{dose.dosage} ilac dozunu alma zamani.",
+                        "url": "/",
+                    },
+                    settings,
+                )
+                session.add(
+                    MedicationPushDelivery(
+                        push_subscription_id=subscription.id,
+                        medication_id=dose.medication_id,
+                        scheduled_for=dose.scheduled_for,
+                        notify_at=dose.notify_at,
+                        sent_at=current_time,
+                    )
+                )
+                session.flush()
+                sent_count += 1
+                dose_sent = True
+            except WebPushException as exc:
+                failed_count += 1
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                if status_code in {404, 410}:
+                    deactivate_push_subscription(session, subscription.endpoint, user_id=owner_id)
+                    deactivated_count += 1
+
+        if dose_sent:
+            delivered_dose_count += 1
+
+    return sent_count, failed_count, deactivated_count, delivered_dose_count
+
+
 def dispatch_due_reminders(
     session: Session,
     *,
@@ -223,11 +294,7 @@ def dispatch_due_reminders(
     for reminder in reminders:
         reminder_count += 1
         reminder_sent = 0
-        reminder_subscriptions = [
-            subscription
-            for subscription in subscriptions
-            if reminder.event.device_id is None or subscription.device_id == reminder.event.device_id
-        ]
+        reminder_subscriptions = subscriptions
         for subscription in reminder_subscriptions:
             try:
                 gateway.send(
@@ -251,10 +318,22 @@ def dispatch_due_reminders(
         if reminder_sent > 0:
             reminder.is_sent = True
 
+    medication_sent, medication_failed, medication_deactivated, medication_dose_count = _dispatch_due_medication_pushes(
+        session,
+        owner_id=owner_id,
+        current_time=current_time,
+        limit=limit,
+        gateway=gateway,
+        settings=settings,
+    )
+    sent_count += medication_sent
+    failed_count += medication_failed
+    deactivated_count += medication_deactivated
     session.commit()
     return PushDispatchResult(
         sent_count=sent_count,
         failed_count=failed_count,
         deactivated_count=deactivated_count,
         reminder_count=reminder_count,
+        medication_dose_count=medication_dose_count,
     )

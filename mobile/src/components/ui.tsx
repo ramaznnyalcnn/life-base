@@ -41,12 +41,12 @@ export function getPalette(theme: ThemeName): Palette {
   if (theme === "light") {
     return {
       mode: theme,
-      background: "#f8fafc",
+      background: "#f7f7f9",
       surface: "#ffffff",
       surfaceAlt: "#f3f4f6",
       surfaceHover: "#f9fafb",
       cardMeta: "#f3f4f6",
-      dock: "rgba(255,255,255,0.94)",
+      dock: "rgba(255,255,255,0.90)",
       overlaySoft: "rgba(0,0,0,0.03)",
       overlayMedium: "rgba(0,0,0,0.06)",
       overlayStrong: "rgba(0,0,0,0.10)",
@@ -65,12 +65,12 @@ export function getPalette(theme: ThemeName): Palette {
   if (theme === "zen") {
     return {
       mode: theme,
-      background: "#f4f1ea",
+      background: "#f3f0eb",
       surface: "#fcfaf8",
       surfaceAlt: "rgba(138,126,114,0.08)",
       surfaceHover: "#ffffff",
       cardMeta: "rgba(138,126,114,0.08)",
-      dock: "rgba(252,250,248,0.92)",
+      dock: "rgba(252,250,248,0.85)",
       overlaySoft: "rgba(138,126,114,0.04)",
       overlayMedium: "rgba(138,126,114,0.08)",
       overlayStrong: "rgba(138,126,114,0.12)",
@@ -93,7 +93,7 @@ export function getPalette(theme: ThemeName): Palette {
     surfaceAlt: "rgba(255,255,255,0.06)",
     surfaceHover: "#1e1e1e",
     cardMeta: "rgba(255,255,255,0.06)",
-    dock: "rgba(20,20,20,0.92)",
+    dock: "rgba(20,20,20,0.70)",
     overlaySoft: "rgba(255,255,255,0.03)",
     overlayMedium: "rgba(255,255,255,0.06)",
     overlayStrong: "rgba(255,255,255,0.10)",

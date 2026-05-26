@@ -19,19 +19,25 @@ vi.mock("../api/events", () => ({
   createRecurringEvent: vi.fn()
 }));
 
+vi.mock("../api/medications", () => ({
+  createMedication: vi.fn()
+}));
+
 import { createTransaction } from "../api/transactions";
 import { createEvent, createRecurringEvent } from "../api/events";
+import { createMedication } from "../api/medications";
 
 describe("AddPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renders 3 tabs", async () => {
+  it("renders medication entry tab", async () => {
     render(<AddPage />);
     expect(await screen.findByRole("button", { name: /İşlem/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Etkinlik/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Rutin/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /İlaç/ })).toBeInTheDocument();
   });
 
   it("transaction tab submits with correct payload", async () => {
@@ -111,5 +117,22 @@ describe("AddPage", () => {
     await user.click(screen.getByRole("button", { name: "Kaydet" }));
 
     expect(await screen.findByText("İşlem kaydedildi.")).toBeInTheDocument();
+  });
+
+  it("creates an interval medication schedule", async () => {
+    createMedication.mockResolvedValue({ id: 8 });
+    const user = userEvent.setup();
+    render(<AddPage />);
+    await user.click(await screen.findByRole("button", { name: /İlaç/ }));
+    await user.type(screen.getByLabelText("İlaç adı"), "Vitamin D");
+    await user.type(screen.getByLabelText("Doz"), "1 tablet");
+    await user.selectOptions(screen.getByLabelText("Program tipi"), "interval");
+    await user.clear(screen.getByLabelText("Kaç günde bir?"));
+    await user.type(screen.getByLabelText("Kaç günde bir?"), "2");
+    await user.click(screen.getByRole("button", { name: "Kaydet" }));
+
+    await waitFor(() => expect(createMedication).toHaveBeenCalledWith(
+      expect.objectContaining({ schedule_mode: "interval", weekdays: [], interval_days: 2 })
+    ));
   });
 });

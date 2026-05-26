@@ -3,7 +3,7 @@
 from app.models.account import Account, AccountType, Category, CategoryType
 from app.models.auth import AccessToken, User
 from app.models.event import Event, Reminder, ReminderChannel
-from app.models.medication import Medication, MedicationDoseLog, MedicationDoseStatus
+from app.models.medication import Medication, MedicationDoseLog, MedicationDoseStatus, MedicationPushDelivery
 from app.models.notification import PushSubscription
 from app.models.recurring_event import RecurringEvent
 from app.models.transfer import Transfer
@@ -25,6 +25,7 @@ __all__ = [
     "Medication",
     "MedicationDoseLog",
     "MedicationDoseStatus",
+    "MedicationPushDelivery",
     "RecurringEvent",
     "PushSubscription",
 ]

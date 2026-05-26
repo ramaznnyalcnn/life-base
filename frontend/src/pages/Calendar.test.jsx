@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CalendarPage from "./Calendar";
@@ -9,7 +9,16 @@ vi.mock("../api/events", () => ({
   deleteEvent: vi.fn()
 }));
 
+vi.mock("../api/medications", () => ({
+  fetchMedicationDashboard: vi.fn(),
+  fetchMedicationSchedule: vi.fn(),
+  markMedicationDoseTaken: vi.fn(),
+  snoozeMedicationDose: vi.fn(),
+  updateMedication: vi.fn()
+}));
+
 import { deleteEvent, fetchCalendarDashboard, updateEvent } from "../api/events";
+import { fetchMedicationDashboard, fetchMedicationSchedule, markMedicationDoseTaken } from "../api/medications";
 
 function isoAt(offsetDays, hour = 9, minute = 0) {
   const date = new Date();
@@ -36,6 +45,8 @@ function monthButtonLabel(offsetDays, planCount) {
 describe("CalendarPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchMedicationDashboard.mockResolvedValue({ medications: [], today_doses: [], upcoming_doses: [] });
+    fetchMedicationSchedule.mockResolvedValue([]);
   });
 
   it("renders monthly calendar and opens a daily plan section", async () => {
@@ -250,5 +261,34 @@ describe("CalendarPage", () => {
     expect(screen.getByText("Bu gorunum haftalik bir rutinden uretiliyor.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Duzenle" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sil" })).not.toBeInTheDocument();
+  });
+
+  it("moves from month to week and medication scenes on consecutive scrolls", async () => {
+    fetchCalendarDashboard.mockResolvedValue({ focus_event: null, upcoming_events: [], past_events: [], pending_reminders: [] });
+    render(<CalendarPage />);
+    await screen.findByRole("group", { name: /takvimi/ });
+    const shell = document.querySelector(".shell--calendar");
+
+    fireEvent.wheel(shell, { deltaY: 900, deltaX: 0 });
+    expect(shell).toHaveAttribute("data-scene", "week");
+    fireEvent.wheel(shell, { deltaY: 900, deltaX: 0 });
+    expect(shell).toHaveAttribute("data-scene", "medication");
+  });
+
+  it("shows medication doses and marks a dose as taken", async () => {
+    const scheduledFor = isoAt(0, 9, 0);
+    fetchCalendarDashboard.mockResolvedValue({ focus_event: null, upcoming_events: [], past_events: [], pending_reminders: [] });
+    fetchMedicationDashboard.mockResolvedValue({
+      medications: [],
+      today_doses: [{ medication_id: 3, medication_name: "Vitamin D", dosage: "1 tablet", scheduled_for: scheduledFor, notify_at: scheduledFor, status: "pending", instructions: null }],
+      upcoming_doses: []
+    });
+    markMedicationDoseTaken.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<CalendarPage />);
+
+    expect(await screen.findByText("Vitamin D")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Aldim" }));
+    expect(markMedicationDoseTaken).toHaveBeenCalledWith(3, scheduledFor);
   });
 });

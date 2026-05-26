@@ -13,6 +13,7 @@ type Props = {
   health: HealthPayload | null;
   currentUser: User | null;
   onSettingsChange: (settings: AppSettings) => Promise<void>;
+  onThemeChange: (theme: ThemeName) => Promise<void>;
   onLogout: () => Promise<void>;
   onRetryConnection: () => Promise<void>;
   onSyncNotifications: () => Promise<void>;
@@ -24,6 +25,7 @@ export function SettingsScreen({
   health,
   currentUser,
   onSettingsChange,
+  onThemeChange,
   onLogout,
   onRetryConnection,
   onSyncNotifications
@@ -45,6 +47,16 @@ export function SettingsScreen({
       setError(nextError instanceof Error ? nextError.message : "Ayar kaydedilemedi.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function selectTheme(nextTheme: ThemeName) {
+    setTheme(nextTheme);
+    setError("");
+    try {
+      await onThemeChange(nextTheme);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Tema kaydedilemedi.");
     }
   }
 
@@ -99,11 +111,11 @@ export function SettingsScreen({
         <SegmentedControl
           palette={palette}
           value={theme}
-          onChange={setTheme}
+          onChange={(value) => void selectTheme(value)}
           options={[
-            { value: "dark", label: "Koyu" },
-            { value: "light", label: "Acik" },
-            { value: "zen", label: "Zen" }
+            { value: "dark", label: "Uzay Siyahi" },
+            { value: "light", label: "Gunes Beyazi" },
+            { value: "zen", label: "Zen Kum" }
           ]}
         />
         <Button

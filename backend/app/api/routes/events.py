@@ -38,7 +38,6 @@ def get_calendar_dashboard(
     return build_calendar_dashboard(
         db,
         user_id=current_user.id,
-        device_id=_device_id(x_device_id),
         include_past=include_past,
     )
 
@@ -50,7 +49,7 @@ def list_events_endpoint(
     x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
 ):
     current_user = resolve_route_user(current_user, db)
-    return list_events(db, user_id=current_user.id, device_id=_device_id(x_device_id))
+    return list_events(db, user_id=current_user.id)
 
 
 @router.get("/{event_id}", response_model=EventRead)
@@ -62,7 +61,7 @@ def get_event(
 ):
     current_user = resolve_route_user(current_user, db)
     try:
-        return get_event_or_raise(db, event_id, current_user.id, _device_id(x_device_id))
+        return get_event_or_raise(db, event_id, current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -89,7 +88,7 @@ def update_event_endpoint(
 ):
     current_user = resolve_route_user(current_user, db)
     try:
-        return update_event(db, event_id, payload, current_user.id, _device_id(x_device_id))
+        return update_event(db, event_id, payload, current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -103,7 +102,7 @@ def delete_event_endpoint(
 ):
     current_user = resolve_route_user(current_user, db)
     try:
-        delete_event(db, event_id, current_user.id, _device_id(x_device_id))
+        delete_event(db, event_id, current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -117,7 +116,7 @@ def list_event_reminders(
 ):
     current_user = resolve_route_user(current_user, db)
     try:
-        return list_reminders(db, event_id, current_user.id, _device_id(x_device_id))
+        return list_reminders(db, event_id, current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -136,7 +135,7 @@ def create_event_reminder(
 ):
     current_user = resolve_route_user(current_user, db)
     try:
-        return add_reminder(db, event_id, payload, current_user.id, _device_id(x_device_id))
+        return add_reminder(db, event_id, payload, current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -154,6 +153,6 @@ def delete_event_reminder(
 ):
     current_user = resolve_route_user(current_user, db)
     try:
-        delete_reminder(db, event_id, reminder_id, current_user.id, _device_id(x_device_id))
+        delete_reminder(db, event_id, reminder_id, current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

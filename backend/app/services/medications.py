@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -62,7 +62,9 @@ def read_medication(medication: Medication) -> MedicationRead:
         name=medication.name,
         dosage=medication.dosage,
         instructions=medication.instructions,
+        schedule_mode=medication.schedule_mode,
         weekdays=_parse_weekdays(medication.weekdays),
+        interval_days=medication.interval_days,
         dose_times=_parse_times(medication.dose_times),
         starts_on=medication.starts_on,
         ends_on=medication.ends_on,
@@ -115,7 +117,9 @@ def create_medication(session: Session, payload: MedicationCreate, *, user_id: i
         name=payload.name,
         dosage=payload.dosage,
         instructions=payload.instructions,
+        schedule_mode=payload.schedule_mode,
         weekdays=_serialize_weekdays(payload.weekdays),
+        interval_days=payload.interval_days,
         dose_times=_serialize_times(payload.dose_times),
         starts_on=payload.starts_on,
         ends_on=payload.ends_on,
@@ -142,6 +146,21 @@ def update_medication(
         updates["weekdays"] = _serialize_weekdays(updates["weekdays"])
     if "dose_times" in updates and updates["dose_times"] is not None:
         updates["dose_times"] = _serialize_times(updates["dose_times"])
+
+    schedule_mode = updates.get("schedule_mode", medication.schedule_mode)
+    weekday_value = updates.get("weekdays", medication.weekdays)
+    weekdays = _parse_weekdays(weekday_value) if isinstance(weekday_value, str) else weekday_value
+    interval_days = updates.get("interval_days", medication.interval_days)
+    if schedule_mode == "weekdays":
+        if not weekdays:
+            raise ValueError("Gun programinda en az bir gun gerekli.")
+        if interval_days is not None:
+            raise ValueError("Gun programinda aralik kullanilamaz.")
+    elif schedule_mode == "interval":
+        if weekdays or interval_days is None:
+            raise ValueError("Aralikli programda gunler bos ve gun araligi zorunlu olmali.")
+    else:
+        raise ValueError("Ilac program tipi gecersiz.")
 
     starts_on = updates.get("starts_on", medication.starts_on)
     ends_on = updates.get("ends_on", medication.ends_on)
@@ -183,7 +202,7 @@ def _dose_item_from_log(
         status = "taken"
     elif snoozed_until is not None:
         status = "snoozed"
-        notify_at = snoozed_until if snoozed_until > now else scheduled_for
+        notify_at = snoozed_until
 
     return MedicationDoseItem(
         medication_id=medication.id,
@@ -198,21 +217,30 @@ def _dose_item_from_log(
     )
 
 
-def _generate_dose_times(medication: Medication, *, now: datetime, days: int) -> list[datetime]:
+def _generate_dose_times_for_range(
+    medication: Medication,
+    *,
+    first_day: date,
+    last_day: date,
+) -> list[datetime]:
     if not medication.is_active:
         return []
 
     tz = ZoneInfo(medication.timezone)
-    local_today = now.astimezone(tz).date()
-    last_day = local_today + timedelta(days=days)
     weekdays = set(_parse_weekdays(medication.weekdays))
     dose_times = _parse_times(medication.dose_times)
     scheduled: list[datetime] = []
-    current_day = local_today
+    current_day = first_day
 
     while current_day <= last_day:
         if current_day >= medication.starts_on and (medication.ends_on is None or current_day <= medication.ends_on):
-            if current_day.weekday() in weekdays:
+            is_due_day = current_day.weekday() in weekdays
+            if medication.schedule_mode == "interval":
+                is_due_day = bool(
+                    medication.interval_days
+                    and (current_day - medication.starts_on).days % medication.interval_days == 0
+                )
+            if is_due_day:
                 for dose_time in dose_times:
                     local_dt = datetime.combine(current_day, dose_time, tzinfo=tz)
                     scheduled.append(local_dt.astimezone(timezone.utc))
@@ -225,15 +253,13 @@ def _load_dose_logs(
     session: Session,
     medications: list[Medication],
     *,
-    now: datetime,
-    days: int,
+    start: datetime,
+    end: datetime,
 ) -> dict[tuple[int, datetime], MedicationDoseLog]:
     medication_ids = [medication.id for medication in medications]
     if not medication_ids:
         return {}
 
-    start = now - timedelta(days=1)
-    end = now + timedelta(days=days + 1)
     logs = list(
         session.scalars(
             select(MedicationDoseLog).where(
@@ -246,6 +272,27 @@ def _load_dose_logs(
     return {(log.medication_id, _as_utc(log.scheduled_for)): log for log in logs}
 
 
+def _build_dose_items_from_schedule(
+    session: Session,
+    scheduled: list[tuple[Medication, datetime]],
+    *,
+    now: datetime,
+) -> list[MedicationDoseItem]:
+    if not scheduled:
+        return []
+
+    medications = list({medication.id: medication for medication, _ in scheduled}.values())
+    start = min(item[1] for item in scheduled) - timedelta(days=1)
+    end = max(item[1] for item in scheduled) + timedelta(days=1)
+    logs = _load_dose_logs(session, medications, start=start, end=end)
+    items = [
+        _dose_item_from_log(medication, _as_utc(scheduled_for), logs.get((medication.id, _as_utc(scheduled_for))), now)
+        for medication, scheduled_for in scheduled
+    ]
+    items.sort(key=lambda item: (item.notify_at, item.medication_id, item.scheduled_for))
+    return items
+
+
 def build_medication_dose_items(
     session: Session,
     medications: list[Medication],
@@ -255,16 +302,70 @@ def build_medication_dose_items(
 ) -> list[MedicationDoseItem]:
     current_time = _as_utc(now or datetime.now(timezone.utc))
     safe_days = max(0, min(days, 90))
-    logs = _load_dose_logs(session, medications, now=current_time, days=safe_days)
-    items: list[MedicationDoseItem] = []
+    scheduled: list[tuple[Medication, datetime]] = []
 
     for medication in medications:
-        for scheduled_for in _generate_dose_times(medication, now=current_time, days=safe_days):
-            log = logs.get((medication.id, _as_utc(scheduled_for)))
-            items.append(_dose_item_from_log(medication, _as_utc(scheduled_for), log, current_time))
+        tz = ZoneInfo(medication.timezone)
+        local_today = current_time.astimezone(tz).date()
+        for scheduled_for in _generate_dose_times_for_range(
+            medication,
+            first_day=local_today,
+            last_day=local_today + timedelta(days=safe_days),
+        ):
+            scheduled.append((medication, scheduled_for))
 
-    items.sort(key=lambda item: (item.notify_at, item.medication_id, item.scheduled_for))
-    return items
+    return _build_dose_items_from_schedule(session, scheduled, now=current_time)
+
+
+def build_medication_schedule(
+    session: Session,
+    *,
+    from_date: date,
+    to_date: date,
+    user_id: int | None = None,
+    device_id: str | None = None,
+    now: datetime | None = None,
+) -> list[MedicationDoseItem]:
+    if to_date < from_date or (to_date - from_date).days > 92:
+        raise ValueError("Ilac takvimi tarih araligi gecersiz.")
+
+    current_time = _as_utc(now or datetime.now(timezone.utc))
+    medications = list_medications(session, user_id=user_id, device_id=device_id, active_only=True)
+    scheduled = [
+        (medication, scheduled_for)
+        for medication in medications
+        for scheduled_for in _generate_dose_times_for_range(medication, first_day=from_date, last_day=to_date)
+    ]
+    return _build_dose_items_from_schedule(session, scheduled, now=current_time)
+
+
+def build_due_medication_dose_items(
+    session: Session,
+    *,
+    user_id: int | None = None,
+    now: datetime | None = None,
+    lookback: timedelta = timedelta(days=1),
+    limit: int = 128,
+) -> list[MedicationDoseItem]:
+    current_time = _as_utc(now or datetime.now(timezone.utc))
+    medications = list_medications(session, user_id=user_id, active_only=True)
+    scheduled: list[tuple[Medication, datetime]] = []
+    for medication in medications:
+        local_today = current_time.astimezone(ZoneInfo(medication.timezone)).date()
+        scheduled.extend(
+            (medication, item)
+            for item in _generate_dose_times_for_range(
+                medication,
+                first_day=local_today - timedelta(days=1),
+                last_day=local_today,
+            )
+        )
+    items = _build_dose_items_from_schedule(session, scheduled, now=current_time)
+    due = [
+        item for item in items
+        if item.status != "taken" and current_time - lookback <= item.notify_at <= current_time
+    ]
+    return due[: max(1, min(limit, 256))]
 
 
 def build_medication_dashboard(

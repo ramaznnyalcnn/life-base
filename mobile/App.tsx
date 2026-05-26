@@ -26,7 +26,8 @@ import {
   DEFAULT_SETTINGS,
   getStoredSettings,
   setStoredSettings,
-  type AppSettings
+  type AppSettings,
+  type ThemeName
 } from "./src/settings/settings";
 
 type TabId = "wallet" | "calendar" | "add" | "history" | "manage" | "settings";
@@ -143,6 +144,11 @@ function LifeBaseApp() {
     await bootstrap(normalized);
   }
 
+  async function saveTheme(theme: ThemeName) {
+    const normalized = await setStoredSettings({ ...settings, theme });
+    setSettings(normalized);
+  }
+
   async function handleAuthenticated(nextSession: AuthSession) {
     await setStoredSession(nextSession);
     setSession(nextSession);
@@ -203,6 +209,7 @@ function LifeBaseApp() {
             health={health}
             currentUser={session?.user ?? null}
             onSettingsChange={saveSettingsAndBootstrap}
+            onThemeChange={saveTheme}
             onLogout={handleLogout}
             onRetryConnection={() => bootstrap(settings)}
             onSyncNotifications={syncNotifications}

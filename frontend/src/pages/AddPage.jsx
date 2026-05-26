@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { fetchAccounts } from "../api/accounts";
 import { createEvent, createRecurringEvent } from "../api/events";
+import { createMedication } from "../api/medications";
 import { createTransaction } from "../api/transactions";
 
 const EXPENSE_CATEGORIES = [
@@ -449,10 +450,97 @@ function RoutineForm() {
   );
 }
 
+function MedicationForm() {
+  const [form, setForm] = useState({
+    name: "", dosage: "", instructions: "", schedule_mode: "weekdays", weekdays: [0, 1, 2, 3, 4, 5, 6],
+    interval_days: "2", dose_times: "09:00", starts_on: todayStr(), ends_on: ""
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function toggleWeekday(day) {
+    setForm((prev) => ({
+      ...prev,
+      weekdays: prev.weekdays.includes(day) ? prev.weekdays.filter((item) => item !== day) : [...prev.weekdays, day]
+    }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const doseTimes = form.dose_times.split(/[,\s]+/).map((item) => item.trim()).filter(Boolean);
+    const intervalDays = Number(form.interval_days);
+    if (!form.name.trim() || !form.dosage.trim() || !doseTimes.length) return;
+    if (form.schedule_mode === "weekdays" && !form.weekdays.length) return;
+    if (form.schedule_mode === "interval" && (!Number.isInteger(intervalDays) || intervalDays < 1)) return;
+    setLoading(true);
+    setError("");
+    try {
+      await createMedication({
+        name: form.name.trim(),
+        dosage: form.dosage.trim(),
+        instructions: form.instructions.trim() || null,
+        schedule_mode: form.schedule_mode,
+        weekdays: form.schedule_mode === "weekdays" ? form.weekdays : [],
+        interval_days: form.schedule_mode === "interval" ? intervalDays : null,
+        dose_times: doseTimes,
+        starts_on: form.starts_on,
+        ends_on: form.ends_on || null,
+        timezone: "Europe/Istanbul",
+        is_active: true
+      });
+      setSuccess("İlaç hatırlatıcısı kaydedildi.");
+      setForm({
+        name: "", dosage: "", instructions: "", schedule_mode: "weekdays", weekdays: [0, 1, 2, 3, 4, 5, 6],
+        interval_days: "2", dose_times: "09:00", starts_on: todayStr(), ends_on: ""
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form className="add-form" onSubmit={handleSubmit}>
+      {success ? <SuccessBanner message={success} onDismiss={() => setSuccess("")} /> : null}
+      <div className="add-form-grid">
+        <FormField label="İlaç adı" htmlFor="med-name"><input id="med-name" className="compose-form__input" value={form.name} onChange={(e) => update("name", e.target.value)} required /></FormField>
+        <FormField label="Doz" htmlFor="med-dosage"><input id="med-dosage" className="compose-form__input" value={form.dosage} onChange={(e) => update("dosage", e.target.value)} required /></FormField>
+        <FormField label="Talimat" htmlFor="med-instructions"><input id="med-instructions" className="compose-form__input" value={form.instructions} onChange={(e) => update("instructions", e.target.value)} /></FormField>
+        <FormField label="Saatler" htmlFor="med-times"><input id="med-times" className="compose-form__input" value={form.dose_times} onChange={(e) => update("dose_times", e.target.value)} required /></FormField>
+        <FormField label="Başlangıç tarihi" htmlFor="med-start"><input id="med-start" className="compose-form__input" type="date" value={form.starts_on} onChange={(e) => update("starts_on", e.target.value)} required /></FormField>
+        <FormField label="Bitiş tarihi" htmlFor="med-end"><input id="med-end" className="compose-form__input" type="date" value={form.ends_on} onChange={(e) => update("ends_on", e.target.value)} /></FormField>
+        <FormField label="Program tipi" htmlFor="med-mode">
+          <select id="med-mode" className="compose-form__input compose-form__select" value={form.schedule_mode} onChange={(e) => update("schedule_mode", e.target.value)}>
+            <option value="weekdays">Belirli günler</option>
+            <option value="interval">Her N günde bir</option>
+          </select>
+        </FormField>
+        {form.schedule_mode === "interval" ? (
+          <FormField label="Kaç günde bir?" htmlFor="med-interval"><input id="med-interval" className="compose-form__input" type="number" min="1" value={form.interval_days} onChange={(e) => update("interval_days", e.target.value)} required /></FormField>
+        ) : null}
+      </div>
+      {form.schedule_mode === "weekdays" ? (
+        <div className="add-field"><p className="compose-form__label">Hangi günler?</p><div className="add-weekday-picker">
+          {WEEKDAY_LABELS.map((label, index) => <button key={label} type="button" className={`add-weekday-btn ${form.weekdays.includes(index) ? "add-weekday-btn--active" : ""}`} onClick={() => toggleWeekday(index)}>{label}</button>)}
+        </div></div>
+      ) : null}
+      {error ? <p className="error-banner">{error}</p> : null}
+      <div className="add-form-actions"><button className="primary-button" type="submit" disabled={loading}>{loading ? "Kaydediliyor..." : "Kaydet"}</button></div>
+    </form>
+  );
+}
+
 const TABS = [
   { id: "transaction", label: "İşlem", icon: "₺" },
   { id: "event", label: "Etkinlik", icon: "◎" },
   { id: "routine", label: "Rutin", icon: "↻" }
+  ,{ id: "medication", label: "İlaç", icon: "+" }
 ];
 
 export default function AddPage() {
@@ -488,6 +576,7 @@ export default function AddPage() {
         {activeTab === "transaction" && <TransactionForm accounts={accounts} />}
         {activeTab === "event" && <EventForm />}
         {activeTab === "routine" && <RoutineForm />}
+        {activeTab === "medication" && <MedicationForm />}
       </section>
     </main>
   );

@@ -1,9 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from types import SimpleNamespace
 
 from pywebpush import WebPushException
 
 from app.api.routes import notifications as notifications_routes
+from app.api.routes.medications import create_medication_endpoint
 from app.api.routes.notifications import (
     create_or_update_subscription,
     dispatch_reminders,
@@ -16,6 +17,7 @@ from app.main import app
 from app.models import Event, Reminder, ReminderChannel
 from app.schemas import (
     PushMessageRequest,
+    MedicationCreate,
     PushSubscriptionCreate,
     PushSubscriptionDelete,
 )
@@ -159,6 +161,32 @@ def test_dispatch_due_reminders_marks_sent_when_push_succeeds(db_session):
     assert result.sent_count == 1
     assert result.reminder_count == 1
     assert db_session.get(Reminder, reminder.id).is_sent is True
+
+
+def test_dispatch_due_medication_dose_sends_once_to_web_subscription(db_session):
+    create_or_update_subscription(sample_payload(), db_session, "web-device")
+    create_medication_endpoint(
+        MedicationCreate(
+            name="Tansiyon ilaci",
+            dosage="5 mg",
+            weekdays=[6],
+            dose_times=[time(9, 0)],
+            starts_on=date(2026, 5, 17),
+            timezone="Europe/Istanbul",
+        ),
+        db_session,
+        x_device_id="mobile-device",
+    )
+    gateway = FakeGateway()
+    now = datetime(2026, 5, 17, 6, 0, tzinfo=timezone.utc)
+
+    first = dispatch_due_reminders(db_session, now=now, gateway=gateway, settings=push_settings())
+    second = dispatch_due_reminders(db_session, now=now, gateway=gateway, settings=push_settings())
+
+    assert first.sent_count == 1
+    assert first.medication_dose_count == 1
+    assert second.sent_count == 0
+    assert second.medication_dose_count == 0
 
 
 def test_send_test_push_targets_only_same_device_subscription(db_session):
