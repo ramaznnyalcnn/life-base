@@ -168,11 +168,11 @@ def test_events_dashboard_splits_upcoming_past_and_pending_reminders(db_session)
     assert dashboard.pending_reminders[0].event_title == "Disci Randevusu"
 
 
-def test_events_dashboard_filters_by_device_id(db_session):
+def test_events_dashboard_route_shares_records_across_user_devices(db_session):
     create_event_endpoint(
         EventCreate(
             title="Benim Etkinligim",
-            starts_at=datetime(2026, 3, 10, 14, 30, tzinfo=timezone.utc),
+            starts_at=datetime(2027, 3, 10, 14, 30, tzinfo=timezone.utc),
             reminder_offsets_minutes=[],
             device_id="device-a",
         ),
@@ -181,21 +181,20 @@ def test_events_dashboard_filters_by_device_id(db_session):
     create_event_endpoint(
         EventCreate(
             title="Diger Cihaz Etkinligi",
-            starts_at=datetime(2026, 3, 10, 16, 0, tzinfo=timezone.utc),
+            starts_at=datetime(2027, 3, 10, 16, 0, tzinfo=timezone.utc),
             reminder_offsets_minutes=[],
             device_id="device-b",
         ),
         db_session,
     )
 
-    dashboard = build_calendar_dashboard(
-        db_session,
+    dashboard = get_calendar_dashboard(
         include_past=False,
-        device_id="device-a",
-        now=datetime(2026, 3, 9, 12, 0, tzinfo=timezone.utc),
+        db=db_session,
+        x_device_id="device-a",
     )
 
-    assert [event.title for event in dashboard.upcoming_events] == ["Benim Etkinligim"]
+    assert [event.title for event in dashboard.upcoming_events] == ["Benim Etkinligim", "Diger Cihaz Etkinligi"]
 
 
 def test_events_dashboard_includes_recurring_occurrences(db_session):

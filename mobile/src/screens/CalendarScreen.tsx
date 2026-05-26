@@ -34,7 +34,9 @@ type MedicationEditForm = {
   name: string;
   dosage: string;
   instructions: string;
+  scheduleMode: "weekdays" | "interval";
   weekdays: number[];
+  intervalDays: string;
   doseTimes: string;
   startsOn: string;
   endsOn: string;
@@ -168,7 +170,9 @@ function toMedicationEditForm(medication: Medication): MedicationEditForm {
     name: medication.name,
     dosage: medication.dosage,
     instructions: medication.instructions ?? "",
+    scheduleMode: medication.schedule_mode,
     weekdays: medication.weekdays,
+    intervalDays: String(medication.interval_days ?? 2),
     doseTimes: medication.dose_times.join(", "),
     startsOn: medication.starts_on,
     endsOn: medication.ends_on ?? "",
@@ -457,7 +461,9 @@ function formatDoseMeta(dose: MedicationDoseItem): string {
 }
 
 function formatMedicationSchedule(medication: Medication): string {
-  const days = medication.weekdays.map((day) => WEEKDAYS[day]).filter(Boolean).join(", ");
+  const days = medication.schedule_mode === "interval"
+    ? `${medication.interval_days} gunde bir, ${medication.starts_on} itibaren`
+    : medication.weekdays.map((day) => WEEKDAYS[day]).filter(Boolean).join(", ");
   const times = medication.dose_times.join(", ");
   return `${days} / ${times}`;
 }
@@ -692,8 +698,14 @@ export function CalendarScreen({ palette, api, refreshKey, onChanged, onSyncNoti
     if (!editingMedication || !medicationForm) {
       return;
     }
-    if (!medicationForm.name.trim() || !medicationForm.dosage.trim() || medicationForm.weekdays.length === 0) {
-      setError("Ilac adi, doz ve en az bir gun zorunlu.");
+    const parsedIntervalDays = Number(medicationForm.intervalDays);
+    if (
+      !medicationForm.name.trim()
+      || !medicationForm.dosage.trim()
+      || (medicationForm.scheduleMode === "weekdays" && medicationForm.weekdays.length === 0)
+      || (medicationForm.scheduleMode === "interval" && (!Number.isInteger(parsedIntervalDays) || parsedIntervalDays < 1))
+    ) {
+      setError("Ilac adi, doz ve gecerli program bilgisi zorunlu.");
       return;
     }
 
@@ -704,7 +716,9 @@ export function CalendarScreen({ palette, api, refreshKey, onChanged, onSyncNoti
         name: medicationForm.name.trim(),
         dosage: medicationForm.dosage.trim(),
         instructions: medicationForm.instructions.trim() || null,
-        weekdays: medicationForm.weekdays,
+        schedule_mode: medicationForm.scheduleMode,
+        weekdays: medicationForm.scheduleMode === "weekdays" ? medicationForm.weekdays : [],
+        interval_days: medicationForm.scheduleMode === "interval" ? parsedIntervalDays : null,
         dose_times: parseDoseTimes(medicationForm.doseTimes),
         starts_on: medicationForm.startsOn,
         ends_on: medicationForm.endsOn.trim() || null,
@@ -955,30 +969,52 @@ export function CalendarScreen({ palette, api, refreshKey, onChanged, onSyncNoti
             value={medicationForm.instructions}
             onChangeText={(value) => updateMedicationForm("instructions", value)}
           />
-          <Text style={[styles.eventStatus, { color: palette.muted }]}>Gunler</Text>
-          <View style={styles.actions}>
-            {WEEKDAYS.map((label, index) => {
-              const active = medicationForm.weekdays.includes(index);
-              return (
-                <Pressable
-                  key={label}
-                  onPress={() => toggleMedicationWeekday(index)}
-                  style={({ pressed }) => [
-                    styles.dayChip,
-                    {
-                      backgroundColor: active ? palette.primary : palette.overlaySoft,
-                      borderColor: active ? palette.primary : palette.border,
-                      transform: [{ scale: pressed ? 0.96 : 1 }]
-                    }
-                  ]}
-                >
-                  <Text style={[styles.dayChipText, { color: active ? palette.primaryText : palette.text }]}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <SegmentedControl
+            palette={palette}
+            value={medicationForm.scheduleMode}
+            onChange={(value) => updateMedicationForm("scheduleMode", value)}
+            options={[
+              { value: "weekdays", label: "Belirli gunler" },
+              { value: "interval", label: "Her N gunde" }
+            ]}
+          />
+          {medicationForm.scheduleMode === "weekdays" ? (
+            <>
+              <Text style={[styles.eventStatus, { color: palette.muted }]}>Gunler</Text>
+              <View style={styles.actions}>
+                {WEEKDAYS.map((label, index) => {
+                  const active = medicationForm.weekdays.includes(index);
+                  return (
+                    <Pressable
+                      key={label}
+                      onPress={() => toggleMedicationWeekday(index)}
+                      style={({ pressed }) => [
+                        styles.dayChip,
+                        {
+                          backgroundColor: active ? palette.primary : palette.overlaySoft,
+                          borderColor: active ? palette.primary : palette.border,
+                          transform: [{ scale: pressed ? 0.96 : 1 }]
+                        }
+                      ]}
+                    >
+                      <Text style={[styles.dayChipText, { color: active ? palette.primaryText : palette.text }]}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
+            <Field
+              palette={palette}
+              label="Kac gunde bir"
+              value={medicationForm.intervalDays}
+              onChangeText={(value) => updateMedicationForm("intervalDays", value)}
+              keyboardType="numeric"
+              placeholder="2"
+            />
+          )}
           <Field
             palette={palette}
             label="Saatler"

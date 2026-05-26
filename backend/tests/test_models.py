@@ -8,6 +8,7 @@ from app.models import (
     Event,
     Medication,
     MedicationDoseLog,
+    MedicationPushDelivery,
     PushSubscription,
     Reminder,
     Transaction,
@@ -32,6 +33,7 @@ def test_all_core_tables_are_registered():
         "push_subscriptions",
         "medications",
         "medication_dose_logs",
+        "medication_push_deliveries",
     } <= tables
 
 
@@ -47,6 +49,7 @@ def test_metadata_can_create_schema():
         "categories",
         "events",
         "medication_dose_logs",
+        "medication_push_deliveries",
         "medications",
         "push_subscriptions",
         "recurring_events",
@@ -91,9 +94,12 @@ def test_medication_model_supports_schedule_and_dose_logs():
     assert "weekdays" in medication_columns
     assert "dose_times" in medication_columns
     assert "timezone" in medication_columns
+    assert "schedule_mode" in medication_columns
+    assert "interval_days" in medication_columns
     assert "scheduled_for" in log_columns
     assert "snoozed_until" in log_columns
     assert medication_fk.target_fullname == "medications.id"
+    assert "notify_at" in MedicationPushDelivery.__table__.columns
 
 
 def test_credit_card_cycle_fields_are_available():

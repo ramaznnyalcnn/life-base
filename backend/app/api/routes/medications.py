@@ -1,5 +1,7 @@
 """Medication reminder endpoints."""
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,7 @@ from app.schemas import (
 )
 from app.services.medications import (
     build_medication_dashboard,
+    build_medication_schedule,
     build_notification_schedule,
     create_medication,
     deactivate_medication,
@@ -42,7 +45,7 @@ def list_medications_endpoint(
     x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
 ):
     current_user = resolve_route_user(current_user, db)
-    return [read_medication(medication) for medication in list_medications(db, user_id=current_user.id, device_id=_device_id(x_device_id))]
+    return [read_medication(medication) for medication in list_medications(db, user_id=current_user.id)]
 
 
 @router.post("", response_model=MedicationRead, status_code=status.HTTP_201_CREATED)
@@ -73,7 +76,6 @@ def update_medication_endpoint(
                 medication_id,
                 payload,
                 user_id=current_user.id,
-                device_id=_device_id(x_device_id),
             )
         )
     except ValueError as exc:
@@ -89,7 +91,7 @@ def delete_medication_endpoint(
 ):
     current_user = resolve_route_user(current_user, db)
     try:
-        deactivate_medication(db, medication_id, user_id=current_user.id, device_id=_device_id(x_device_id))
+        deactivate_medication(db, medication_id, user_id=current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -105,7 +107,6 @@ def get_medication_dashboard(
     return build_medication_dashboard(
         db,
         user_id=current_user.id,
-        device_id=_device_id(x_device_id),
         days=days,
     )
 
@@ -122,10 +123,28 @@ def get_medication_notification_schedule(
     return build_notification_schedule(
         db,
         user_id=current_user.id,
-        device_id=_device_id(x_device_id),
         days=days,
         limit=limit,
     )
+
+
+@router.get("/schedule", response_model=list[MedicationDoseItem])
+def get_medication_schedule(
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current_user = resolve_route_user(current_user, db)
+    try:
+        return build_medication_schedule(
+            db,
+            user_id=current_user.id,
+            from_date=from_date,
+            to_date=to_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/{medication_id}/doses/taken", response_model=MedicationDoseItem)
@@ -143,7 +162,6 @@ def mark_medication_dose_taken_endpoint(
             medication_id,
             payload,
             user_id=current_user.id,
-            device_id=_device_id(x_device_id),
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -164,7 +182,6 @@ def snooze_medication_dose_endpoint(
             medication_id,
             payload,
             user_id=current_user.id,
-            device_id=_device_id(x_device_id),
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

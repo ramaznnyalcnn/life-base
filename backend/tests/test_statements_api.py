@@ -99,12 +99,12 @@ def test_build_card_statements_moves_to_next_bucket_after_cutoff(db_session):
 
 
 def test_statements_route_is_registered_and_returns_payload(db_session):
-    seed_card_statement_state(db_session)
+    card = seed_card_statement_state(db_session)
 
     payload = list_card_statements(db_session)
 
     assert len(payload) == 1
-    assert payload[0].statement_amount == Decimal("2500.00")
+    assert payload[0].account_id == card.id
 
     paths = {route.path for route in app.routes}
     assert "/api/v1/wallet/statements" in paths

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, date
 from enum import Enum
 
-from sqlalchemy import Boolean, Date, DateTime, Enum as SqlEnum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Enum as SqlEnum, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -28,7 +28,9 @@ class Medication(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(120), index=True)
     dosage: Mapped[str] = mapped_column(String(120))
     instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    schedule_mode: Mapped[str] = mapped_column(String(16), default="weekdays")
     weekdays: Mapped[str] = mapped_column(String(32))
+    interval_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     dose_times: Mapped[str] = mapped_column(String(255))
     starts_on: Mapped[date] = mapped_column(Date, index=True)
     ends_on: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
@@ -63,3 +65,25 @@ class MedicationDoseLog(TimestampMixin, Base):
     snoozed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     medication = relationship("Medication", back_populates="dose_logs")
+
+
+class MedicationPushDelivery(TimestampMixin, Base):
+    """Successful push delivery for one medication dose notification."""
+
+    __tablename__ = "medication_push_deliveries"
+    __table_args__ = (
+        UniqueConstraint(
+            "push_subscription_id",
+            "medication_id",
+            "scheduled_for",
+            "notify_at",
+            name="uq_medication_push_delivery_target_dose_time",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    push_subscription_id: Mapped[int] = mapped_column(ForeignKey("push_subscriptions.id"), index=True)
+    medication_id: Mapped[int] = mapped_column(ForeignKey("medications.id"), index=True)
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    notify_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
