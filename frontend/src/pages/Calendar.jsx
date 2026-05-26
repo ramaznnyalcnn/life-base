@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { deleteEvent, fetchCalendarDashboard, updateEvent } from "../api/events";
+import {
+  fetchMedicationDashboard,
+  fetchMedicationSchedule,
+  markMedicationDoseTaken,
+  snoozeMedicationDose,
+  updateMedication
+} from "../api/medications";
 
 const INITIAL_EDIT_FORM = {
   title: "",
@@ -10,7 +17,9 @@ const INITIAL_EDIT_FORM = {
 };
 
 const MONTH_FLIP_MS = 380;
+const MAX_TRANSITION_PROGRESS = 2;
 const IS_TEST_MODE = import.meta.env.MODE === "test";
+const WEEKDAY_LABELS = ["Pzt", "Sal", "Car", "Per", "Cum", "Cmt", "Paz"];
 
 function addDays(value, amount) {
   const nextDate = new Date(value);
@@ -173,7 +182,7 @@ function getEventMediaGlyph(visualTone) {
   }
 }
 
-function buildMonthGrid(eventsByDay, viewingDate) {
+function buildMonthGrid(eventsByDay, dosesByDay, viewingDate) {
   const currentMonth = new Date(viewingDate.getFullYear(), viewingDate.getMonth(), 1);
   const gridStart = addDays(currentMonth, -((currentMonth.getDay() + 6) % 7));
   const gridDays = [];
@@ -182,6 +191,7 @@ function buildMonthGrid(eventsByDay, viewingDate) {
     const date = addDays(gridStart, index);
     const key = toDateKey(date);
     const events = eventsByDay.get(key) ?? [];
+    const doses = dosesByDay.get(key) ?? [];
     const rowStart = Math.floor(index / 7) * 7;
     const prevEvents = index > rowStart ? (gridDays[index - 1]?.events.length ?? 0) : 0;
     const nextDate = addDays(gridStart, index + 1);
@@ -203,6 +213,7 @@ function buildMonthGrid(eventsByDay, viewingDate) {
       key,
       date,
       events,
+      doses,
       inCurrentMonth: date.getMonth() === viewingDate.getMonth(),
       isToday: key === toDateKey(new Date()),
       isSelected: false,
@@ -213,6 +224,34 @@ function buildMonthGrid(eventsByDay, viewingDate) {
   return gridDays;
 }
 
+function formatDoseStatus(dose) {
+  if (dose.status === "taken") return "Alindi";
+  if (dose.status === "snoozed") return "Ertelendi";
+  return "Bekliyor";
+}
+
+function formatMedicationSchedule(medication) {
+  const cadence = medication.schedule_mode === "interval"
+    ? `${medication.interval_days} gunde bir, ${medication.starts_on} itibaren`
+    : medication.weekdays.map((day) => WEEKDAY_LABELS[day]).filter(Boolean).join(", ");
+  return `${cadence} / ${medication.dose_times.join(", ")}`;
+}
+
+function toMedicationForm(medication) {
+  return {
+    name: medication.name,
+    dosage: medication.dosage,
+    instructions: medication.instructions ?? "",
+    schedule_mode: medication.schedule_mode,
+    weekdays: medication.weekdays,
+    interval_days: String(medication.interval_days ?? 2),
+    dose_times: medication.dose_times.join(", "),
+    starts_on: medication.starts_on,
+    ends_on: medication.ends_on ?? "",
+    is_active: medication.is_active
+  };
+}
+
 function getTodayOpenState() {
   return {
     [toDateKey(new Date())]: true
@@ -221,6 +260,8 @@ function getTodayOpenState() {
 
 export default function CalendarPage() {
   const [dashboard, setDashboard] = useState(null);
+  const [medicationDashboard, setMedicationDashboard] = useState(null);
+  const [monthDoses, setMonthDoses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingEventId, setEditingEventId] = useState(null);
@@ -230,6 +271,8 @@ export default function CalendarPage() {
   const [selectedDateKey, setSelectedDateKey] = useState(toDateKey(new Date()));
   const [viewingDate, setViewingDate] = useState(() => new Date());
   const [flipState, setFlipState] = useState({ direction: null, phase: "idle" });
+  const [editingMedicationId, setEditingMedicationId] = useState(null);
+  const [medicationForm, setMedicationForm] = useState(null);
   const shellRef = useRef(null);
   const monthFlipTimerRef = useRef(null);
   const monthFlipResetTimerRef = useRef(null);
@@ -241,8 +284,12 @@ export default function CalendarPage() {
     setError("");
 
     try {
-      const payload = await fetchCalendarDashboard(true);
-      setDashboard(payload);
+      const [calendarPayload, medicationPayload] = await Promise.all([
+        fetchCalendarDashboard(true),
+        fetchMedicationDashboard(30)
+      ]);
+      setDashboard(calendarPayload);
+      setMedicationDashboard(medicationPayload);
     } catch (nextError) {
       setError(nextError.message);
     } finally {
@@ -253,6 +300,24 @@ export default function CalendarPage() {
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const firstDayOfMonth = new Date(viewingDate.getFullYear(), viewingDate.getMonth(), 1);
+    const gridStart = addDays(firstDayOfMonth, -((firstDayOfMonth.getDay() + 6) % 7));
+    const gridEnd = addDays(gridStart, 34);
+
+    fetchMedicationSchedule(toDateKey(gridStart), toDateKey(gridEnd))
+      .then((payload) => {
+        if (!cancelled) setMonthDoses(payload);
+      })
+      .catch((nextError) => {
+        if (!cancelled) setError(nextError.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewingDate]);
 
   useEffect(
     () => () => {
@@ -274,13 +339,24 @@ export default function CalendarPage() {
     }
 
     function applyGestureDelta(rawDelta) {
-      const nextProgress = Math.max(0, Math.min(1, gestureProgressRef.current + rawDelta));
+      const currentProgress = gestureProgressRef.current;
+      let nextProgress = Math.max(0, Math.min(MAX_TRANSITION_PROGRESS, currentProgress + rawDelta));
+      if (currentProgress < 1 && nextProgress > 1) nextProgress = 1;
+      if (currentProgress > 1 && nextProgress < 1) nextProgress = 1;
       gestureProgressRef.current = nextProgress;
       setTransitionProgress(nextProgress);
     }
 
     function shouldAllowWeekScroll(deltaY) {
       if (!shellNode || gestureProgressRef.current < 0.98) {
+        return false;
+      }
+
+      if (gestureProgressRef.current > 1.02 && gestureProgressRef.current < 1.98) {
+        return false;
+      }
+
+      if (gestureProgressRef.current <= 1.02 && deltaY > 0) {
         return false;
       }
 
@@ -383,6 +459,17 @@ export default function CalendarPage() {
     return map;
   }, [allEvents]);
 
+  const dosesByDay = useMemo(() => {
+    const map = new Map();
+    for (const dose of monthDoses) {
+      const key = toDateKey(dose.scheduled_for);
+      const current = map.get(key) ?? [];
+      current.push(dose);
+      map.set(key, current);
+    }
+    return map;
+  }, [monthDoses]);
+
   const todayKey = toDateKey(new Date());
 
   const agendaDays = useMemo(() => {
@@ -401,12 +488,27 @@ export default function CalendarPage() {
 
   const monthGrid = useMemo(
     () =>
-      buildMonthGrid(eventsByDay, viewingDate).map((day) => ({
+      buildMonthGrid(eventsByDay, dosesByDay, viewingDate).map((day) => ({
         ...day,
         isSelected: day.key === selectedDateKey
       })),
-    [eventsByDay, selectedDateKey, viewingDate]
+    [dosesByDay, eventsByDay, selectedDateKey, viewingDate]
   );
+
+  const medicationDays = useMemo(() => {
+    const uniqueDoses = new Map();
+    for (const dose of [...(medicationDashboard?.today_doses ?? []), ...(medicationDashboard?.upcoming_doses ?? [])]) {
+      uniqueDoses.set(`${dose.medication_id}-${dose.scheduled_for}`, dose);
+    }
+    const grouped = new Map();
+    for (const dose of uniqueDoses.values()) {
+      const key = toDateKey(dose.scheduled_for);
+      const current = grouped.get(key) ?? [];
+      current.push(dose);
+      grouped.set(key, current);
+    }
+    return Array.from(grouped.entries()).map(([key, doses]) => ({ key, date: fromDateKey(key), doses }));
+  }, [medicationDashboard]);
 
   function toggleDay(dayKey) {
     const nextDate = fromDateKey(dayKey);
@@ -519,6 +621,89 @@ export default function CalendarPage() {
         cancelEditing();
       }
       await loadDashboard();
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  }
+
+  async function reloadMedicationData() {
+    const firstDayOfMonth = new Date(viewingDate.getFullYear(), viewingDate.getMonth(), 1);
+    const gridStart = addDays(firstDayOfMonth, -((firstDayOfMonth.getDay() + 6) % 7));
+    const gridEnd = addDays(gridStart, 34);
+    const [medicationPayload, schedulePayload] = await Promise.all([
+      fetchMedicationDashboard(30),
+      fetchMedicationSchedule(toDateKey(gridStart), toDateKey(gridEnd))
+    ]);
+    setMedicationDashboard(medicationPayload);
+    setMonthDoses(schedulePayload);
+  }
+
+  function startEditingMedication(medication) {
+    setEditingMedicationId(medication.id);
+    setMedicationForm(toMedicationForm(medication));
+  }
+
+  function toggleMedicationWeekday(day) {
+    setMedicationForm((current) => ({
+      ...current,
+      weekdays: current.weekdays.includes(day)
+        ? current.weekdays.filter((item) => item !== day)
+        : [...current.weekdays, day]
+    }));
+  }
+
+  async function handleMedicationSave(event) {
+    event.preventDefault();
+    if (!medicationForm || !editingMedicationId) return;
+    const intervalDays = Number(medicationForm.interval_days);
+    const doseTimes = medicationForm.dose_times.split(/[,\s]+/).map((item) => item.trim()).filter(Boolean);
+    try {
+      setError("");
+      await updateMedication(editingMedicationId, {
+        name: medicationForm.name.trim(),
+        dosage: medicationForm.dosage.trim(),
+        instructions: medicationForm.instructions.trim() || null,
+        schedule_mode: medicationForm.schedule_mode,
+        weekdays: medicationForm.schedule_mode === "weekdays" ? medicationForm.weekdays : [],
+        interval_days: medicationForm.schedule_mode === "interval" ? intervalDays : null,
+        dose_times: doseTimes,
+        starts_on: medicationForm.starts_on,
+        ends_on: medicationForm.ends_on || null,
+        is_active: medicationForm.is_active
+      });
+      setEditingMedicationId(null);
+      setMedicationForm(null);
+      await reloadMedicationData();
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  }
+
+  async function handleMedicationDeactivate(medicationId) {
+    try {
+      setError("");
+      await updateMedication(medicationId, { is_active: false });
+      await reloadMedicationData();
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  }
+
+  async function handleDoseTaken(dose) {
+    try {
+      setError("");
+      await markMedicationDoseTaken(dose.medication_id, dose.scheduled_for);
+      await reloadMedicationData();
+    } catch (nextError) {
+      setError(nextError.message);
+    }
+  }
+
+  async function handleDoseSnooze(dose) {
+    try {
+      setError("");
+      await snoozeMedicationDose(dose.medication_id, dose.scheduled_for, 10);
+      await reloadMedicationData();
     } catch (nextError) {
       setError(nextError.message);
     }
@@ -724,10 +909,12 @@ export default function CalendarPage() {
   const todayAgendaIndex = agendaDays.findIndex((day) => day.key === todayKey);
   const weekOriginY = ((Math.max(todayAgendaIndex, 0) + 0.5) / agendaDays.length) * 100;
   const flipClass = flipState.phase !== "idle" ? `calendar-flip-${flipState.phase}-${flipState.direction}` : "";
-  const calendarScene = transitionProgress > 0.5 ? "week" : "month";
-  const monthZoomProgress = Math.min(1, transitionProgress / 0.54);
-  const viewSwapProgress = Math.max(0, Math.min(1, (transitionProgress - 0.36) / 0.28));
-  const weekGrowProgress = Math.max(0, Math.min(1, (transitionProgress - 0.48) / 0.52));
+  const firstTransitionProgress = Math.min(1, transitionProgress);
+  const medicationSwapProgress = Math.max(0, Math.min(1, (transitionProgress - 1.2) / 0.5));
+  const calendarScene = transitionProgress > 1.5 ? "medication" : transitionProgress > 0.5 ? "week" : "month";
+  const monthZoomProgress = Math.min(1, firstTransitionProgress / 0.54);
+  const viewSwapProgress = Math.max(0, Math.min(1, (firstTransitionProgress - 0.36) / 0.28));
+  const weekGrowProgress = Math.max(0, Math.min(1, (firstTransitionProgress - 0.48) / 0.52));
   const monthSceneStyle = {
     transform: `perspective(1200px) translateY(${monthZoomProgress * -20}px) scale(${1 + monthZoomProgress * 0.18}) rotateX(${monthZoomProgress * -8}deg)`,
     opacity: Math.max(0, 1 - viewSwapProgress * 1.2),
@@ -739,17 +926,22 @@ export default function CalendarPage() {
     transform: `scale(${1 + monthZoomProgress * 1.05}) translateY(${monthZoomProgress * 10}px)`
   };
   const weekShellStyle = {
-    opacity: IS_TEST_MODE ? 1 : Math.max(0, (transitionProgress - 0.28) / 0.5),
+    opacity: IS_TEST_MODE ? 1 : Math.max(0, (firstTransitionProgress - 0.28) / 0.5) * (1 - medicationSwapProgress),
     transformOrigin: `50% ${weekOriginY}%`,
     transform: IS_TEST_MODE
       ? "none"
       : `perspective(1200px) translateY(${-26 + weekGrowProgress * 26}px) scale(${1.52 - weekGrowProgress * 0.52}) rotateX(${12 - weekGrowProgress * 12}deg)`,
     filter: IS_TEST_MODE ? "none" : `blur(${(1 - weekGrowProgress) * 7}px)`,
-    pointerEvents: IS_TEST_MODE ? "auto" : transitionProgress > 0.5 ? "auto" : "none"
+    pointerEvents: IS_TEST_MODE ? "auto" : transitionProgress > 0.5 && transitionProgress < 1.5 ? "auto" : "none"
+  };
+  const medicationSceneStyle = {
+    opacity: IS_TEST_MODE ? 1 : medicationSwapProgress,
+    transform: IS_TEST_MODE ? "none" : `translateY(${(1 - medicationSwapProgress) * 30}px) scale(${0.96 + medicationSwapProgress * 0.04})`,
+    pointerEvents: IS_TEST_MODE ? "auto" : transitionProgress > 1.5 ? "auto" : "none"
   };
   const stageGlowStyle = {
-    transform: `scale(${1 + transitionProgress * 0.08})`,
-    opacity: Math.sin(transitionProgress * Math.PI) * 0.5
+    transform: `scale(${1 + firstTransitionProgress * 0.08})`,
+    opacity: Math.sin(firstTransitionProgress * Math.PI) * 0.5
   };
 
   return (
@@ -829,7 +1021,7 @@ export default function CalendarPage() {
                               onClick={() => openFromCalendar(day.key)}
                               aria-label={`${formatDayHeader(day.date)}, ${
                                 day.events.length ? `${day.events.length} plan` : "plan yok"
-                              }`}
+                              }${day.doses.length ? `, ${day.doses.length} ilac dozu` : ""}`}
                             >
                               <span className="calendar-month-day__number">{day.date.getDate()}</span>
                               {day.events.length ? (
@@ -843,6 +1035,7 @@ export default function CalendarPage() {
                                   {day.events.length}
                                 </span>
                               ) : null}
+                              {day.doses.length ? <span className="calendar-month-day__medication-marker">+</span> : null}
                             </button>
                           ))}
                         </div>
@@ -924,6 +1117,75 @@ export default function CalendarPage() {
                     </article>
                   ))}
                 </div>
+              </section>
+            </section>
+
+            <section
+              aria-hidden={IS_TEST_MODE ? undefined : transitionProgress <= 1.5}
+              className="calendar-transition-layer calendar-medication-shell"
+              style={medicationSceneStyle}
+            >
+              <section className="calendar-medication-section">
+                <header className="calendar-medication-header">
+                  <p className="status-card__eyebrow">Ilac Takvimi</p>
+                  <h2>Planlanan dozlar</h2>
+                  <p>Bugun ve sonraki 30 gun</p>
+                </header>
+                {medicationDays.length ? medicationDays.map((day) => (
+                  <article className="calendar-day-panel calendar-day-panel--open" key={`medication-${day.key}`}>
+                    <div className="calendar-day-panel__header">
+                      <div className="calendar-day-panel__main"><h2>{formatDayHeader(day.date)}</h2></div>
+                      <strong className="calendar-day-panel__count">{day.doses.length} doz</strong>
+                    </div>
+                    <div className="calendar-day-panel__content">
+                      {day.doses.map((dose) => (
+                        <article className="calendar-medication-dose" key={`${dose.medication_id}-${dose.scheduled_for}`}>
+                          <div><h3>{dose.medication_name}</h3><p>{dose.dosage} / {formatTimeRange(dose.scheduled_for, null).split(" - ")[0]}</p></div>
+                          <span className="calendar-agenda-card__pill">{formatDoseStatus(dose)}</span>
+                          {dose.instructions ? <p className="calendar-agenda-card__description">{dose.instructions}</p> : null}
+                          {dose.status !== "taken" ? (
+                            <div className="event-actions">
+                              <button className="secondary-button" type="button" onClick={() => handleDoseTaken(dose)}>Aldim</button>
+                              <button className="ghost-button" type="button" onClick={() => handleDoseSnooze(dose)}>10 dk ertele</button>
+                            </div>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  </article>
+                )) : <p className="calendar-day-panel__empty">Planlanmis ilac dozu yok.</p>}
+
+                <div className="calendar-medication-programs">
+                  <h2>Ilac programlari</h2>
+                  {(medicationDashboard?.medications ?? []).filter((medication) => medication.is_active).map((medication) => (
+                    <article className="calendar-medication-program" key={medication.id}>
+                      <div><h3>{medication.name}</h3><p>{medication.dosage}</p><p>{formatMedicationSchedule(medication)}</p></div>
+                      <div className="event-actions">
+                        <button className="secondary-button" type="button" onClick={() => startEditingMedication(medication)}>Duzenle</button>
+                        <button className="ghost-button ghost-button--danger" type="button" onClick={() => handleMedicationDeactivate(medication.id)}>Pasiflestir</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                {medicationForm ? (
+                  <form className="calendar-medication-editor" onSubmit={handleMedicationSave}>
+                    <h2>Ilac programini duzenle</h2>
+                    <input className="compose-form__input" value={medicationForm.name} onChange={(event) => setMedicationForm((current) => ({ ...current, name: event.target.value }))} aria-label="Ilac adi" required />
+                    <input className="compose-form__input" value={medicationForm.dosage} onChange={(event) => setMedicationForm((current) => ({ ...current, dosage: event.target.value }))} aria-label="Doz" required />
+                    <input className="compose-form__input" value={medicationForm.instructions} onChange={(event) => setMedicationForm((current) => ({ ...current, instructions: event.target.value }))} aria-label="Talimat" />
+                    <select className="compose-form__input compose-form__select" value={medicationForm.schedule_mode} onChange={(event) => setMedicationForm((current) => ({ ...current, schedule_mode: event.target.value }))} aria-label="Program tipi">
+                      <option value="weekdays">Belirli gunler</option><option value="interval">Her N gunde bir</option>
+                    </select>
+                    {medicationForm.schedule_mode === "weekdays" ? (
+                      <div className="add-weekday-picker">{WEEKDAY_LABELS.map((label, index) => <button key={label} type="button" className={`add-weekday-btn ${medicationForm.weekdays.includes(index) ? "add-weekday-btn--active" : ""}`} onClick={() => toggleMedicationWeekday(index)}>{label}</button>)}</div>
+                    ) : <input className="compose-form__input" type="number" min="1" step="1" value={medicationForm.interval_days} onChange={(event) => setMedicationForm((current) => ({ ...current, interval_days: event.target.value }))} aria-label="Kac gunde bir" required />}
+                    <input className="compose-form__input" value={medicationForm.dose_times} onChange={(event) => setMedicationForm((current) => ({ ...current, dose_times: event.target.value }))} aria-label="Saatler" required />
+                    <input className="compose-form__input" type="date" value={medicationForm.starts_on} onChange={(event) => setMedicationForm((current) => ({ ...current, starts_on: event.target.value }))} aria-label="Baslangic tarihi" required />
+                    <input className="compose-form__input" type="date" value={medicationForm.ends_on} onChange={(event) => setMedicationForm((current) => ({ ...current, ends_on: event.target.value }))} aria-label="Bitis tarihi" />
+                    <div className="event-actions"><button className="secondary-button" type="submit">Kaydet</button><button className="ghost-button" type="button" onClick={() => setMedicationForm(null)}>Vazgec</button></div>
+                  </form>
+                ) : null}
               </section>
             </section>
 

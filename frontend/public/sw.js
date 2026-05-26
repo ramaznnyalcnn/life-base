@@ -1,4 +1,4 @@
-const CACHE_NAME = "life-base-shell-v3";
+const CACHE_NAME = "life-base-shell-v4";
 const APP_SHELL = ["/", "/manifest.json", "/icons/icon-192.svg", "/icons/icon-512.svg"];
 
 self.addEventListener("install", (event) => {
@@ -24,6 +24,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith("/api/") || url.pathname === "/health") {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const cloned = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put("/", cloned));
+          return response;
+        })
+        .catch(() => caches.match("/"))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) {
@@ -40,7 +59,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
           return response;
         })
-        .catch(() => caches.match("/"));
+        .catch(() => caches.match(event.request));
     })
   );
 });

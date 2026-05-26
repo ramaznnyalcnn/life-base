@@ -29,6 +29,7 @@ export default function App() {
   const [requiresLogin, setRequiresLogin] = useState(true);
   const [bootError, setBootError] = useState("");
   const [isDockSliding, setIsDockSliding] = useState(false);
+  const [foregroundRefreshKey, setForegroundRefreshKey] = useState(0);
   const holdTimerRef = useRef(null);
   const pointerIdRef = useRef(null);
   const suppressClickRef = useRef(false);
@@ -102,6 +103,21 @@ export default function App() {
     if (holdTimerRef.current !== null) {
       window.clearTimeout(holdTimerRef.current);
     }
+  }, []);
+
+  useEffect(() => {
+    function refreshVisiblePage() {
+      if (document.visibilityState === "visible") {
+        setForegroundRefreshKey((current) => current + 1);
+      }
+    }
+
+    window.addEventListener("pageshow", refreshVisiblePage);
+    document.addEventListener("visibilitychange", refreshVisiblePage);
+    return () => {
+      window.removeEventListener("pageshow", refreshVisiblePage);
+      document.removeEventListener("visibilitychange", refreshVisiblePage);
+    };
   }, []);
 
   function clearHoldTimer() {
@@ -204,6 +220,7 @@ export default function App() {
       <div className="app-content" id="main-scroll-container">
         <div className="app-content__page">
           <ActivePage
+            key={`${activeItem.id}-${foregroundRefreshKey}`}
             onNavigate={setActiveTab}
             currentUser={currentUser}
             onLogout={() => {

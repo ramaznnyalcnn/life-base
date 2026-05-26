@@ -1078,6 +1078,21 @@ body {
   box-shadow: 0 0 6px var(--wf-expense);
 }
 
+.calendar-month-day__medication-marker {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--wf-health);
+  color: #fff;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .calendar-today-panel {
   margin-top: 32px;
   padding-top: 24px;
@@ -1436,6 +1451,100 @@ body {
   top: auto;
   left: auto;
   height: auto;
+}
+
+.calendar-medication-shell {
+  z-index: 30;
+  overflow-y: auto;
+  padding-bottom: 120px;
+}
+
+.shell--calendar[data-scene="medication"] {
+  height: auto;
+  min-height: calc(100dvh - var(--safe-top) - 64px - var(--dock-height) - 16px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.shell--calendar[data-scene="medication"] .calendar-transition-shell {
+  height: auto;
+  min-height: 100%;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.shell--calendar[data-scene="medication"] .calendar-transition-stage {
+  align-items: flex-start;
+  min-height: 100%;
+  overflow: visible;
+}
+
+.shell--calendar[data-scene="medication"] .calendar-medication-shell {
+  position: relative;
+  top: auto;
+  left: auto;
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+.calendar-medication-section {
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.calendar-medication-header {
+  margin-bottom: 20px;
+  padding: 20px 22px;
+  border: 1px solid var(--wf-border);
+  border-radius: var(--app-radius);
+  background: var(--wf-card-grad);
+}
+
+.calendar-medication-header h2,
+.calendar-medication-programs h2,
+.calendar-medication-editor h2 {
+  color: var(--wf-text-primary);
+  margin: 6px 0;
+}
+
+.calendar-medication-header > p:last-child,
+.calendar-medication-program p,
+.calendar-medication-dose p {
+  color: var(--wf-text-secondary);
+  font-size: 0.875rem;
+}
+
+.calendar-medication-dose,
+.calendar-medication-program,
+.calendar-medication-editor {
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--wf-border);
+  border-radius: 16px;
+  background: var(--wf-card-meta);
+}
+
+.calendar-medication-dose h3,
+.calendar-medication-program h3 {
+  color: var(--wf-text-primary);
+  margin-bottom: 4px;
+}
+
+.calendar-medication-dose .calendar-agenda-card__pill {
+  display: inline-flex;
+  margin-top: 10px;
+}
+
+.calendar-medication-programs {
+  margin-top: 24px;
+}
+
+.calendar-medication-editor {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
 }
 .calendar-entry__scene {
   background: var(--wf-card-grad);

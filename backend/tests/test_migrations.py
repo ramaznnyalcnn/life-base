@@ -17,6 +17,7 @@ def test_alembic_files_exist():
     assert (base / "versions" / "20260314_0006_transfers.py").exists()
     assert (base / "versions" / "20260316_0009_user_passwords_and_admins.py").exists()
     assert (base / "versions" / "20260517_0010_medication_reminders.py").exists()
+    assert (base / "versions" / "20260526_0011_medication_intervals_and_push_delivery.py").exists()
 
 
 def test_initial_migration_contains_core_tables():
@@ -89,3 +90,13 @@ def test_medication_migration_contains_schedule_and_dose_tables():
     assert "medication_dose_logs" in migration
     assert "dose_times" in migration
     assert "snoozed_until" in migration
+
+
+def test_medication_interval_migration_contains_schedule_mode_and_push_delivery():
+    migration = (
+        REPO_ROOT / "backend" / "alembic" / "versions" / "20260526_0011_medication_intervals_and_push_delivery.py"
+    ).read_text()
+
+    assert "schedule_mode" in migration
+    assert "interval_days" in migration
+    assert "medication_push_deliveries" in migration

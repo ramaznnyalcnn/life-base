@@ -45,3 +45,4 @@ class PushDispatchResult(BaseModel):
     failed_count: int
     deactivated_count: int
     reminder_count: int = 0
+    medication_dose_count: int = 0

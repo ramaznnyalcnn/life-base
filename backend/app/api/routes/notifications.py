@@ -110,7 +110,6 @@ def dispatch_reminders(
         return dispatch_due_reminders(
             db,
             user_id=current_user.id,
-            device_id=_device_id(x_device_id),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

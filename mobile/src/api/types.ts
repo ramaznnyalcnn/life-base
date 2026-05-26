@@ -146,7 +146,9 @@ export type Medication = {
   name: string;
   dosage: string;
   instructions: string | null;
+  schedule_mode: "weekdays" | "interval";
   weekdays: number[];
+  interval_days: number | null;
   dose_times: string[];
   starts_on: string;
   ends_on: string | null;
