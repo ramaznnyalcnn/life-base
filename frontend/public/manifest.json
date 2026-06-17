@@ -1,0 +1,24 @@
+{
+  "name": "life-base",
+  "short_name": "life-base",
+  "description": "life-base'in GitHub'da acik kaynak gelistirilen kisisel finans, takvim ve akilli kayit uygulamasi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "lang": "tr",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

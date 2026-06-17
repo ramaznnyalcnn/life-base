@@ -1,0 +1,42 @@
+[
+  {
+    "message": "350 tl migros",
+    "model_payload": "{\"action\":\"expense\",\"confidence\":0.97,\"missing_fields\":[],\"assistant_message\":\"Harcama olarak algiladim.\",\"transaction\":{\"amount\":350,\"account_name\":null,\"category_name\":\"Market\",\"description\":\"Migros harcamasi\",\"occurred_at\":\"2026-03-09T12:00:00+00:00\"},\"event\":null,\"summary\":null}",
+    "expected": {
+      "action": "expense",
+      "missing_fields": []
+    }
+  },
+  {
+    "message": "enparaya 5000 odeme yaptim",
+    "model_payload": "{\"action\":\"payment\",\"confidence\":0.95,\"missing_fields\":[],\"assistant_message\":\"Kart odemesi olarak algiladim.\",\"transaction\":{\"amount\":5000,\"account_name\":\"Enpara\",\"category_name\":null,\"description\":\"Kredi karti odemesi\",\"occurred_at\":\"2026-03-09T12:00:00+00:00\"},\"event\":null,\"summary\":null}",
+    "expected": {
+      "action": "payment",
+      "missing_fields": []
+    }
+  },
+  {
+    "message": "yarin saat 11 toplanti",
+    "model_payload": "{\"action\":\"event\",\"confidence\":0.95,\"missing_fields\":[],\"assistant_message\":\"Etkinlik olarak algiladim.\",\"transaction\":null,\"event\":{\"title\":\"Toplanti\",\"description\":null,\"starts_at\":\"2026-03-10T11:00:00+00:00\",\"ends_at\":null},\"summary\":null}",
+    "expected": {
+      "action": "event",
+      "missing_fields": []
+    }
+  },
+  {
+    "message": "markete gittim",
+    "model_payload": "{\"action\":\"expense\",\"confidence\":0.68,\"missing_fields\":[],\"assistant_message\":\"Harcama gibi gorunuyor ama tutar eksik.\",\"transaction\":{\"amount\":null,\"account_name\":null,\"category_name\":\"Market\",\"description\":\"Market harcamasi\",\"occurred_at\":\"2026-03-09T12:00:00+00:00\"},\"event\":null,\"summary\":null}",
+    "expected": {
+      "action": "expense",
+      "missing_fields": ["amount"]
+    }
+  },
+  {
+    "message": "yarin bir sey var",
+    "model_payload": "{\"action\":\"event\",\"confidence\":0.55,\"missing_fields\":[],\"assistant_message\":\"Etkinlik olabilir ama baslik ve saat eksik.\",\"transaction\":null,\"event\":{\"title\":null,\"description\":null,\"starts_at\":null,\"ends_at\":null},\"summary\":null}",
+    "expected": {
+      "action": "event",
+      "missing_fields": ["title", "starts_at"]
+    }
+  }
+]

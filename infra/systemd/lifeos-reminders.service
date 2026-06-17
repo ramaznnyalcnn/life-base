@@ -1,0 +1,13 @@
+[Unit]
+Description=Life OS Reminder Dispatch
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/lifeos
+EnvironmentFile=/opt/lifeos/.env
+ExecStart=/opt/lifeos/.venv/bin/python -m app.cli.dispatch_reminders --limit 50
+Environment=PYTHONPATH=/opt/lifeos/backend
+
+[Install]
+WantedBy=multi-user.target

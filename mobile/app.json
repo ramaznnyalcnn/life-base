@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "LifeBase",
+    "slug": "lifeos-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "lifebase",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "app.lifebase.mobile",
+      "versionCode": 1,
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#111827"
+      }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#4f46e5",
+          "defaultChannel": "reminders"
+        }
+      ]
+    ]
+  }
+}

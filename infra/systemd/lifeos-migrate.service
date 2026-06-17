@@ -1,0 +1,10 @@
+[Unit]
+Description=Life OS DB Migration
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/lifeos
+EnvironmentFile=/opt/lifeos/.env
+ExecStart=/opt/lifeos/infra/scripts/backend-migrate.sh
+RemainAfterExit=yes

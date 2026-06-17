@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Life OS reminder dispatch every minute
+
+[Timer]
+OnBootSec=30sec
+OnUnitActiveSec=60sec
+Unit=lifeos-reminders.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
