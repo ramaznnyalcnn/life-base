@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, time
 
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text, Time
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
 
@@ -18,6 +18,9 @@ class RecurringEvent(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     device_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("activity_templates.id"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(160), index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     weekdays: Mapped[str] = mapped_column(String(32))
@@ -29,3 +32,5 @@ class RecurringEvent(TimestampMixin, Base):
     is_important: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     interval_weeks: Mapped[int] = mapped_column(Integer, default=1)
+
+    template = relationship("ActivityTemplate", back_populates="recurring_events")

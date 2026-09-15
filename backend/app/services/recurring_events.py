@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -89,10 +90,17 @@ def read_recurring_rule(rule: RecurringEvent) -> RecurringEventRead:
     )
 
 
-def _combine_occurrence_datetime(value: date, at: time | None, *, is_all_day: bool) -> datetime:
+def _combine_occurrence_datetime(
+    value: date,
+    at: time | None,
+    *,
+    is_all_day: bool,
+    timezone_name: str,
+) -> datetime:
+    zone = ZoneInfo(timezone_name)
     if is_all_day or at is None:
-        return datetime.combine(value, time(hour=12), tzinfo=timezone.utc)
-    return datetime.combine(value, at, tzinfo=timezone.utc)
+        return datetime.combine(value, time(hour=12), tzinfo=zone).astimezone(timezone.utc)
+    return datetime.combine(value, at, tzinfo=zone).astimezone(timezone.utc)
 
 
 def _matches_rule(rule: RecurringEvent, value: date) -> bool:
@@ -114,6 +122,7 @@ def expand_recurring_events(
     *,
     range_start: datetime,
     range_end: datetime,
+    timezone_name: str = "Europe/Istanbul",
 ) -> list[EventRead]:
     occurrences: list[EventRead] = []
     current_day = range_start.date()
@@ -124,9 +133,19 @@ def expand_recurring_events(
             if not _matches_rule(rule, current_day):
                 continue
 
-            starts_at = _combine_occurrence_datetime(current_day, rule.start_time, is_all_day=rule.is_all_day)
+            starts_at = _combine_occurrence_datetime(
+                current_day,
+                rule.start_time,
+                is_all_day=rule.is_all_day,
+                timezone_name=timezone_name,
+            )
             ends_at = (
-                _combine_occurrence_datetime(current_day, rule.end_time, is_all_day=False)
+                _combine_occurrence_datetime(
+                    current_day,
+                    rule.end_time,
+                    is_all_day=False,
+                    timezone_name=timezone_name,
+                )
                 if rule.end_time is not None and not rule.is_all_day
                 else None
             )

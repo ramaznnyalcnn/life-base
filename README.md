@@ -41,6 +41,7 @@ infra/
 - `backend/app/core`: config, security, settings
 - `backend/app/db`: PostgreSQL session and persistence helpers
 - `backend/app/models`: ORM models
+- `backend/app/operations`: class-based, transactional application operations
 - `backend/app/schemas`: request/response schemas
 - `backend/app/services`: business logic
 - `frontend/src/api`: frontend API clients
@@ -61,3 +62,4 @@ The next step is wiring the backend application entrypoint and frontend app boot
 - Run reminder dispatch without HTTP via `python -m app.cli.dispatch_reminders`.
 - Run the periodic worker via `python -m app.cli.run_reminder_worker --interval 60`.
 - Provision a DB-backed bearer token via `python -m app.cli.issue_token --email owner@example.com --name "Owner"`.
+- See [Structured Operation API](docs/operation-api.md) for the `/api/v2` mobile and widget contract.

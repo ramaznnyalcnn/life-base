@@ -28,6 +28,13 @@ class User(TimestampMixin, Base):
     transactions = relationship("Transaction", back_populates="user")
     transfers = relationship("Transfer", back_populates="user")
     events = relationship("Event", back_populates="user")
+    activity_templates = relationship("ActivityTemplate", back_populates="user")
+    tasks = relationship("Task", back_populates="user")
+    scheduled_payments = relationship("ScheduledPayment", back_populates="user")
+    operation_executions = relationship("OperationExecution", back_populates="user")
+    agenda_revision = relationship(
+        "AgendaRevision", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
     medications = relationship("Medication", back_populates="user")
     push_subscriptions = relationship("PushSubscription", back_populates="user")
 

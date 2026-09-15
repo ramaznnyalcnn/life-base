@@ -6,12 +6,20 @@ import json
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from pywebpush import WebPushException, webpush
 
 from app.core.config import Settings, get_settings
-from app.models import Event, MedicationPushDelivery, PushSubscription, Reminder, ReminderChannel
+from app.models import (
+    Event,
+    MedicationPushDelivery,
+    PushSubscription,
+    Reminder,
+    ReminderChannel,
+    ScheduledPayment,
+    Task,
+)
 from app.schemas import PushDispatchResult, PushMessageRequest, PushSubscriptionCreate
 from app.services.auth import ensure_default_user
 from app.services.medications import build_due_medication_dose_items
@@ -272,13 +280,17 @@ def dispatch_due_reminders(
     reminders = list(
         session.scalars(
             select(Reminder)
-            .join(Event, Event.id == Reminder.event_id)
+            .outerjoin(Event, Event.id == Reminder.event_id)
+            .outerjoin(Task, Task.id == Reminder.task_id)
+            .outerjoin(ScheduledPayment, ScheduledPayment.id == Reminder.scheduled_payment_id)
             .where(
                 Reminder.is_sent.is_(False),
                 Reminder.channel == ReminderChannel.WEB_PUSH,
                 Reminder.remind_at <= current_time,
-                Event.user_id == owner_id,
-                Event.device_id == device_id if device_id else True,
+                or_(Event.user_id == owner_id, Task.user_id == owner_id, ScheduledPayment.user_id == owner_id),
+                or_(Event.device_id == device_id, Task.device_id == device_id, ScheduledPayment.device_id == device_id)
+                if device_id
+                else True,
             )
             .order_by(Reminder.remind_at.asc(), Reminder.id.asc())
             .limit(limit)
@@ -295,13 +307,23 @@ def dispatch_due_reminders(
         reminder_count += 1
         reminder_sent = 0
         reminder_subscriptions = subscriptions
+        if reminder.event is not None:
+            title = reminder.event.title
+            body = reminder.event.description or "Yaklasan etkinlik hatirlatmasi."
+        elif reminder.task is not None:
+            title = reminder.task.title
+            body = "Yaklasan gorev hatirlatmasi."
+        else:
+            payment = reminder.scheduled_payment
+            title = f"{payment.amount:.2f} {payment.source_account.currency} odeme"
+            body = f"{payment.destination_account.name} odeme zamani yaklasiyor."
         for subscription in reminder_subscriptions:
             try:
                 gateway.send(
                     subscription,
                     {
-                        "title": reminder.event.title,
-                        "body": reminder.event.description or "Yaklasan etkinlik hatirlatmasi.",
+                        "title": title,
+                        "body": body,
                         "url": "/",
                     },
                     settings,

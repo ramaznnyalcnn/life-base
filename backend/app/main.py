@@ -12,10 +12,13 @@ from sqlalchemy.exc import ProgrammingError
 from app.api.routes import (
     ai_router,
     accounts_router,
+    activity_templates_v2_router,
+    agenda_v2_router,
     auth_router,
     events_router,
     medications_router,
     notifications_router,
+    operations_v2_router,
     recurring_events_router,
     transfers_router,
     transactions_router,
@@ -75,6 +78,9 @@ app.include_router(notifications_router, prefix=settings.api_v1_prefix)
 app.include_router(transfers_router, prefix=settings.api_v1_prefix)
 app.include_router(transactions_router, prefix=settings.api_v1_prefix)
 app.include_router(wallet_router, prefix=settings.api_v1_prefix)
+app.include_router(operations_v2_router, prefix="/api/v2")
+app.include_router(agenda_v2_router, prefix="/api/v2")
+app.include_router(activity_templates_v2_router, prefix="/api/v2")
 
 
 @app.exception_handler(ProgrammingError)

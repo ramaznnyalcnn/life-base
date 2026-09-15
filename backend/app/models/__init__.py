@@ -5,7 +5,10 @@ from app.models.auth import AccessToken, User
 from app.models.event import Event, Reminder, ReminderChannel
 from app.models.medication import Medication, MedicationDoseLog, MedicationDoseStatus, MedicationPushDelivery
 from app.models.notification import PushSubscription
+from app.models.operation_execution import AgendaRevision, OperationExecution
+from app.models.planning import ActivityTemplate, ActivityTemplateKind, Task
 from app.models.recurring_event import RecurringEvent
+from app.models.scheduled_payment import ScheduledPayment
 from app.models.transfer import Transfer
 from app.models.transaction import Transaction, TransactionType
 
@@ -28,4 +31,10 @@ __all__ = [
     "MedicationPushDelivery",
     "RecurringEvent",
     "PushSubscription",
+    "ActivityTemplate",
+    "ActivityTemplateKind",
+    "Task",
+    "ScheduledPayment",
+    "OperationExecution",
+    "AgendaRevision",
 ]

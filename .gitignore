@@ -17,6 +17,7 @@ mobile/ios/
 # Env
 .env
 .env.*
+!.env.example
 
 # Test artifacts
 backend/tests/.test.db
