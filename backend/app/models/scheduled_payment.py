@@ -8,10 +8,10 @@ from decimal import Decimal
 from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 
 
-class ScheduledPayment(TimestampMixin, Base):
+class ScheduledPayment(EntityVersionMixin, TimestampMixin, Base):
     """Payment reminder that changes balances only after confirmation."""
 
     __tablename__ = "scheduled_payments"

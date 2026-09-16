@@ -10,6 +10,7 @@ from app.operations.finance import (
 from app.operations.health import MedicationScheduleOperation, MedicationSnoozeOperation, MedicationTakeOperation
 from app.operations.planning import EventCreateOperation, RoutineCreateOperation, TaskCompleteOperation, TaskCreateOperation
 from app.operations.registry import OperationRegistry
+from app.operations.daily import DAILY_OPERATIONS
 
 
 def build_operation_registry() -> OperationRegistry:
@@ -26,4 +27,5 @@ def build_operation_registry() -> OperationRegistry:
         MedicationScheduleOperation(),
         MedicationTakeOperation(),
         MedicationSnoozeOperation(),
+        *(operation() for operation in DAILY_OPERATIONS),
     ])

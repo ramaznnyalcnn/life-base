@@ -65,6 +65,7 @@ def build_agenda_range(
                 day=day, starts_at=_aware(event.starts_at), ends_at=_aware(event.ends_at) if event.ends_at else None,
                 is_all_day=event.is_all_day, is_important=event.is_important,
                 is_completed=event.is_completed, status="completed" if event.is_completed else "pending",
+                reminders=[_aware(item.remind_at) for item in event.reminders],
             ))
 
     range_start = datetime.combine(from_date, time.min, tzinfo=zone).astimezone(timezone.utc)
@@ -92,6 +93,8 @@ def build_agenda_range(
                 day=task.due_on, starts_at=_aware(task.scheduled_at) if task.scheduled_at else None,
                 is_important=task.is_important, is_completed=task.is_completed,
                 status="completed" if task.is_completed else "pending",
+                metadata={"entity_version": task.entity_version},
+                reminders=[_aware(item.remind_at) for item in task.reminders],
             ))
 
     for payment in session.scalars(select(ScheduledPayment).where(ScheduledPayment.user_id == user_id)).all():
@@ -102,7 +105,12 @@ def build_agenda_range(
                 title=f"{payment.amount:.2f} {payment.source_account.currency} odeme", day=day,
                 starts_at=_aware(payment.due_at), is_completed=payment.is_completed,
                 status="completed" if payment.is_completed else "pending",
-                metadata={"source_account_id": payment.source_account_id, "destination_account_id": payment.destination_account_id},
+                metadata={
+                    "source_account_id": payment.source_account_id,
+                    "destination_account_id": payment.destination_account_id,
+                    "entity_version": payment.entity_version,
+                },
+                reminders=[_aware(item.remind_at) for item in payment.reminders],
             ))
 
     doses = build_medication_schedule(
@@ -116,6 +124,7 @@ def build_agenda_range(
                 source_id=dose.medication_id, kind="medication", title=f"{dose.medication_name} · {dose.dosage}",
                 day=day, starts_at=dose.notify_at, is_completed=dose.status == "taken", status=dose.status,
                 metadata={"scheduled_for": dose.scheduled_for.isoformat()},
+                reminders=[dose.notify_at],
             ))
 
     items.sort(key=_sort_key)

@@ -1,14 +1,26 @@
-# LifeBase Mobile
+# LifeBase Android
 
-Expo React Native Android app for the existing LifeBase FastAPI backend.
+Flutter 3.38 tabanlı, seçim odaklı LifeBase istemcisi.
+
+## Çalıştırma
+
+```bash
+flutter pub get
+flutter run
+```
+
+Uygulama ilk açılışta sunucu adresi ve kullanıcı bilgilerini ister; ardından
+takvim ve bildirim izinlerini toplar. Android 8.0+ desteklenir.
 
 ## Topology
 
 - Backend stays on the always-on second computer.
 - Android connects through Tailscale, for example `http://lifeos:8000`.
-- The mobile app stores the server URL in-app, then calls `/api/v1/*`.
-- Login tokens are stored with `expo-secure-store`.
-- Reminder notifications are Android local notifications scheduled from `/events/dashboard`.
+- The client uses `/api/v2` structured operations and daily read endpoints.
+- Flutter keeps the login token in Android encrypted storage. The native worker
+  has a separate Android Keystore-encrypted copy for background sync.
+- HTTP is supported for user-selected emulator, LAN, and Tailscale servers;
+  use HTTPS for any server reachable from the public internet.
 
 ## Server Checklist
 
@@ -37,44 +49,37 @@ For personal use, prefer `SINGLE_USER_MODE=false` plus a user created with the b
 
 ## Local Development
 
+Android derlemesi için JDK 21 kullanın. `JAVA_HOME` daha yeni ve Gradle ile
+uyumsuz bir JDK gösteriyorsa komutu JDK 21 ile çalıştırın.
+
 ```bash
 cd mobile
-npm install
-npm run verify:config
-npm run typecheck
-npm run start
-```
-
-Open the app in Expo Go or run a native Android build:
-
-```bash
-npm run android
+flutter pub get
+dart run build_runner build --force-jit
+flutter analyze
+flutter test
+JAVA_HOME=/path/to/jdk-21 flutter run
 ```
 
 ## APK Build
 
-Cloud EAS APK:
-
 ```bash
 cd mobile
-npm install -g eas-cli
-npm run build:apk
+JAVA_HOME=/path/to/jdk-21 flutter build apk --debug
 ```
 
-Local EAS APK:
-
-```bash
-cd mobile
-npm run build:local-apk
-```
-
-The preview profile outputs an installable APK for personal Android use.
+The APK is written to `build/app/outputs/flutter-apk/app-debug.apk`. Configure a
+private release signing key before producing a distributable release build.
 
 ## Current Scope
 
-- Cuzdan: net worth, monthly income/expense, card/account overview.
-- Yonet: account/card create, edit and active/passive state.
-- Ekle: transaction, event, routine and AI command entry.
-- Gecmis: transaction list, filters, edit and delete.
-- Takvim: month view, upcoming events, edit/complete/delete.
-- Ayarlar: server URL, theme, logout, health, notification test and reminder sync.
+- **Bugün:** next item, overdue work, tasks, and hourly timeline.
+- **Takvim:** day/week/month views and domain filters.
+- **Ekle:** catalog-driven finance, planning, and medication wizard without AI/NLP.
+- **Finans:** overview and account cards.
+- **Sağlık:** upcoming doses and medication program.
+- **Ayarlar:** theme, queue/conflict status, writable calendar, and logout.
+
+The app caches read surfaces with Drift and queues UUID operations FIFO. Native
+WorkManager refreshes the selected Android calendar, Glance widget, and local
+alarms every 15 minutes and immediately after a mutation.

@@ -9,7 +9,6 @@ venv/
 node_modules/
 dist/
 .expo/
-mobile/android/
 mobile/ios/
 *.apk
 *.aab
@@ -26,6 +25,9 @@ backend/tests/.test.db
 .DS_Store
 .idea/
 .vscode/
+.Codex/
+.codex/
+.agents/
 
 # Local artifacts
 2026-03-14_22-26.png

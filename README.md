@@ -1,9 +1,9 @@
 # Life OS
 
-Cloud-ready, mobile-first rewrite of Life OS.
+Cloud-ready, Android-first rewrite of Life OS.
 
-This repository starts as a clean monorepo skeleton so the old project's
-finance/event engine can be migrated into a better backend and a React frontend.
+This repository contains the migrated finance/event backend, a React web
+frontend, and a Flutter Android client.
 The new system is designed around PostgreSQL, not SQLite.
 
 ## Initial Structure
@@ -29,6 +29,9 @@ frontend/
     lib/
     pages/
     styles/
+mobile/
+  lib/
+  android/
 shared/
   contracts/
 docs/
@@ -47,11 +50,11 @@ infra/
 - `frontend/src/api`: frontend API clients
 - `frontend/src/app`: app shell, routing, providers
 - `frontend/src/features`: feature-specific UI and state
+- `mobile/lib`: Flutter feature-first MVVM client
+- `mobile/android`: Calendar Provider, WorkManager, Keystore, and Glance widget
 - `shared/contracts`: shared payload contracts and migration notes
 - `docs`: architecture and migration documentation
 - `infra`: deployment files
-
-The next step is wiring the backend application entrypoint and frontend app boot.
 
 ## Backend Hardening Notes
 
@@ -63,3 +66,4 @@ The next step is wiring the backend application entrypoint and frontend app boot
 - Run the periodic worker via `python -m app.cli.run_reminder_worker --interval 60`.
 - Provision a DB-backed bearer token via `python -m app.cli.issue_token --email owner@example.com --name "Owner"`.
 - See [Structured Operation API](docs/operation-api.md) for the `/api/v2` mobile and widget contract.
+- See [Android architecture](docs/mobile-android.md) for client setup, offline behavior, and native sync.

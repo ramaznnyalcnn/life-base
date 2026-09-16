@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import MetaData
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
 
 NAMING_CONVENTION = {
@@ -36,3 +36,13 @@ class TimestampMixin:
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+class EntityVersionMixin:
+    """Optimistic concurrency token for mobile edits."""
+
+    entity_version: Mapped[int] = mapped_column(default=1, nullable=False)
+
+    @declared_attr.directive
+    def __mapper_args__(cls):
+        return {"version_id_col": cls.entity_version}

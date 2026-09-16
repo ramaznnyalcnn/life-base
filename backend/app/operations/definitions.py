@@ -13,6 +13,8 @@ def field(
     max_length: int | None = None,
     min_value: int | None = None,
     max_value: int | None = None,
+    multiple: bool = False,
+    visible_when: dict[str, object] | None = None,
 ) -> OperationFieldDefinition:
     return OperationFieldDefinition(
         key=key,
@@ -23,8 +25,10 @@ def field(
         max_length=max_length,
         min_value=min_value,
         max_value=max_value,
+        multiple=multiple,
+        visible_when=visible_when,
     )
 
 
-def definition(key: str, group: str, label: str, fields: list[OperationFieldDefinition]) -> OperationDefinition:
-    return OperationDefinition(key=key, group=group, label=label, version=1, fields=fields)
+def definition(key: str, group: str, label: str, fields: list[OperationFieldDefinition], *, steps: int = 2) -> OperationDefinition:
+    return OperationDefinition(key=key, group=group, label=label, version=1, surface="wizard", steps=steps, fields=fields)

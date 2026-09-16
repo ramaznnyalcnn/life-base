@@ -14,6 +14,7 @@ from app.api.routes import (
     accounts_router,
     activity_templates_v2_router,
     agenda_v2_router,
+    daily_v2_router,
     auth_router,
     events_router,
     medications_router,
@@ -69,6 +70,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
+app.include_router(auth_router, prefix="/api/v2")
 app.include_router(ai_router, prefix=settings.api_v1_prefix)
 app.include_router(accounts_router, prefix=settings.api_v1_prefix)
 app.include_router(events_router, prefix=settings.api_v1_prefix)
@@ -81,6 +83,7 @@ app.include_router(wallet_router, prefix=settings.api_v1_prefix)
 app.include_router(operations_v2_router, prefix="/api/v2")
 app.include_router(agenda_v2_router, prefix="/api/v2")
 app.include_router(activity_templates_v2_router, prefix="/api/v2")
+app.include_router(daily_v2_router, prefix="/api/v2")
 
 
 @app.exception_handler(ProgrammingError)

@@ -19,6 +19,7 @@ class AgendaItem(BaseModel):
     status: str = "pending"
     calendar_exportable: bool = True
     metadata: dict[str, object] = Field(default_factory=dict)
+    reminders: list[datetime] = Field(default_factory=list)
 
 
 class AgendaToday(BaseModel):

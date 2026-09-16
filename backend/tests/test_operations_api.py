@@ -26,7 +26,7 @@ def test_catalog_and_context_expose_selection_driven_mobile_contract():
     context = api_request("GET", "/api/v2/operations/context")
 
     assert catalog.status_code == 200
-    assert len(catalog.json()) == 12
+    assert len(catalog.json()) >= 38
     assert {item["key"] for item in catalog.json()} >= {
         "planning.task.create",
         "finance.expense.record",
@@ -126,7 +126,7 @@ def test_schedule_then_complete_payment_changes_balances_only_on_completion(setu
 
     completed = api_request("POST", "/api/v2/operations/execute", json={
         "request_id": str(uuid4()), "operation_key": "finance.payment.complete",
-        "scheduled_payment_id": payment_id,
+        "scheduled_payment_id": payment_id, "expected_version": 1,
     })
     assert completed.status_code == 200
     with setup_database() as session:
@@ -176,6 +176,7 @@ def test_medication_schedule_take_and_snooze_operations(setup_database):
         "request_id": str(uuid4()), "operation_key": "health.medication.schedule",
         "medication_id": medication_id, "schedule_mode": "interval", "weekdays": [],
         "interval_days": 2, "dose_times": ["08:30:00"], "starts_on": "2026-09-15",
+        "expected_version": 1,
     })
     assert scheduled.status_code == 200
     dose_time = datetime(2026, 9, 15, 5, 30, tzinfo=timezone.utc).isoformat()
@@ -195,3 +196,96 @@ def test_medication_schedule_take_and_snooze_operations(setup_database):
         assert medication.schedule_mode == "interval"
         assert medication.interval_days == 2
         assert [log.status.value for log in logs] == ["taken", "snoozed"]
+
+
+def test_medication_action_rejects_an_occurrence_from_another_medication(setup_database):
+    with setup_database() as session:
+        owner = ensure_default_user(session)
+        monday = Medication(
+            user_id=owner.id, name="Monday", dosage="1 tablet", schedule_mode="weekdays",
+            weekdays="0", dose_times="09:00", starts_on=date(2026, 9, 1), timezone="Europe/Istanbul",
+        )
+        tuesday = Medication(
+            user_id=owner.id, name="Tuesday", dosage="1 tablet", schedule_mode="weekdays",
+            weekdays="1", dose_times="09:00", starts_on=date(2026, 9, 1), timezone="Europe/Istanbul",
+        )
+        session.add_all([monday, tuesday])
+        session.commit()
+        monday_id = monday.id
+
+    tuesday_occurrence = datetime(2026, 9, 15, 6, 0, tzinfo=timezone.utc).isoformat()
+    response = api_request("POST", "/api/v2/operations/execute", json={
+        "request_id": str(uuid4()),
+        "operation_key": "health.medication.take",
+        "medication_id": monday_id,
+        "scheduled_for": tuesday_occurrence,
+    })
+
+    assert response.status_code == 400
+    with setup_database() as session:
+        assert session.scalar(select(MedicationDoseLog)) is None
+
+
+def test_existing_entity_mutations_require_version_and_context_supplies_it(setup_database):
+    with setup_database() as session:
+        owner = ensure_default_user(session)
+        source = Account(user_id=owner.id, name="Banka", type=AccountType.BANK, balance=Decimal("100"))
+        target = Account(user_id=owner.id, name="Kart", type=AccountType.CREDIT_CARD, balance=Decimal("0"))
+        medication = Medication(
+            user_id=owner.id, name="Vitamin", dosage="1 tablet", schedule_mode="weekdays",
+            weekdays="0", dose_times="09:00", starts_on=date(2026, 9, 1), timezone="Europe/Istanbul",
+        )
+        task = Task(user_id=owner.id, title="Kontrol", due_on=date(2026, 9, 15))
+        session.add_all([source, target, medication, task])
+        session.flush()
+        payment = ScheduledPayment(
+            user_id=owner.id,
+            source_account_id=source.id,
+            destination_account_id=target.id,
+            amount=Decimal("10"),
+            due_at=datetime(2026, 9, 20, tzinfo=timezone.utc),
+        )
+        session.add(payment)
+        session.commit()
+        payment_id = payment.id
+        medication_id = medication.id
+        task_id = task.id
+
+    payment_response = api_request(
+        "POST",
+        "/api/v2/operations/execute",
+        json={
+            "request_id": str(uuid4()),
+            "operation_key": "finance.payment.complete",
+            "scheduled_payment_id": payment_id,
+        },
+    )
+    task_response = api_request(
+        "POST",
+        "/api/v2/operations/execute",
+        json={
+            "request_id": str(uuid4()),
+            "operation_key": "planning.task.complete",
+            "task_id": task_id,
+        },
+    )
+    medication_response = api_request(
+        "POST",
+        "/api/v2/operations/execute",
+        json={
+            "request_id": str(uuid4()),
+            "operation_key": "health.medication.schedule",
+            "medication_id": medication_id,
+            "schedule_mode": "weekdays",
+            "weekdays": [0],
+            "dose_times": ["09:00:00"],
+            "starts_on": "2026-09-15",
+        },
+    )
+    context = api_request("GET", "/api/v2/operations/context").json()["sources"]
+
+    assert payment_response.status_code == 400
+    assert task_response.status_code == 400
+    assert medication_response.status_code == 400
+    payment_option = next(item for item in context["scheduled_payments.pending"] if item["value"] == payment_id)
+    assert payment_option["metadata"]["entity_version"] == 1

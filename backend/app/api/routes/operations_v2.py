@@ -9,7 +9,7 @@ from app.api.security import get_current_user, resolve_route_user
 from app.db import get_db
 from app.models import User
 from app.operations.catalog import build_operation_registry
-from app.operations.executor import OperationConflictError, OperationExecutor
+from app.operations.executor import EntityVersionConflictError, OperationConflictError, OperationExecutor
 from app.schemas import OperationContextResponse, OperationDefinition, OperationExecuteInput, OperationResult
 from app.services.activity_templates import ensure_system_activity_templates
 from app.services.operation_context import build_operation_context
@@ -51,6 +51,8 @@ def execute_operation(
             device_id=x_device_id,
             now=datetime.now(timezone.utc),
         )
+    except EntityVersionConflictError as exc:
+        raise HTTPException(status_code=409, detail={"message": str(exc), "current": exc.current}) from exc
     except OperationConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (KeyError, ValueError) as exc:

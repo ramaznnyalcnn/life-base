@@ -7,10 +7,10 @@ from datetime import date, time
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 
 
-class RecurringEvent(TimestampMixin, Base):
+class RecurringEvent(EntityVersionMixin, TimestampMixin, Base):
     """A weekly routine rule expanded into virtual calendar occurrences."""
 
     __tablename__ = "recurring_events"

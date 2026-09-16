@@ -3,9 +3,10 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from app.models import MedicationDoseStatus
+from app.models import Medication, MedicationDoseStatus
 from app.operations.base import HandlerResult, OperationContext, OperationHandler
 from app.operations.definitions import definition, field
+from app.operations.executor import EntityVersionConflictError
 from app.schemas import EntityRef, OperationFieldKind
 from app.schemas.operation_inputs import MedicationScheduleInput, MedicationSnoozeInput, MedicationTakeInput
 from app.services.medications import _get_or_create_dose_log, _serialize_times, _serialize_weekdays, get_medication_or_raise
@@ -18,6 +19,8 @@ def _as_utc(value: datetime) -> datetime:
 class MedicationScheduleOperation(OperationHandler[MedicationScheduleInput]):
     key = "health.medication.schedule"
     input_model = MedicationScheduleInput
+    versioned_model = Medication
+    versioned_id_field = "medication_id"
     definition = definition(key, "health", "Ilac programla", [
         field("medication_id", "Ilac", OperationFieldKind.CHOICE, source="medications"),
         field("schedule_mode", "Program", OperationFieldKind.CHOICE, source="medication.schedule_modes"),
@@ -26,6 +29,7 @@ class MedicationScheduleOperation(OperationHandler[MedicationScheduleInput]):
         field("dose_times", "Saatler", OperationFieldKind.TIME),
         field("starts_on", "Baslangic", OperationFieldKind.DATE),
         field("ends_on", "Bitis", OperationFieldKind.DATE, required=False),
+        field("expected_version", "Surum", OperationFieldKind.DURATION),
     ])
 
     def execute(self, context: OperationContext, payload: MedicationScheduleInput) -> HandlerResult:
@@ -34,6 +38,8 @@ class MedicationScheduleOperation(OperationHandler[MedicationScheduleInput]):
         except ZoneInfoNotFoundError as exc:
             raise ValueError("Timezone gecersiz.") from exc
         medication = get_medication_or_raise(context.session, payload.medication_id, context.user_id)
+        if medication.entity_version != payload.expected_version:
+            raise EntityVersionConflictError(self.current_snapshot(context, payload))
         medication.schedule_mode = payload.schedule_mode
         medication.weekdays = _serialize_weekdays(payload.weekdays)
         medication.interval_days = payload.interval_days

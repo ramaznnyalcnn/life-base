@@ -8,7 +8,7 @@ from enum import Enum
 from sqlalchemy import Boolean, Date, DateTime, Enum as SqlEnum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 from app.models.event import enum_values
 
 
@@ -18,7 +18,7 @@ class ActivityTemplateKind(str, Enum):
     ROUTINE = "routine"
 
 
-class ActivityTemplate(TimestampMixin, Base):
+class ActivityTemplate(EntityVersionMixin, TimestampMixin, Base):
     """Reusable selection shown by structured planning operations."""
 
     __tablename__ = "activity_templates"
@@ -42,7 +42,7 @@ class ActivityTemplate(TimestampMixin, Base):
     recurring_events = relationship("RecurringEvent", back_populates="template")
 
 
-class Task(TimestampMixin, Base):
+class Task(EntityVersionMixin, TimestampMixin, Base):
     """Completable work item that may optionally have a clock time."""
 
     __tablename__ = "tasks"

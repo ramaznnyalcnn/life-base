@@ -1,0 +1,122 @@
+import 'package:drift/drift.dart';
+import 'package:drift_flutter/drift_flutter.dart';
+
+import '../models/operation.dart';
+import '../sync/queue_policy.dart';
+
+part 'app_database.g.dart';
+
+class CachedDocuments extends Table {
+  TextColumn get key => text()();
+  TextColumn get payload => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}
+
+class QueuedOperations extends Table {
+  TextColumn get requestId => text()();
+  TextColumn get operationKey => text()();
+  TextColumn get payload => text()();
+  TextColumn get state => text().withDefault(const Constant('pending'))();
+  TextColumn get conflictPayload => text().nullable()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {requestId};
+}
+
+@DriftDatabase(tables: [CachedDocuments, QueuedOperations])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase({QueryExecutor? executor})
+      : super(executor ?? driftDatabase(name: 'lifebase'));
+
+  @override
+  int get schemaVersion => 1;
+
+  Future<void> cache(String key, String payload) => into(cachedDocuments)
+      .insertOnConflictUpdate(CachedDocumentsCompanion.insert(
+        key: key,
+        payload: payload,
+        updatedAt: DateTime.now().toUtc(),
+      ));
+
+  Future<String?> cached(String key) async =>
+      (await (select(cachedDocuments)..where((row) => row.key.equals(key)))
+              .getSingleOrNull())
+          ?.payload;
+
+  Future<void> clearCache() => delete(cachedDocuments).go();
+
+  Future<void> enqueue({
+    required String requestId,
+    required String operationKey,
+    required String payload,
+  }) =>
+      into(queuedOperations).insertOnConflictUpdate(
+        QueuedOperationsCompanion.insert(
+          requestId: requestId,
+          operationKey: operationKey,
+          payload: payload,
+          createdAt: DateTime.now().toUtc(),
+        ),
+      );
+
+  Future<List<QueuedOperation>> pending() async {
+    final rows = await (select(queuedOperations)
+          ..orderBy([(row) => OrderingTerm.asc(row.createdAt)]))
+        .get();
+    final outstanding = rows.where((row) => row.state != 'done').toList();
+    final pendingCount = QueuePolicy.contiguousPending(
+      outstanding.map((row) => row.state),
+    ).length;
+    return outstanding.take(pendingCount).toList();
+  }
+
+  Future<List<QueuedOperation>> conflicts() =>
+      (select(queuedOperations)
+            ..where((row) => row.state.equals('conflict'))
+            ..orderBy([(row) => OrderingTerm.asc(row.createdAt)]))
+          .get();
+
+  Stream<int> watchOutstandingCount() => select(queuedOperations)
+      .watch()
+      .map((rows) => rows.where((row) => row.state != 'done').length);
+
+  Future<void> markDone(String requestId) =>
+      (update(queuedOperations)..where((row) => row.requestId.equals(requestId)))
+          .write(const QueuedOperationsCompanion(state: Value('done')));
+
+  Future<void> markState(String requestId, String state, {String? conflict}) =>
+      (update(queuedOperations)..where((row) => row.requestId.equals(requestId)))
+          .write(QueuedOperationsCompanion(
+        state: Value(state),
+        conflictPayload: Value(conflict),
+      ));
+
+  Future<void> acceptServer(String requestId) => markDone(requestId);
+
+  Future<void> resumePaused() =>
+      (update(queuedOperations)..where((row) => row.state.equals('paused')))
+          .write(const QueuedOperationsCompanion(state: Value('pending')));
+
+  Future<void> retryWithVersion(String requestId, int entityVersion) async {
+    final row = await (select(queuedOperations)
+          ..where((item) => item.requestId.equals(requestId)))
+        .getSingle();
+    final operation = OperationEnvelope.decode(row.payload);
+    final updated = OperationEnvelope(
+      requestId: operation.requestId,
+      operationKey: operation.operationKey,
+      values: {...operation.values, 'expected_version': entityVersion},
+    );
+    await (update(queuedOperations)..where((item) => item.requestId.equals(requestId)))
+        .write(QueuedOperationsCompanion(
+      payload: Value(updated.encode()),
+      state: const Value('pending'),
+      conflictPayload: const Value(null),
+    ));
+  }
+}

@@ -8,7 +8,7 @@ from enum import Enum
 from sqlalchemy import Boolean, Date, DateTime, Enum as SqlEnum, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 from app.models.event import enum_values
 
 
@@ -17,7 +17,7 @@ class MedicationDoseStatus(str, Enum):
     SNOOZED = "snoozed"
 
 
-class Medication(TimestampMixin, Base):
+class Medication(EntityVersionMixin, TimestampMixin, Base):
     """Recurring medication schedule owned by a user/device."""
 
     __tablename__ = "medications"

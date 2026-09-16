@@ -9,7 +9,7 @@ from enum import Enum
 from sqlalchemy import Date, DateTime, Enum as SqlEnum, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 
 
 def enum_values(enum_cls: type[Enum]) -> list[str]:
@@ -22,7 +22,7 @@ class TransactionType(str, Enum):
     PAYMENT = "payment"
 
 
-class Transaction(TimestampMixin, Base):
+class Transaction(EntityVersionMixin, TimestampMixin, Base):
     """Money movement records."""
 
     __tablename__ = "transactions"

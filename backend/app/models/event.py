@@ -8,7 +8,7 @@ from enum import Enum
 from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum as SqlEnum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 
 
 def enum_values(enum_cls: type[Enum]) -> list[str]:
@@ -20,7 +20,7 @@ class ReminderChannel(str, Enum):
     TELEGRAM = "telegram"
 
 
-class Event(TimestampMixin, Base):
+class Event(EntityVersionMixin, TimestampMixin, Base):
     """User events and scheduled items."""
 
     __tablename__ = "events"

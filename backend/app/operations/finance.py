@@ -17,6 +17,7 @@ from app.models import (
 )
 from app.operations.base import HandlerResult, OperationContext, OperationHandler
 from app.operations.definitions import definition, field
+from app.operations.executor import EntityVersionConflictError
 from app.schemas import EntityRef, OperationFieldKind
 from app.schemas.operation_inputs import (
     ExpenseRecordInput,
@@ -165,8 +166,11 @@ class PaymentScheduleOperation(OperationHandler[PaymentScheduleInput]):
 class PaymentCompleteOperation(OperationHandler[PaymentCompleteInput]):
     key = "finance.payment.complete"
     input_model = PaymentCompleteInput
+    versioned_model = ScheduledPayment
+    versioned_id_field = "scheduled_payment_id"
     definition = definition(key, "finance", "Odemeyi tamamla", [
-        field("scheduled_payment_id", "Planli odeme", OperationFieldKind.CHOICE, source="scheduled_payments.pending")
+        field("scheduled_payment_id", "Planli odeme", OperationFieldKind.CHOICE, source="scheduled_payments.pending"),
+        field("expected_version", "Surum", OperationFieldKind.DURATION),
     ])
 
     def execute(self, context: OperationContext, payload: PaymentCompleteInput) -> HandlerResult:
@@ -178,6 +182,8 @@ class PaymentCompleteOperation(OperationHandler[PaymentCompleteInput]):
         )
         if payment is None:
             raise ValueError("Planli odeme bulunamadi.")
+        if payment.entity_version != payload.expected_version:
+            raise EntityVersionConflictError(self.current_snapshot(context, payload))
         if payment.is_completed:
             raise ValueError("Planli odeme zaten tamamlandi.")
         source = _owned_account(context, payment.source_account_id)

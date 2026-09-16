@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.models import AgendaRevision, OperationExecution
 from app.operations.base import OperationContext
@@ -19,6 +20,14 @@ from app.schemas import OperationResult
 
 class OperationConflictError(ValueError):
     """Raised when a request id is reused for different operation content."""
+
+
+class EntityVersionConflictError(OperationConflictError):
+    """Raised when an offline edit targets an older entity revision."""
+
+    def __init__(self, current: dict[str, object]):
+        super().__init__("Kayit baska bir cihazda degistirildi.")
+        self.current = current
 
 
 class OperationExecutor:
@@ -98,6 +107,18 @@ class OperationExecutor:
             )
             session.commit()
             return result
+        except StaleDataError as exc:
+            session.rollback()
+            snapshot = handler.current_snapshot(
+                OperationContext(
+                    session=session,
+                    user_id=user_id,
+                    device_id=device_id,
+                    now=current_time,
+                ),
+                typed_payload,
+            )
+            raise EntityVersionConflictError(snapshot) from exc
         except Exception:
             session.rollback()
             raise

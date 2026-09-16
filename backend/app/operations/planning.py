@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.models import ActivityTemplate, ActivityTemplateKind, Event, RecurringEvent, Reminder, Task
 from app.operations.base import HandlerResult, OperationContext, OperationHandler
 from app.operations.definitions import definition, field
+from app.operations.daily import _bump, _check
 from app.schemas import EntityRef, OperationFieldKind
 from app.schemas.operation_inputs import EventCreateInput, RoutineCreateInput, TaskCompleteInput, TaskCreateInput
 
@@ -44,7 +45,7 @@ class TaskCreateOperation(OperationHandler[TaskCreateInput]):
         field("template_id", "Gorev", OperationFieldKind.CHOICE, source="activity_templates.task"),
         field("custom_title", "Kisa baslik", OperationFieldKind.SHORT_TEXT, required=False, max_length=160),
         field("due_on", "Gun", OperationFieldKind.DATE),
-        field("scheduled_at", "Saat", OperationFieldKind.TIME, required=False),
+        field("scheduled_at", "Saat", OperationFieldKind.DATETIME, required=False),
         field("is_important", "Onemli", OperationFieldKind.BOOLEAN, required=False),
         field("reminder_offsets_minutes", "Hatirlatmalar", OperationFieldKind.DURATION, required=False),
     ])
@@ -70,16 +71,21 @@ class TaskCreateOperation(OperationHandler[TaskCreateInput]):
 class TaskCompleteOperation(OperationHandler[TaskCompleteInput]):
     key = "planning.task.complete"
     input_model = TaskCompleteInput
+    versioned_model = Task
+    versioned_id_field = "task_id"
     definition = definition(key, "planning", "Gorevi tamamla", [
-        field("task_id", "Gorev", OperationFieldKind.CHOICE, source="tasks.pending")
+        field("task_id", "Gorev", OperationFieldKind.CHOICE, source="tasks.pending"),
+        field("expected_version", "Surum", OperationFieldKind.DURATION),
     ])
 
     def execute(self, context: OperationContext, payload: TaskCompleteInput) -> HandlerResult:
         task = context.session.scalar(select(Task).where(Task.id == payload.task_id, Task.user_id == context.user_id))
         if task is None:
             raise ValueError("Gorev bulunamadi.")
+        _check(task, payload)
         task.is_completed = True
         task.completed_at = context.now
+        _bump(task)
         return HandlerResult(entities=[EntityRef(kind="task", id=task.id)], affects_agenda=True)
 
 
@@ -89,8 +95,8 @@ class EventCreateOperation(OperationHandler[EventCreateInput]):
     definition = definition(key, "planning", "Etkinlik olustur", [
         field("template_id", "Etkinlik", OperationFieldKind.CHOICE, source="activity_templates.event"),
         field("custom_title", "Kisa baslik", OperationFieldKind.SHORT_TEXT, required=False, max_length=160),
-        field("starts_at", "Baslangic", OperationFieldKind.DATE),
-        field("ends_at", "Bitis", OperationFieldKind.DATE, required=False),
+        field("starts_at", "Baslangic", OperationFieldKind.DATETIME),
+        field("ends_at", "Bitis", OperationFieldKind.DATETIME, required=False),
         field("is_all_day", "Tum gun", OperationFieldKind.BOOLEAN, required=False),
         field("is_important", "Onemli", OperationFieldKind.BOOLEAN, required=False),
         field("reminder_offsets_minutes", "Hatirlatmalar", OperationFieldKind.DURATION, required=False),
@@ -123,7 +129,7 @@ class RoutineCreateOperation(OperationHandler[RoutineCreateInput]):
     definition = definition(key, "planning", "Rutin olustur", [
         field("template_id", "Rutin", OperationFieldKind.CHOICE, source="activity_templates.routine"),
         field("custom_title", "Kisa baslik", OperationFieldKind.SHORT_TEXT, required=False, max_length=160),
-        field("weekdays", "Gunler", OperationFieldKind.CHOICE, source="weekdays"),
+        field("weekdays", "Gunler", OperationFieldKind.CHOICE, source="weekdays", multiple=True),
         field("starts_on", "Baslangic gunu", OperationFieldKind.DATE),
         field("ends_on", "Bitis gunu", OperationFieldKind.DATE, required=False),
         field("start_time", "Saat", OperationFieldKind.TIME, required=False),

@@ -11,11 +11,28 @@ available under deprecated `/api/v1/ai/*` routes during the client migration.
 2. `GET /api/v2/operations/context` returns the current selectable values such
    as accounts, categories, activity templates, pending tasks, payments, and
    medication doses.
-3. `POST /api/v2/operations/execute` accepts one discriminated operation input.
+3. `POST /api/v2/operations/execute` accepts an operation envelope, then the
+   selected operation class validates its own typed input.
    Every request requires a UUID `request_id`. Retrying identical content is
    safe; reusing the UUID with changed content returns HTTP 409.
 4. `GET /api/v2/agenda/today` and `GET /api/v2/agenda/range` return the unified
    read model used by the app, widget, reminders, and calendar synchronization.
+   Agenda responses include reminder times and an `ETag`; clients may send
+   `If-None-Match` and receive HTTP 304.
+
+Schedule changes, task/payment completion actions, edits, toggles, and deletes
+on existing versioned entities carry `expected_version`. If the entity changed
+after the client cached it, the API returns HTTP 409 with the current entity
+snapshot.
+This lets the mobile queue ask the user which version to keep without silently
+overwriting another device.
+
+## Daily read surfaces
+
+- `/api/v2/auth/login`, `/api/v2/auth/me`
+- `/api/v2/finance/overview`, `/accounts`, `/categories`, `/entries`, `/payments`
+- `/api/v2/planning/tasks`, `/events`, `/routines`
+- `/api/v2/health/dashboard`, `/medications`, `/medications/{id}`
 
 ## Layers
 
@@ -43,6 +60,6 @@ selected template reference and their saved title snapshot.
 
 ## Database upgrade
 
-Run `alembic -c alembic.ini upgrade head` from `backend/`. Revisions `0012` and
-`0013` add the operation core, task/payment models, agenda versioning, and
-polymorphic reminder ownership.
+Run `alembic -c alembic.ini upgrade head` from `backend/`. Revisions `0012`–
+`0014` add the operation core, task/payment models, agenda versioning,
+polymorphic reminder ownership, and optimistic entity versions.

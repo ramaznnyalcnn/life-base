@@ -10,6 +10,7 @@ class OperationFieldKind(str, Enum):
     CHOICE = "choice"
     MONEY = "money"
     DATE = "date"
+    DATETIME = "datetime"
     TIME = "time"
     DURATION = "duration"
     BOOLEAN = "boolean"
@@ -25,6 +26,8 @@ class OperationFieldDefinition(BaseModel):
     min_value: int | None = None
     max_value: int | None = None
     max_length: int | None = None
+    multiple: bool = False
+    visible_when: dict[str, object] | None = None
 
 
 class OperationDefinition(BaseModel):
@@ -32,6 +35,8 @@ class OperationDefinition(BaseModel):
     group: str
     label: str
     version: int = Field(ge=1)
+    surface: str = "wizard"
+    steps: int = Field(default=2, ge=1)
     fields: list[OperationFieldDefinition] = Field(default_factory=list)
 
 

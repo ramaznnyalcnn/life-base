@@ -427,6 +427,14 @@ def _get_or_create_dose_log(
     scheduled_for: datetime,
 ) -> MedicationDoseLog:
     normalized_scheduled_for = _as_utc(scheduled_for)
+    local_day = normalized_scheduled_for.astimezone(ZoneInfo(medication.timezone)).date()
+    valid_occurrences = _generate_dose_times_for_range(
+        medication,
+        first_day=local_day,
+        last_day=local_day,
+    )
+    if normalized_scheduled_for not in valid_occurrences:
+        raise ValueError("Secilen doz bu ilacin programinda bulunamadi.")
     log = session.scalar(
         select(MedicationDoseLog).where(
             MedicationDoseLog.medication_id == medication.id,
