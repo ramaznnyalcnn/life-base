@@ -103,11 +103,11 @@ final confirmedWalletProvider = StreamProvider<WalletData>((ref) {
       emit();
     }),
   ];
-  ref.onDispose(() async {
+  ref.onDispose(() {
     for (final s in subscriptions) {
-      await s.cancel();
+      unawaited(s.cancel());
     }
-    await controller.close();
+    unawaited(controller.close());
   });
   return controller.stream;
 });
@@ -126,3 +126,6 @@ final walletProvider = Provider<AsyncValue<WalletData>>((ref) {
     categoryNames: {for (final c in categories) c.id: c.name},
   ));
 });
+
+/// `h:<id>` when this user is in a household (shared accounts allowed).
+final walletScopeProvider = StreamProvider<String?>((ref) => _syncState(ref.watch(databaseProvider), 'wallet.scope'));

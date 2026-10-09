@@ -14,6 +14,7 @@ import '../../../core/platform/device_calendar.dart';
 import '../../../core/providers.dart';
 import '../../../core/sync/sync_controller.dart';
 import '../data/session_controller.dart';
+import 'household_card.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -33,6 +34,9 @@ class AccountScreen extends ConsumerWidget {
         const SizedBox(height: 24),
         const _SectionLabel('Görünüm'),
         const _AppearanceCard(),
+        const SizedBox(height: 24),
+        const _SectionLabel('Hane'),
+        const HouseholdCard(),
         const SizedBox(height: 24),
         const _SectionLabel('Bildirimler'),
         const Card(child: Column(children: [_DefaultRemindersTile(), Divider(height: 1), _AlarmPermissionTiles()])),

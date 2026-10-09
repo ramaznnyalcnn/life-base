@@ -44,21 +44,6 @@ class ApiClient {
     }
   }
 
-  Future<List<Object?>> _cachedList(
-    String key,
-    Future<List<Object?>> Function() fetch,
-  ) async {
-    try {
-      final value = await fetch();
-      await _database.cache(_key(key), jsonEncode(value));
-      return value;
-    } on DioException {
-      final value = await _database.cached(_key(key));
-      if (value == null) rethrow;
-      return List<Object?>.from(jsonDecode(value) as List);
-    }
-  }
-
   Future<TodayAgenda> today(DateTime date) async {
     final key = _key('agenda:${DateFormat('yyyy-MM-dd').format(date)}');
     try {
@@ -136,21 +121,4 @@ class ApiClient {
 
   Future<List<Map<String, Object?>>> legacyRoutines() async =>
       ((await _dio.get<List<Object?>>('/api/v1/recurring-events')).data ?? const []).cast<Map>().map(Map<String, Object?>.from).toList();
-
-  Future<Map<String, Object?>> walletSummary() => _cachedMap(
-        'finance-overview',
-        () async => (await _dio.get<Map<String, Object?>>('/api/v2/finance/overview')).data!,
-      );
-
-  Future<List<Map<String, Object?>>> accounts() async =>
-      (await _cachedList('finance-accounts', () async =>
-              (await _dio.get<List<Object?>>('/api/v2/finance/accounts')).data ?? const []))
-          .cast<Map>()
-          .map((item) => Map<String, Object?>.from(item))
-          .toList();
-
-  Future<Map<String, Object?>> medicationDashboard() => _cachedMap(
-        'health-dashboard',
-        () async => (await _dio.get<Map<String, Object?>>('/api/v2/health/dashboard')).data!,
-      );
 }

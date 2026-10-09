@@ -9,6 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Account, Category, StatementMark, Transaction, Transfer, User, WalletChange
+from app.services.bootstrap import ensure_default_categories
 from app.services.households import describe
 from app.services.ledger import SHARED, Viewer, current_cursor
 
@@ -203,6 +204,7 @@ def pull(session: Session, user_id: int, *, since: int, scope: str | None, limit
     """Changes since ``since``; a full snapshot when the client is new or its scope changed
     (joined or left a household)."""
 
+    ensure_default_categories(session)
     viewer = Viewer.of(session, user_id)
     reset = since == 0 or scope != viewer.scope
     if reset:

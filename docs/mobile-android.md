@@ -110,6 +110,44 @@ grants with shortcuts to the system screens; the İlaç screen shows a banner
 when one that its medicines need is off. When the exact-alarm grant changes,
 every reminder is scheduled again in the new mode.
 
+## Wallet
+
+The wallet is server-authoritative (two people can share it) but works
+offline. The phone keeps a mirror of what the server last sent (Drift
+`wallet_*` tables, money in kuruş) and an outbox of writes; the screen shows
+the mirror with queued writes applied on top, so a new expense or account
+appears at once, faded with a clock icon, and balances read "tahmini" until
+the server confirms.
+
+- **Screen:** Hepsi / Kişisel / Ortak filter (when something is shared), net
+  worth, card debt and this month's spending, a card carousel at real card
+  proportions (bank, network, last four digits, this period's spending,
+  available limit, statement and due date, a ring counting down to the
+  statement date), bank and cash accounts (IBAN copy) and movements by day
+  with who entered them on shared accounts.
+- **Adding:** the floating button opens the wallet's own flow — Gider, Gelir,
+  Transfer or Kart ödemesi — with a big keypad, then account, category chips,
+  date and time, "Neden?" (with this category's recent reasons) and, for card
+  purchases, installments (equal parts in kuruş over the coming statements).
+  Card payments suggest the statement amount and the total debt.
+- **Accounts and cards:** type, name, bank, current balance (or debt; history
+  is kept by moving the opening balance), limit, statement and due day, last
+  four digits, network, colour, IBAN, shared or personal, archive.
+- **Card page:** statements with their period, due date, spending, payments
+  and status (açık, ödenmedi, kısmen, ödendi, gecikti). A statement counts as
+  paid once card payments after its statement date cover it; it can also be
+  marked paid/unpaid by hand.
+- **Household** (Hesap ve ayarlar → Hane): members, invite code, join with a
+  code, leave.
+
+**Sync.** Writes go oldest first, but only writes on the same account wait for
+each other: a conflict, failure or retry delay holds just those accounts.
+Offline backs off exponentially (5 s … 30 min). A 409 shows "Seninki /
+Sunucudaki" (on the movement and in "Kararını bekleyenler"); other refusals
+can be retried or dropped. Accepted writes leave the outbox only together with
+the pull that contains them, so nothing is counted twice. Pulls run with the
+rest of sync; joining or leaving a household replaces the mirror.
+
 ## Android integration
 
 **Google calendar, both ways, own account only.** Settings connect the

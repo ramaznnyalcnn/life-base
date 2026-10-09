@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:lifebase_mobile/core/storage/app_database.dart';
+import 'package:lifebase_mobile/core/wallet/statements.dart';
 import 'package:lifebase_mobile/core/wallet/wallet_models.dart';
 import 'package:lifebase_mobile/core/wallet/wallet_outbox.dart';
 import 'package:lifebase_mobile/core/wallet/wallet_sync.dart';
@@ -258,6 +259,57 @@ void main() {
       await engine.pull();
       expect(await db.select(db.walletTransfers).get(), isEmpty);
       expect(await db.syncState('wallet.scope'), 'u:1');
+    });
+  });
+
+  group('statements', () {
+    const card = WalletAccount(id: 'c', ownerId: 1, name: 'Bonus', type: AccountType.creditCard, balance: -150000, statementDay: 15, dueDay: 25, limit: 1000000);
+    WalletTransaction buy(String id, DateTime at, Cents amount, {TxKind kind = TxKind.expense}) =>
+        WalletTransaction(id: id, accountId: 'c', kind: kind, amount: amount, occurredAt: at, createdBy: 1, statementMonth: statementMonthOf(at, 15));
+
+    test('dates: statement day clamps to the month, due follows it', () {
+      expect(closeDateOf(DateTime(2026, 2), 31), DateTime(2026, 2, 28));
+      expect(dueDateOf(DateTime(2026, 10, 15), 25), DateTime(2026, 10, 25));
+      expect(dueDateOf(DateTime(2026, 10, 25), 5), DateTime(2026, 11, 5));
+    });
+
+    test('payments after the statement date settle it; manual marks win', () {
+      final wallet = WalletData(
+        accounts: {'c': card},
+        transactions: {
+          'a': buy('a', DateTime(2026, 9, 20), 100000),
+          'b': buy('b', DateTime(2026, 10, 2), 60000),
+          'r': buy('r', DateTime(2026, 10, 3), 10000, kind: TxKind.income),
+          'n': buy('n', DateTime(2026, 10, 20), 5000),
+        },
+        transfers: {
+          'p': WalletTransfer(id: 'p', fromAccountId: 'bank', toAccountId: 'c', amount: 30000, occurredAt: DateTime(2026, 10, 18), createdBy: 1),
+        },
+      );
+      final now = DateTime(2026, 10, 26);
+      final periods = {for (final p in statementsOf(card, wallet, now)) p.month: p};
+
+      final october = periods[DateTime(2026, 10)]!;
+      expect(october.spent, 150000, reason: 'purchases minus the refund');
+      expect(october.paidAmount, 30000);
+      expect(october.status, StatementStatus.overdue, reason: 'due 25 Oct, only partly paid');
+      expect(periods[DateTime(2026, 11)]!.status, StatementStatus.open);
+      expect(upcomingDue(card, wallet, now)!.remaining, 120000);
+
+      final marked = WalletData(
+        accounts: wallet.accounts,
+        transactions: wallet.transactions,
+        transfers: wallet.transfers,
+        marks: {'c:2026-10': StatementMark(accountId: 'c', month: DateTime(2026, 10), paid: true)},
+      );
+      expect(statementsOf(card, marked, now).firstWhere((p) => p.month == DateTime(2026, 10)).status, StatementStatus.paid);
+    });
+
+    test('next statement countdown', () {
+      final next = nextClose(card, DateTime(2026, 10, 10))!;
+      expect(next.close, DateTime(2026, 10, 15));
+      expect(next.daysLeft, 5);
+      expect(next.progress, closeTo(25 / 30, .01));
     });
   });
 }

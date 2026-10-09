@@ -1,94 +1,519 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
-import '../../../core/providers.dart';
-import 'wallet_add_page.dart';
+import '../../../core/sync/sync_controller.dart';
+import '../../../core/wallet/wallet_models.dart';
+import '../../../core/wallet/wallet_outbox.dart';
+import '../../../core/wallet/wallet_store.dart';
+import 'account_detail_page.dart';
+import 'account_edit_page.dart';
+import 'card_face.dart';
+import 'entry_detail_page.dart';
+import 'entry_page.dart';
+import 'outbox_issues_page.dart';
+import 'wallet_format.dart';
 
-final financeProvider = FutureProvider<({Map<String, Object?> summary, List<Map<String, Object?>> accounts})>((ref) async {
-  final api = ref.watch(apiClientProvider)!;
-  final values = await Future.wait([api.walletSummary(), api.accounts()]);
-  return (summary: values[0] as Map<String, Object?>, accounts: values[1] as List<Map<String, Object?>>);
-});
+enum WalletFilter { all, personal, shared }
 
-class WalletScreen extends ConsumerWidget {
+final walletFilterProvider = StateProvider<WalletFilter>((ref) => WalletFilter.all);
+
+bool _passes(WalletAccount account, WalletFilter filter) => switch (filter) {
+      WalletFilter.all => true,
+      WalletFilter.personal => !account.shared,
+      WalletFilter.shared => account.shared,
+    };
+
+/// One line of the movements list: an expense/income or a transfer.
+class WalletEntry {
+  WalletEntry.tx(WalletTransaction this.tx)
+      : transfer = null,
+        at = tx.occurredAt,
+        sync = tx.sync;
+  WalletEntry.transfer(WalletTransfer this.transfer)
+      : tx = null,
+        at = transfer.occurredAt,
+        sync = transfer.sync;
+
+  final WalletTransaction? tx;
+  final WalletTransfer? transfer;
+  final DateTime at;
+  final SyncMark sync;
+  String get id => tx?.id ?? transfer!.id;
+}
+
+/// Movements touching [accountIds], newest first, up to today (later
+/// installments are listed under their card's statements).
+List<WalletEntry> entriesOf(WalletData wallet, Set<String> accountIds, DateTime now) {
+  final endOfToday = DateTime(now.year, now.month, now.day + 1);
+  return [
+    for (final tx in wallet.transactions.values)
+      if (accountIds.contains(tx.accountId) && tx.occurredAt.isBefore(endOfToday)) WalletEntry.tx(tx),
+    for (final transfer in wallet.transfers.values)
+      if (accountIds.contains(transfer.fromAccountId) || accountIds.contains(transfer.toAccountId)) WalletEntry.transfer(transfer),
+  ]..sort((a, b) => b.at.compareTo(a.at));
+}
+
+class WalletScreen extends ConsumerStatefulWidget {
   const WalletScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends ConsumerState<WalletScreen> {
+  int _shown = 40;
+
+  @override
+  Widget build(BuildContext context) {
     final t = LbTokens.of(context);
+    final walletValue = ref.watch(walletProvider);
+    final filter = ref.watch(walletFilterProvider);
+    final issues = (ref.watch(walletOutboxProvider).value ?? const <WalletOp>[])
+        .where((op) => op.state == OutboxState.conflict || op.state == OutboxState.failed)
+        .length;
+    final now = DateTime.now();
+
     return ModuleScaffold(
       module: LbModule.wallet,
       title: 'Cüzdan',
       addLabel: 'Hareket',
-      addPageBuilder: (context) => const WalletAddPage(),
-      body: ref.watch(financeProvider).when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stackTrace) => Center(child: Text('Finans özeti alınamadı.', style: TextStyle(color: t.muted))),
-            data: (data) {
-              final total = data.summary['total_balance'] ?? data.summary['net_worth'] ?? '0';
-              return RefreshIndicator(
-                onRefresh: () => ref.refresh(financeProvider.future),
-                child: ListView(padding: moduleListPadding(context, hasAddButton: true), children: [
-                  NeuSurface(
-                    padding: const EdgeInsets.all(22),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('TOPLAM BAKİYE',
-                          style: TextStyle(letterSpacing: 1.4, fontWeight: FontWeight.w800, fontSize: 12, color: t.module(LbModule.wallet))),
-                      const SizedBox(height: 8),
-                      Text(_money(total),
-                          style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: t.onBase)),
-                    ]),
+      addPageBuilder: (context) => const EntryPage(),
+      body: walletValue.when(
+        // The local mirror opens in a moment; no spinner for that.
+        loading: () => const SizedBox.shrink(),
+        error: (error, _) => Center(child: Text('Cüzdan açılamadı.', style: TextStyle(color: t.muted))),
+        data: (wallet) {
+          final all = wallet.accounts.values.where((a) => a.active).toList()..sort(_byTypeThenName);
+          final accounts = all.where((a) => _passes(a, filter)).toList();
+          final cards = accounts.where((a) => a.isCard).toList();
+          final others = accounts.where((a) => !a.isCard).toList();
+          final ids = {for (final a in accounts) a.id};
+          final entries = entriesOf(wallet, ids, now);
+          final anyShared = all.any((a) => a.shared);
+
+          return RefreshIndicator(
+            onRefresh: () => ref.read(syncControllerProvider.notifier).syncNow(),
+            child: ListView(padding: moduleListPadding(context, hasAddButton: true), children: [
+              if (issues > 0) _IssuesBanner(count: issues),
+              if (all.isEmpty)
+                _EmptyWallet(onAdd: () => _openAccountEditor(context))
+              else ...[
+                if (anyShared) _FilterChips(filter: filter),
+                _Totals(accounts: accounts, wallet: wallet, now: now),
+                if (cards.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _Cards(cards: cards, wallet: wallet, now: now),
+                ],
+                _SectionHeader(
+                  title: 'Hesaplar',
+                  action: IconButton(
+                    tooltip: 'Hesap veya kart ekle',
+                    onPressed: () => _openAccountEditor(context),
+                    icon: const Icon(Icons.add_card_rounded),
                   ),
-                  const SizedBox(height: 28),
-                  Text('Hesaplar', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: t.onBase)),
-                  const SizedBox(height: 12),
-                  for (final account in data.accounts)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: NeuSurface(
-                        depth: 4,
-                        radius: LbTokens.radiusSmall + 4,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        child: Row(children: [
-                          Icon(_icon(account['type'] as String?), color: t.module(LbModule.wallet)),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(account['name'] as String? ?? 'Hesap',
-                                  style: TextStyle(fontWeight: FontWeight.w700, color: t.onBase)),
-                              Text(_type(account['type'] as String?), style: TextStyle(color: t.muted, fontSize: 12)),
-                            ]),
-                          ),
-                          Text(_money(account['balance']), style: TextStyle(fontWeight: FontWeight.w800, color: t.onBase)),
-                        ]),
-                      ),
-                    ),
-                ]),
-              );
-            },
-          ),
+                ),
+                for (final account in others) _AccountTile(account: account),
+                if (others.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text('Banka veya nakit hesabı yok.', style: TextStyle(color: t.muted)),
+                  ),
+                _SectionHeader(title: 'Hareketler'),
+                if (entries.isEmpty) Text('Henüz hareket yok. Sağ alttan ekleyebilirsin.', style: TextStyle(color: t.muted)),
+                ..._grouped(context, entries.take(_shown).toList(), wallet, now),
+                if (entries.length > _shown)
+                  TextButton(onPressed: () => setState(() => _shown += 60), child: const Text('Daha fazla göster')),
+              ],
+            ]),
+          );
+        },
+      ),
     );
   }
 
-  static String _money(Object? value) {
-    final amount = num.tryParse('$value') ?? 0;
-    return NumberFormat.currency(locale: 'tr_TR', symbol: '₺').format(amount);
+  static int _byTypeThenName(WalletAccount a, WalletAccount b) {
+    final byType = a.type.index.compareTo(b.type.index);
+    return byType != 0 ? byType : a.name.toLowerCase().compareTo(b.name.toLowerCase());
   }
 
-  static IconData _icon(String? value) => switch (value) {
-        'cash' => Icons.payments_rounded,
-        'credit_card' => Icons.credit_card_rounded,
-        _ => Icons.account_balance_rounded,
-      };
+  List<Widget> _grouped(BuildContext context, List<WalletEntry> entries, WalletData wallet, DateTime now) {
+    final today = DateUtils.dateOnly(now);
+    final widgets = <Widget>[];
+    DateTime? day;
+    for (final entry in entries) {
+      final entryDay = DateUtils.dateOnly(entry.at);
+      if (entryDay != day) {
+        day = entryDay;
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 14, bottom: 6),
+          child: Text(dayLabel(entryDay, today), style: TextStyle(color: LbTokens.of(context).muted, fontWeight: FontWeight.w700)),
+        ));
+      }
+      widgets.add(EntryTile(entry: entry, wallet: wallet));
+    }
+    return widgets;
+  }
+}
 
-  static String _type(String? value) => switch (value) {
-        'cash' => 'Nakit',
-        'bank' => 'Banka',
-        'credit_card' => 'Kredi kartı',
-        _ => 'Hesap',
-      };
+void _openAccountEditor(BuildContext context, [WalletAccount? account]) =>
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountEditPage(initial: account)));
+
+class _EmptyWallet extends StatelessWidget {
+  const _EmptyWallet({required this.onAdd});
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LbTokens.of(context);
+    return NeuSurface(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.account_balance_wallet_rounded, color: t.module(LbModule.wallet), size: 32),
+          const SizedBox(width: 14),
+          Expanded(child: Text('Banka hesaplarını, kartlarını ve nakdini ekle; harcamaların hesaplarına işlesin.', style: TextStyle(color: t.muted))),
+        ]),
+        const SizedBox(height: 14),
+        FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add_card_rounded), label: const Text('Hesap veya kart ekle')),
+      ]),
+    );
+  }
+}
+
+class _FilterChips extends ConsumerWidget {
+  const _FilterChips({required this.filter});
+  final WalletFilter filter;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: SegmentedButton<WalletFilter>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: WalletFilter.all, label: Text('Hepsi')),
+            ButtonSegment(value: WalletFilter.personal, label: Text('Kişisel')),
+            ButtonSegment(value: WalletFilter.shared, label: Text('Ortak')),
+          ],
+          selected: {filter},
+          onSelectionChanged: (value) => ref.read(walletFilterProvider.notifier).state = value.first,
+        ),
+      );
+}
+
+class _Totals extends StatelessWidget {
+  const _Totals({required this.accounts, required this.wallet, required this.now});
+  final List<WalletAccount> accounts;
+  final WalletData wallet;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LbTokens.of(context);
+    final net = accounts.fold<Cents>(0, (sum, a) => sum + a.balance);
+    final debt = accounts.fold<Cents>(0, (sum, a) => sum + a.debt);
+    final ids = {for (final a in accounts) a.id};
+    final monthStart = DateTime(now.year, now.month);
+    final spent = wallet.transactions.values
+        .where((tx) => ids.contains(tx.accountId) && tx.kind == TxKind.expense && !tx.occurredAt.isBefore(monthStart) && !tx.occurredAt.isAfter(now))
+        .fold<Cents>(0, (sum, tx) => sum + tx.amount);
+    final estimated = accounts.any((a) => a.sync != SyncMark.confirmed);
+    final label = TextStyle(letterSpacing: 1.2, fontWeight: FontWeight.w800, fontSize: 11, color: t.module(LbModule.wallet));
+
+    return NeuSurface(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text('NET VARLIK', style: label),
+          if (estimated) ...[
+            const SizedBox(width: 8),
+            Tooltip(
+              message: 'Gönderilmeyi bekleyen işlemlerle hesaplandı',
+              child: Text('tahmini', style: TextStyle(color: t.muted, fontSize: 12, fontStyle: FontStyle.italic)),
+            ),
+          ],
+        ]),
+        const SizedBox(height: 6),
+        Text(formatMoney(net),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, color: net < 0 ? t.expense : t.onBase)),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _Figure(label: 'Kart borcu', value: formatMoney(debt))),
+          Expanded(child: _Figure(label: 'Bu ay gider', value: formatMoney(spent))),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _Figure extends StatelessWidget {
+  const _Figure({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LbTokens.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(color: t.muted, fontSize: 12, fontWeight: FontWeight.w600)),
+      Text(value, style: TextStyle(color: t.onBase, fontWeight: FontWeight.w800, fontSize: 16)),
+    ]);
+  }
+}
+
+class _Cards extends StatefulWidget {
+  const _Cards({required this.cards, required this.wallet, required this.now});
+  final List<WalletAccount> cards;
+  final WalletData wallet;
+  final DateTime now;
+
+  @override
+  State<_Cards> createState() => _CardsState();
+}
+
+class _CardsState extends State<_Cards> {
+  final _controller = PageController(viewportFraction: .9);
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width - 40;
+    final height = width * .9 * 54 / 85.6;
+    return Column(children: [
+      SizedBox(
+        height: height + 16,
+        child: PageView.builder(
+          controller: _controller,
+          padEnds: false,
+          itemCount: widget.cards.length,
+          onPageChanged: (page) => setState(() => _page = page),
+          itemBuilder: (context, index) {
+            final card = widget.cards[index];
+            return Padding(
+              padding: const EdgeInsets.only(right: 12, bottom: 16),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountDetailPage(accountId: card.id))),
+                child: CardFace(card: card, wallet: widget.wallet, now: widget.now),
+              ),
+            );
+          },
+        ),
+      ),
+      if (widget.cards.length > 1)
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (var i = 0; i < widget.cards.length; i++)
+            AnimatedContainer(
+              duration: LbTokens.motionShort,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: i == _page ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: i == _page ? LbTokens.of(context).module(LbModule.wallet) : LbTokens.of(context).shade,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+        ]),
+    ]);
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.action});
+  final String title;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 22, bottom: 8),
+        child: Row(children: [
+          Expanded(
+            child: Text(title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: LbTokens.of(context).onBase)),
+          ),
+          ?action,
+        ]),
+      );
+}
+
+class _AccountTile extends StatelessWidget {
+  const _AccountTile({required this.account});
+  final WalletAccount account;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LbTokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountDetailPage(accountId: account.id))),
+        child: NeuSurface(
+          depth: 4,
+          radius: LbTokens.radiusSmall + 4,
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          child: Row(children: [
+            Icon(account.type == AccountType.cash ? Icons.payments_rounded : Icons.account_balance_rounded, color: t.module(LbModule.wallet)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Flexible(child: Text(account.name, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, color: t.onBase))),
+                  if (account.shared) Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.group_rounded, size: 16, color: t.muted)),
+                ]),
+                Text(
+                  [account.bank ?? account.type.label, if (account.iban != null) formatIban(account.iban!)].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: t.muted, fontSize: 12),
+                ),
+              ]),
+            ),
+            Text(formatMoney(account.balance), style: TextStyle(fontWeight: FontWeight.w800, color: account.balance < 0 ? t.expense : t.onBase)),
+            if (account.iban != null)
+              IconButton(
+                tooltip: 'IBAN kopyala',
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: account.iban!.replaceAll(' ', '')));
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('IBAN kopyalandı')));
+                },
+              )
+            else
+              const SizedBox(width: 8),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// One movement: category, why, which account, how much, who entered it.
+class EntryTile extends ConsumerWidget {
+  const EntryTile({super.key, required this.entry, required this.wallet});
+  final WalletEntry entry;
+  final WalletData wallet;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = LbTokens.of(context);
+    final members = {for (final m in ref.watch(walletMembersProvider).value ?? const <HouseholdMember>[]) m.userId: m};
+    final tx = entry.tx;
+    final transfer = entry.transfer;
+    final IconData icon;
+    final String title;
+    final String subtitle;
+    final Cents signed;
+    final int createdBy;
+    final bool shared;
+    if (tx != null) {
+      final account = wallet.accounts[tx.accountId];
+      icon = categoryIcon(tx.category, tx.kind);
+      title = tx.kind == TxKind.payment ? 'Kart ödemesi' : categoryLabel(tx.category);
+      subtitle = [
+        if (tx.note != null) tx.note!,
+        account?.name ?? 'Hesap',
+        if (tx.installmentCount != null) '${tx.installmentIndex}/${tx.installmentCount} taksit',
+      ].join(' · ');
+      signed = tx.kind.effect(tx.amount);
+      createdBy = tx.createdBy;
+      shared = account?.shared ?? false;
+    } else {
+      final from = wallet.accounts[transfer!.fromAccountId];
+      final to = wallet.accounts[transfer.toAccountId];
+      final cardPayment = to?.isCard ?? false;
+      icon = cardPayment ? Icons.credit_score_rounded : Icons.swap_horiz_rounded;
+      title = cardPayment ? 'Kart ödemesi' : 'Transfer';
+      subtitle = [if (transfer.note != null) transfer.note!, '${from?.name ?? 'Diğer hesap'} → ${to?.name ?? 'Diğer hesap'}'].join(' · ');
+      signed = 0;
+      createdBy = transfer.createdBy;
+      shared = (from?.shared ?? false) || (to?.shared ?? false);
+    }
+    final author = shared && members.length > 1 ? members[createdBy] : null;
+    final amountColor = signed > 0 ? t.income : t.onBase;
+
+    return Opacity(
+      opacity: entry.sync == SyncMark.pending ? .6 : 1,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(LbTokens.radiusSmall),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => EntryDetailPage(entryId: entry.id))),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(children: [
+            Stack(clipBehavior: Clip.none, children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(color: t.module(LbModule.wallet).withValues(alpha: .14), shape: BoxShape.circle),
+                child: Icon(icon, color: t.module(LbModule.wallet), size: 22),
+              ),
+              if (author != null)
+                Positioned(
+                  right: -4,
+                  bottom: -4,
+                  child: Tooltip(
+                    message: '${author.name} girdi',
+                    child: CircleAvatar(
+                      radius: 10,
+                      backgroundColor: t.base,
+                      child: CircleAvatar(
+                        radius: 9,
+                        backgroundColor: author.isMe ? t.module(LbModule.wallet) : t.accent,
+                        child: Text(author.initials, style: TextStyle(fontSize: 8, color: t.onAccent, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ),
+                ),
+            ]),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: t.onBase)),
+                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.muted, fontSize: 12)),
+              ]),
+            ),
+            const SizedBox(width: 8),
+            syncBadge(context, entry.sync),
+            const SizedBox(width: 4),
+            Text(
+              tx == null ? formatMoney(transfer!.amount) : '${signed > 0 ? '+' : '−'}${formatMoney(tx.amount)}',
+              style: TextStyle(fontWeight: FontWeight.w800, color: amountColor, fontFeatures: const [FontFeature.tabularFigures()]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _IssuesBanner extends StatelessWidget {
+  const _IssuesBanner({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LbTokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: NeuSurface(
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+        child: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFE09B2D)),
+          const SizedBox(width: 12),
+          Expanded(child: Text('$count işlem senin kararını bekliyor', style: TextStyle(color: t.onBase, fontWeight: FontWeight.w600))),
+          TextButton(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const OutboxIssuesPage())),
+            child: const Text('Gör'),
+          ),
+        ]),
+      ),
+    );
+  }
 }

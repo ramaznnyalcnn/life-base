@@ -14,6 +14,7 @@ DEFAULT_CATEGORIES: tuple[tuple[str, CategoryType, bool], ...] = (
     ("Yeme Icmek", CategoryType.EXPENSE, True),
     ("Ulasim", CategoryType.EXPENSE, True),
     ("Faturalar", CategoryType.EXPENSE, True),
+    ("Kira", CategoryType.EXPENSE, True),
     ("Abonelik", CategoryType.EXPENSE, True),
     ("Saglik", CategoryType.EXPENSE, True),
     ("Diger Gider", CategoryType.EXPENSE, True),
