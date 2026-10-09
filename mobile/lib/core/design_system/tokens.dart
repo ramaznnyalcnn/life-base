@@ -15,8 +15,8 @@ enum LbPalette {
   final bool darkOnly;
 }
 
-/// The four modules; each owns a hue used for its nav bubble and accents.
-enum LbModule { today, wallet, calendar, meds }
+/// The five modules; each owns a hue used for its nav bubble and accents.
+enum LbModule { today, wallet, calendar, meds, notes }
 
 /// Design tokens shared by every module.
 ///
@@ -268,6 +268,7 @@ const _lightModules = <LbModule, Color>{
   LbModule.wallet: Color(0xFF2E6B4A),
   LbModule.calendar: Color(0xFF2F5E9E),
   LbModule.meds: Color(0xFFA03D5A),
+  LbModule.notes: Color(0xFF6447B0),
 };
 
 const _darkModules = <LbModule, Color>{
@@ -275,4 +276,5 @@ const _darkModules = <LbModule, Color>{
   LbModule.wallet: Color(0xFF86CFA5),
   LbModule.calendar: Color(0xFF8DB7F0),
   LbModule.meds: Color(0xFFF199B3),
+  LbModule.notes: Color(0xFFC4B2F5),
 };

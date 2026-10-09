@@ -6,13 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../core/design_system/glass_nav_bar.dart';
 import '../core/design_system/tokens.dart';
 
+/// Bugün sits in the middle and is home: the app opens there and back returns there.
 const shellDestinations = [
-  GlassNavItem(
-    label: 'Bugün',
-    icon: Icons.wb_sunny_outlined,
-    selectedIcon: Icons.wb_sunny_rounded,
-    module: LbModule.today,
-  ),
   GlassNavItem(
     label: 'Cüzdan',
     icon: Icons.account_balance_wallet_outlined,
@@ -26,12 +21,27 @@ const shellDestinations = [
     module: LbModule.calendar,
   ),
   GlassNavItem(
+    label: 'Bugün',
+    icon: Icons.wb_sunny_outlined,
+    selectedIcon: Icons.wb_sunny_rounded,
+    module: LbModule.today,
+  ),
+  GlassNavItem(
     label: 'İlaç',
     icon: Icons.medication_outlined,
     selectedIcon: Icons.medication_rounded,
     module: LbModule.meds,
   ),
+  GlassNavItem(
+    label: 'Notlar',
+    icon: Icons.sticky_note_2_outlined,
+    selectedIcon: Icons.sticky_note_2_rounded,
+    module: LbModule.notes,
+  ),
 ];
+
+/// Index of Bugün in [shellDestinations].
+const homeIndex = 2;
 
 /// Tracks whether a tab's navigator has a page open above the module root.
 class TabStackObserver extends NavigatorObserver {
@@ -49,7 +59,7 @@ class TabStackObserver extends NavigatorObserver {
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) => _update();
 }
 
-/// Hosts the four modules behind the glass navigation bar.
+/// Hosts the five modules behind the glass navigation bar.
 ///
 /// Back button order: pop inside the current tab (handled by go_router before
 /// this scope is asked) → return to Bugün → press twice to leave the app.
@@ -76,8 +86,8 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _handleBack() {
-    if (widget.shell.currentIndex != 0) {
-      widget.shell.goBranch(0);
+    if (widget.shell.currentIndex != homeIndex) {
+      widget.shell.goBranch(homeIndex);
       return;
     }
     final now = DateTime.now();

@@ -56,13 +56,30 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('glass bar offers the four modules and starts on Bugün', (tester) async {
+  testWidgets('glass bar offers the five modules, Bugün in the middle, and starts there', (tester) async {
     await pumpApp(tester);
 
-    for (final label in ['Bugün', 'Cüzdan', 'Takvim', 'İlaç']) {
-      expect(find.bySemanticsLabel(label), findsWidgets);
-    }
+    final labels = ['Cüzdan', 'Takvim', 'Bugün', 'İlaç', 'Notlar'];
+    final xs = [for (final label in labels) tester.getCenter(find.bySemanticsLabel(label).last).dx];
+    expect(xs, [...xs]..sort(), reason: 'left to right in this order');
     expect(location(), AppRoutes.today);
+  });
+
+  testWidgets('sliding a finger along the bar opens the tab it ends on', (tester) async {
+    await pumpApp(tester);
+    final bugun = tester.getCenter(find.bySemanticsLabel('Bugün').last);
+    final notlar = tester.getCenter(find.bySemanticsLabel('Notlar').last);
+
+    final gesture = await tester.startGesture(bugun);
+    for (var i = 1; i <= 10; i++) {
+      await gesture.moveTo(Offset.lerp(bugun, notlar, i / 10)!);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(location(), AppRoutes.today, reason: 'nothing opens until the finger lifts');
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(location(), AppRoutes.notes);
   });
 
   testWidgets('back inside a tab returns to the previous page, not out of the app', (tester) async {

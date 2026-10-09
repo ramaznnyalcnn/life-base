@@ -9,6 +9,7 @@ import '../modules/account/ui/account_screen.dart';
 import '../modules/calendar/ui/calendar_screen.dart';
 import '../modules/meds/ui/dose_alarm_page.dart';
 import '../modules/meds/ui/meds_screen.dart';
+import '../modules/notes/ui/notes_screen.dart';
 import '../modules/today/ui/today_screen.dart';
 import '../modules/wallet/ui/wallet_screen.dart';
 import 'app_shell.dart';
@@ -19,7 +20,15 @@ GoRouter buildRouter({String initialLocation = AppRoutes.today}) {
   final rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
   GoRoute tab(String path, Widget screen) => GoRoute(path: path, builder: (context, state) => screen);
   // One per tab: tells the shell when a page is open on top of a module.
-  final stacks = List.generate(4, (_) => TabStackObserver());
+  final stacks = List.generate(shellDestinations.length, (_) => TabStackObserver());
+  // Same order as shellDestinations: Cüzdan · Takvim · Bugün · İlaç · Notlar.
+  final screens = {
+    AppRoutes.wallet: const WalletScreen(),
+    AppRoutes.calendar: const CalendarScreen(),
+    AppRoutes.today: const TodayScreen(),
+    AppRoutes.meds: const MedsScreen(),
+    AppRoutes.notes: const NotesScreen(),
+  }.entries.toList();
   return GoRouter(
     navigatorKey: rootKey,
     initialLocation: initialLocation,
@@ -29,10 +38,8 @@ GoRouter buildRouter({String initialLocation = AppRoutes.today}) {
         navigatorContainerBuilder: (context, shell, children) =>
             FadeThroughBranches(currentIndex: shell.currentIndex, children: children),
         branches: [
-          StatefulShellBranch(observers: [stacks[0]], routes: [tab(AppRoutes.today, const TodayScreen())]),
-          StatefulShellBranch(observers: [stacks[1]], routes: [tab(AppRoutes.wallet, const WalletScreen())]),
-          StatefulShellBranch(observers: [stacks[2]], routes: [tab(AppRoutes.calendar, const CalendarScreen())]),
-          StatefulShellBranch(observers: [stacks[3]], routes: [tab(AppRoutes.meds, const MedsScreen())]),
+          for (var i = 0; i < screens.length; i++)
+            StatefulShellBranch(observers: [stacks[i]], routes: [tab(screens[i].key, screens[i].value)]),
         ],
       ),
       GoRoute(
