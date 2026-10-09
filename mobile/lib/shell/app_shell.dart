@@ -82,7 +82,18 @@ class _AppShellState extends State<AppShell> {
         },
         child: Scaffold(
           extendBody: true,
-          body: widget.shell,
+          // A tab navigator reports "cannot pop" once its last page closes.
+          // The shell always handles back (switch tab or confirm exit), so
+          // Android must never be told otherwise, or predictive back closes
+          // the app without asking Flutter.
+          body: NotificationListener<NavigationNotification>(
+            onNotification: (notification) {
+              if (notification.canHandlePop) return false;
+              const NavigationNotification(canHandlePop: true).dispatch(context);
+              return true;
+            },
+            child: widget.shell,
+          ),
           bottomNavigationBar: GlassNavBar(
             items: shellDestinations,
             currentIndex: widget.shell.currentIndex,

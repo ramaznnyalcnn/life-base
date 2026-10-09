@@ -130,4 +130,26 @@ void main() {
     expect(find.byType(AccountScreen), findsNothing);
     expect(location(), AppRoutes.meds);
   });
+
+  testWidgets('Android is always told the app handles back, so it never closes the app itself', (tester) async {
+    // With predictive back, Android exits without asking Flutter when the
+    // framework reports it cannot handle back. A tab's navigator reports that
+    // after its last page pops; the shell must override it.
+    final handlesBack = <bool>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'SystemNavigator.setFrameworkHandlesBack') handlesBack.add(call.arguments as bool);
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await pumpApp(tester);
+
+    await openTab(tester, 'Takvim');
+    await tester.tap(find.byKey(const ValueKey('add-calendar')));
+    await tester.pumpAndSettle();
+    await pressBack(tester);
+
+    expect(handlesBack, isNotEmpty);
+    expect(handlesBack.last, isTrue);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 }
