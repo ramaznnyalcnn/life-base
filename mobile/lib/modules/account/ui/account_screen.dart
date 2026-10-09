@@ -167,16 +167,22 @@ class _AppearanceCard extends ConsumerWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Renk şeması', style: TextStyle(fontWeight: FontWeight.w700, color: t.onBase)),
         const SizedBox(height: 12),
-        Row(children: [
-          for (final palette in LbPalette.values)
-            Expanded(
-              child: _PaletteSwatch(
-                palette: palette,
-                selected: appearance.palette == palette,
-                onTap: () => controller.setPalette(palette),
-              ),
-            ),
-        ]),
+        LayoutBuilder(
+          builder: (context, constraints) => Wrap(
+            runSpacing: 14,
+            children: [
+              for (final palette in LbPalette.values)
+                SizedBox(
+                  width: constraints.maxWidth / 4,
+                  child: _PaletteSwatch(
+                    palette: palette,
+                    selected: appearance.palette == palette,
+                    onTap: () => controller.setPalette(palette),
+                  ),
+                ),
+            ],
+          ),
+        ),
         const SizedBox(height: 20),
         Text('Mod', style: TextStyle(fontWeight: FontWeight.w700, color: t.onBase)),
         const SizedBox(height: 10),
@@ -233,16 +239,14 @@ class _PaletteSwatch extends StatelessWidget {
             duration: t.reduceMotion ? Duration.zero : LbTokens.motionShort,
             width: 52,
             height: 52,
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [preview.base, preview.accent],
-                stops: const [.5, .5],
-              ),
               border: Border.all(color: selected ? t.accent : t.shade, width: selected ? 3 : 1),
             ),
+            // Painted rather than a hard-stop gradient: animating a gradient
+            // with duplicate stops trips a Flutter assertion.
+            child: CustomPaint(painter: _SwatchPainter(preview)),
           ),
           const SizedBox(height: 6),
           Text(
@@ -257,4 +261,20 @@ class _PaletteSwatch extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Half base colour, half accent.
+class _SwatchPainter extends CustomPainter {
+  _SwatchPainter(this.tokens);
+  final LbTokens tokens;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    canvas.drawOval(rect, Paint()..color = tokens.base);
+    canvas.drawArc(rect, -3.141592653589793 / 4, 3.141592653589793, true, Paint()..color = tokens.accent);
+  }
+
+  @override
+  bool shouldRepaint(_SwatchPainter oldDelegate) => oldDelegate.tokens != tokens;
 }

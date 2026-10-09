@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// User-selectable colour families. [gece] is dark-only.
+/// User-selectable colour families. Some are dark-only.
 enum LbPalette {
   kum('Kum'),
   adacayi('Adaçayı'),
   okyanus('Okyanus'),
-  gece('Gece');
+  lavanta('Lavanta'),
+  gul('Gül'),
+  gece('Gece', darkOnly: true),
+  grafit('Grafit', darkOnly: true);
 
-  const LbPalette(this.label);
+  const LbPalette(this.label, {this.darkOnly = false});
   final String label;
-
-  bool get darkOnly => this == LbPalette.gece;
+  final bool darkOnly;
 }
 
 /// The four modules; each owns a hue used for its nav bubble and accents.
@@ -177,15 +179,25 @@ const _light = <LbPalette, _Swatch>{
     muted: Color(0xFF586577),
     accent: Color(0xFF2C67A6),
   ),
-  // Gece is dark-only; its light entry is never used.
-  LbPalette.gece: _Swatch(
-    base: Color(0xFF16171B),
-    highlight: Color(0xFF22242A),
-    shade: Color(0xFF0B0C0E),
-    onBase: Color(0xFFECECF1),
-    muted: Color(0xFF9C9FAD),
-    accent: Color(0xFFA99BFF),
+  LbPalette.lavanta: _Swatch(
+    base: Color(0xFFECE8F3),
+    highlight: Color(0xFFFFFFFF),
+    shade: Color(0xFFCAC3D8),
+    onBase: Color(0xFF241F2E),
+    muted: Color(0xFF5F5870),
+    accent: Color(0xFF6447B0),
   ),
+  LbPalette.gul: _Swatch(
+    base: Color(0xFFF3E8E6),
+    highlight: Color(0xFFFFFFFF),
+    shade: Color(0xFFD6C5C2),
+    onBase: Color(0xFF2E2120),
+    muted: Color(0xFF6E5A58),
+    accent: Color(0xFFA8445C),
+  ),
+  // Dark-only palettes: their light entries are never used.
+  LbPalette.gece: _gece,
+  LbPalette.grafit: _grafit,
 };
 
 const _dark = <LbPalette, _Swatch>{
@@ -213,15 +225,43 @@ const _dark = <LbPalette, _Swatch>{
     muted: Color(0xFF9EABBC),
     accent: Color(0xFF82B4E8),
   ),
-  LbPalette.gece: _Swatch(
-    base: Color(0xFF16171B),
-    highlight: Color(0xFF22242A),
-    shade: Color(0xFF0B0C0E),
-    onBase: Color(0xFFECECF1),
-    muted: Color(0xFF9C9FAD),
-    accent: Color(0xFFA99BFF),
+  LbPalette.lavanta: _Swatch(
+    base: Color(0xFF241F2D),
+    highlight: Color(0xFF2F2939),
+    shade: Color(0xFF17131E),
+    onBase: Color(0xFFECE7F5),
+    muted: Color(0xFFA9A1BB),
+    accent: Color(0xFFB9A4F5),
   ),
+  LbPalette.gul: _Swatch(
+    base: Color(0xFF2B2223),
+    highlight: Color(0xFF372C2D),
+    shade: Color(0xFF1C1617),
+    onBase: Color(0xFFF3E6E6),
+    muted: Color(0xFFB9A3A4),
+    accent: Color(0xFFEE9AAE),
+  ),
+  LbPalette.gece: _gece,
+  LbPalette.grafit: _grafit,
 };
+
+const _gece = _Swatch(
+  base: Color(0xFF16171B),
+  highlight: Color(0xFF22242A),
+  shade: Color(0xFF0B0C0E),
+  onBase: Color(0xFFECECF1),
+  muted: Color(0xFF9C9FAD),
+  accent: Color(0xFFA99BFF),
+);
+
+const _grafit = _Swatch(
+  base: Color(0xFF1C1D1F),
+  highlight: Color(0xFF27292C),
+  shade: Color(0xFF101112),
+  onBase: Color(0xFFEDEDEE),
+  muted: Color(0xFFA0A3A8),
+  accent: Color(0xFFF2B84B),
+);
 
 const _lightModules = <LbModule, Color>{
   LbModule.today: Color(0xFF8A5A00),

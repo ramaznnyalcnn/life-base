@@ -5,6 +5,8 @@ import 'package:lifebase_mobile/core/design_system/add_page_scaffold.dart';
 import 'package:lifebase_mobile/core/design_system/app_theme.dart';
 import 'package:lifebase_mobile/core/design_system/appearance.dart';
 import 'package:lifebase_mobile/core/design_system/tokens.dart';
+import 'package:lifebase_mobile/core/providers.dart';
+import 'package:lifebase_mobile/modules/account/ui/account_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -76,5 +78,36 @@ void main() {
     await tester.tap(find.text('Vazgeç'));
     await tester.pumpAndSettle();
     expect(find.text('Yeni'), findsNothing);
+  });
+
+  testWidgets('switching through every palette and mode animates without errors', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [outstandingOperationsProvider.overrideWith((ref) => Stream.value(0))],
+      child: Consumer(builder: (context, ref, _) {
+        final a = ref.watch(appearanceProvider);
+        return MaterialApp(
+          theme: AppTheme.build(a.palette, Brightness.light),
+          darkTheme: AppTheme.build(a.palette, Brightness.dark),
+          themeMode: a.palette.darkOnly ? ThemeMode.dark : a.mode,
+          home: const AccountScreen(),
+        );
+      }),
+    ));
+    await tester.pumpAndSettle();
+
+    for (final palette in [...LbPalette.values.reversed, LbPalette.kum]) {
+      await tester.tap(find.bySemanticsLabel('${palette.label} renk şeması'));
+      // Pump through the middle of the theme/swatch animations.
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 30));
+      }
+    }
+    await tester.tap(find.text('Koyu'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
   });
 }
