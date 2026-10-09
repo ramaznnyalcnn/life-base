@@ -105,13 +105,26 @@ void main() {
     expect(calls, contains('SystemNavigator.pop'));
   });
 
+  testWidgets('the bar steps aside while a page is open and returns after', (tester) async {
+    await pumpApp(tester);
+    await openTab(tester, 'Takvim');
+    await tester.tap(find.byKey(const ValueKey('add-calendar')));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Cüzdan'), findsNothing);
+
+    await pressBack(tester);
+    expect(find.bySemanticsLabel('Cüzdan'), findsWidgets);
+  });
+
   testWidgets('each tab keeps its own back stack while switching', (tester) async {
     await pumpApp(tester);
     await openTab(tester, 'Takvim');
     await tester.tap(find.byKey(const ValueKey('add-calendar')));
     await tester.pumpAndSettle();
 
-    await openTab(tester, 'Cüzdan');
+    // e.g. tapping an item on Bugün jumps to another tab.
+    router.go(AppRoutes.wallet);
+    await tester.pumpAndSettle();
     expect(find.byType(EventEditPage), findsNothing);
 
     await openTab(tester, 'Takvim');
@@ -152,4 +165,21 @@ void main() {
     expect(handlesBack, isNotEmpty);
     expect(handlesBack.last, isTrue);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('back on an add page with unsaved input asks first and stays in the tab', (tester) async {
+    await pumpApp(tester);
+    await openTab(tester, 'Takvim');
+    await tester.tap(find.byKey(const ValueKey('add-calendar')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Başlık'), 'Yarım kalan');
+    await tester.pump();
+
+    await pressBack(tester);
+
+    expect(find.text('Vazgeçilsin mi?'), findsOneWidget);
+    expect(location(), AppRoutes.calendar);
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EventEditPage), findsOneWidget);
+  });
 }

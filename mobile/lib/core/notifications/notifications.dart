@@ -98,6 +98,9 @@ class PluginNotificationPort implements NotificationPort {
       const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
       onDidReceiveNotificationResponse: (response) => onTap?.call(response.payload),
     );
+    // The app may have been started by tapping a notification.
+    final launch = await plugin.getNotificationAppLaunchDetails();
+    if (launch?.didNotificationLaunchApp ?? false) onTap?.call(launch!.notificationResponse?.payload);
     final android = plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()!;
     for (final channel in NotificationChannel.values) {
       await android.createNotificationChannel(AndroidNotificationChannel(channel.id, channel.label, importance: channel.importance));

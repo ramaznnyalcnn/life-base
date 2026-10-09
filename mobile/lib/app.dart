@@ -1,14 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/calendar/google_projection.dart';
 import 'core/design_system/app_theme.dart';
 import 'core/design_system/appearance.dart';
+import 'core/calendar/calendar_reminders.dart';
 import 'core/notifications/reminder_sync.dart';
+import 'core/routes.dart';
 import 'core/sync/sync_controller.dart';
 import 'modules/account/data/session_controller.dart';
+import 'modules/calendar/data/server_import.dart';
 import 'modules/account/ui/onboarding_screen.dart';
 import 'shell/router.dart';
+
+/// Turkish pickers, dialogs and number formats everywhere.
+const _locale = Locale('tr', 'TR');
+const _localizations = [
+  GlobalMaterialLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+  GlobalCupertinoLocalizations.delegate,
+];
 
 class LifeBaseApp extends ConsumerWidget {
   const LifeBaseApp({super.key});
@@ -32,9 +45,17 @@ class LifeBaseApp extends ConsumerWidget {
       ref.listen(syncControllerProvider, (_, _) {});
       // Local reminders work offline; they are re-planned whenever events change.
       ref.listen(calendarReminderSyncProvider, (_, _) {});
+      ref.listen(googleProjectionProvider, (_, _) {});
+      ref.listen(serverCalendarImportProvider, (_, _) {});
+      ref.listen(notificationTapProvider, (_, payload) {
+        if (payload?.startsWith('$calendarNotificationGroup|') ?? false) ref.read(routerProvider).go(AppRoutes.calendar);
+      });
       return MaterialApp.router(
         title: 'LifeBase',
         debugShowCheckedModeBanner: false,
+        locale: _locale,
+        supportedLocales: const [_locale],
+        localizationsDelegates: _localizations,
         theme: light,
         darkTheme: dark,
         themeMode: mode,
@@ -44,6 +65,9 @@ class LifeBaseApp extends ConsumerWidget {
     return MaterialApp(
       title: 'LifeBase',
       debugShowCheckedModeBanner: false,
+      locale: _locale,
+      supportedLocales: const [_locale],
+      localizationsDelegates: _localizations,
       theme: light,
       darkTheme: dark,
       themeMode: mode,

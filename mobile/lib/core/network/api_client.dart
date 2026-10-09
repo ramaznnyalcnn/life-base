@@ -110,6 +110,13 @@ class ApiClient {
   Future<Map<String, Object?>> syncPull(int since) async =>
       (await _dio.get<Map<String, Object?>>('/api/v3/sync/pull', queryParameters: {'since': since})).data!;
 
+  /// Server-side events and routines from before the calendar moved on-device.
+  Future<List<Map<String, Object?>>> legacyEvents() async =>
+      ((await _dio.get<List<Object?>>('/api/v1/events')).data ?? const []).cast<Map>().map(Map<String, Object?>.from).toList();
+
+  Future<List<Map<String, Object?>>> legacyRoutines() async =>
+      ((await _dio.get<List<Object?>>('/api/v1/recurring-events')).data ?? const []).cast<Map>().map(Map<String, Object?>.from).toList();
+
   Future<Map<String, Object?>> walletSummary() => _cachedMap(
         'finance-overview',
         () async => (await _dio.get<Map<String, Object?>>('/api/v2/finance/overview')).data!,

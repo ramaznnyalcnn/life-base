@@ -46,6 +46,13 @@ class MainActivity : FlutterActivity() {
                         if (connected) WorkManager.getInstance(this).enqueue(CalendarSyncer.oneTimeRequest())
                         result.success(connected)
                     }
+                    "projectLocalEvents" -> {
+                        val items = org.json.JSONArray(call.argument<String>("items") ?: "[]")
+                        Thread {
+                            runCatching { CalendarSyncer(this).projectLocal(items) }
+                            runOnUiThread { result.success(true) }
+                        }.start()
+                    }
                     "deviceEvents" -> {
                         val from = call.argument<Number>("from")!!.toLong()
                         val to = call.argument<Number>("to")!!.toLong()

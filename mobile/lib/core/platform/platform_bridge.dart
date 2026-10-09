@@ -40,6 +40,10 @@ class PlatformBridge {
     return (account: raw['account'] as String?, permission: raw['permission'] == true);
   }
 
+  /// Writes the app's local events into the connected Google calendar.
+  Future<void> projectLocalEvents(String itemsJson) =>
+      _channel.invokeMethod<void>('projectLocalEvents', {'items': itemsJson});
+
   Future<List<Map<String, Object?>>> deviceEvents(DateTime from, DateTime to) async {
     final values = await _channel.invokeListMethod<Object?>('deviceEvents', {
           'from': from.millisecondsSinceEpoch,

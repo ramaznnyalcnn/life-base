@@ -17,19 +17,21 @@ import 'app_shell.dart';
 GoRouter buildRouter({String initialLocation = AppRoutes.today}) {
   final rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
   GoRoute tab(String path, Widget screen) => GoRoute(path: path, builder: (context, state) => screen);
+  // One per tab: tells the shell when a page is open on top of a module.
+  final stacks = List.generate(4, (_) => TabStackObserver());
   return GoRouter(
     navigatorKey: rootKey,
     initialLocation: initialLocation,
     routes: [
       StatefulShellRoute(
-        builder: (context, state, shell) => AppShell(shell: shell),
+        builder: (context, state, shell) => AppShell(shell: shell, stacks: stacks),
         navigatorContainerBuilder: (context, shell, children) =>
             FadeThroughBranches(currentIndex: shell.currentIndex, children: children),
         branches: [
-          StatefulShellBranch(routes: [tab(AppRoutes.today, const TodayScreen())]),
-          StatefulShellBranch(routes: [tab(AppRoutes.wallet, const WalletScreen())]),
-          StatefulShellBranch(routes: [tab(AppRoutes.calendar, const CalendarScreen())]),
-          StatefulShellBranch(routes: [tab(AppRoutes.meds, const MedsScreen())]),
+          StatefulShellBranch(observers: [stacks[0]], routes: [tab(AppRoutes.today, const TodayScreen())]),
+          StatefulShellBranch(observers: [stacks[1]], routes: [tab(AppRoutes.wallet, const WalletScreen())]),
+          StatefulShellBranch(observers: [stacks[2]], routes: [tab(AppRoutes.calendar, const CalendarScreen())]),
+          StatefulShellBranch(observers: [stacks[3]], routes: [tab(AppRoutes.meds, const MedsScreen())]),
         ],
       ),
       GoRoute(

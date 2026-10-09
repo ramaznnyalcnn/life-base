@@ -18,6 +18,7 @@ from app.models import Event, Reminder, ReminderChannel
 from app.schemas import EventCreate, EventUpdate, RecurringEventCreate, ReminderCreate
 from app.services.events import build_calendar_dashboard
 from app.services.recurring_events import create_recurring_event
+from tests.conftest import api_request
 
 
 def test_events_api_creates_event_with_default_reminders(db_session):
@@ -231,3 +232,20 @@ def test_event_routes_are_registered_on_app():
     assert "/api/v1/events" in paths
     assert "/api/v1/events/{event_id}" in paths
     assert "/api/v1/events/{event_id}/reminders" in paths
+
+
+def test_recurring_events_can_be_listed_for_device_import():
+    created = api_request("POST", "/api/v1/recurring-events", json={
+        "title": "Spor",
+        "weekdays": [0, 2],
+        "starts_on": "2026-10-05",
+        "start_time": "18:00:00",
+        "end_time": "19:00:00",
+        "interval_weeks": 2,
+    })
+    assert created.status_code == 201, created.text
+
+    listed = api_request("GET", "/api/v1/recurring-events")
+
+    assert listed.status_code == 200
+    assert listed.json() == [created.json()]

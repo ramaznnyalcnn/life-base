@@ -120,6 +120,9 @@ class CalendarSyncer(private val context: Context) {
             today.plusDays(152) to today.plusDays(180),
         )
         val items = ranges.flatMap { (from, to) -> fetch(from, to) ?: return false }
+            // Events and routines live on the device now; the app projects and
+            // reminds them itself, so the server copies would duplicate them.
+            .filter { it.optString("kind") !in localKinds }
         updateWidgetSnapshot(today, items)
         ReminderScheduler(context).reconcile(items)
         val calendarId = vault.calendarId() ?: return true
@@ -131,8 +134,64 @@ class CalendarSyncer(private val context: Context) {
             upsert(calendarId, sourceKey, item)
             seen += sourceKey
         }
-        removeMissing(seen)
+        removeMissing(seen, prefix = serverPrefix)
         return true
+    }
+
+    /**
+     * Mirrors the app's local events into the connected Google calendar: one
+     * provider event per LifeBase event, repeating ones as RRULE + EXDATE.
+     * No reminders are copied; LifeBase notifies itself.
+     */
+    fun projectLocal(items: JSONArray) {
+        val calendarId = vault.calendarId() ?: return
+        if (!hasPermission()) return
+        val seen = mutableSetOf<String>()
+        repeat(items.length()) { index ->
+            val item = items.getJSONObject(index)
+            val key = item.getString("id")
+            upsertLocal(calendarId, key, item)
+            seen += key
+        }
+        removeMissing(seen, prefix = localPrefix)
+    }
+
+    private fun upsertLocal(calendarId: Long, key: String, item: org.json.JSONObject) {
+        val mappingKey = "calendar_mapping:$key"
+        val existing = vault.mappings().getLong(mappingKey, -1)
+        val allDay = item.optBoolean("all_day")
+        val start = ZonedDateTime.parse(item.getString("starts_at")).toInstant().toEpochMilli()
+        val values = ContentValues().apply {
+            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+            put(CalendarContract.Events.TITLE, item.getString("title"))
+            put(CalendarContract.Events.DESCRIPTION, item.optString("notes"))
+            put(CalendarContract.Events.DTSTART, start)
+            // The provider requires UTC for all-day events.
+            put(CalendarContract.Events.EVENT_TIMEZONE, if (allDay) "UTC" else ZoneId.systemDefault().id)
+            put(CalendarContract.Events.ALL_DAY, if (allDay) 1 else 0)
+            put(CalendarContract.Events.HAS_ALARM, 0)
+            put(CalendarContract.Events.CUSTOM_APP_PACKAGE, context.packageName)
+            put(CalendarContract.Events.CUSTOM_APP_URI, "lifebase://calendar/$key")
+            val rrule = item.optString("rrule")
+            if (rrule.isNotEmpty()) {
+                // Repeating events carry a duration instead of an end time.
+                put(CalendarContract.Events.RRULE, rrule)
+                put(CalendarContract.Events.DURATION, item.getString("duration"))
+                putNull(CalendarContract.Events.DTEND)
+                put(CalendarContract.Events.EXDATE, item.optString("exdate").ifEmpty { null })
+            } else {
+                put(CalendarContract.Events.DTEND, ZonedDateTime.parse(item.getString("ends_at")).toInstant().toEpochMilli())
+                putNull(CalendarContract.Events.RRULE)
+                putNull(CalendarContract.Events.DURATION)
+                putNull(CalendarContract.Events.EXDATE)
+            }
+        }
+        val updated = existing >= 0 &&
+            context.contentResolver.update(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existing), values, null, null) > 0
+        if (!updated) {
+            val eventId = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)?.lastPathSegment?.toLongOrNull() ?: return
+            vault.mappings().edit().putLong(mappingKey, eventId).apply()
+        }
     }
 
     fun clearProjectedEvents() {
@@ -230,9 +289,10 @@ class CalendarSyncer(private val context: Context) {
         vault.saveWidget(snapshot.toString())
     }
 
-    private fun removeMissing(seen: Set<String>) {
+    /** Deletes projected events of one origin ([prefix]) that are no longer wanted. */
+    private fun removeMissing(seen: Set<String>, prefix: (String) -> Boolean) {
         val editor = vault.mappings().edit()
-        vault.mappings().all.filterKeys { it.startsWith("calendar_mapping:") }.forEach { (key, value) ->
+        vault.mappings().all.filterKeys { it.startsWith("calendar_mapping:") && prefix(it.removePrefix("calendar_mapping:")) }.forEach { (key, value) ->
             if (key.removePrefix("calendar_mapping:") !in seen) {
                 (value as? Long)?.let { context.contentResolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, it), null, null) }
                 editor.remove(key)
@@ -247,6 +307,9 @@ class CalendarSyncer(private val context: Context) {
 
     companion object {
         private const val googleType = "com.google"
+        private val localKinds = setOf("event", "routine")
+        private val localPrefix: (String) -> Boolean = { it.startsWith("local:") }
+        private val serverPrefix: (String) -> Boolean = { !it.startsWith("local:") }
 
         fun oneTimeRequest(): OneTimeWorkRequest = OneTimeWorkRequestBuilder<SyncWorker>().addTag(SyncWorker.workTag).build()
     }

@@ -3,6 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/calendar/google_projection.dart';
+import '../../../core/calendar/reminder_defaults.dart';
+import '../../../core/calendar/reminder_picker.dart';
+import '../../../core/notifications/reminder_sync.dart';
 import '../../../core/design_system/appearance.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
@@ -29,6 +33,9 @@ class AccountScreen extends ConsumerWidget {
         const SizedBox(height: 24),
         const _SectionLabel('Görünüm'),
         const _AppearanceCard(),
+        const SizedBox(height: 24),
+        const _SectionLabel('Bildirimler'),
+        const Card(child: Column(children: [_DefaultRemindersTile(), Divider(height: 1), _ExactAlarmTile()])),
         const SizedBox(height: 24),
         const _SectionLabel('Eşitleme'),
         Card(child: Column(children: [
@@ -324,6 +331,8 @@ class _GoogleCalendarTile extends ConsumerWidget {
     final connected = await bridge.connectGoogle(account);
     ref.invalidate(googleCalendarStatusProvider);
     ref.invalidate(deviceEventsProvider);
+    // Write the local events into the newly connected calendar right away.
+    ref.invalidate(googleProjectionProvider);
     messenger.showSnackBar(SnackBar(
       content: Text(connected ? '$account bağlandı.' : 'Bu hesapta yazılabilir takvim bulunamadı.'),
     ));
@@ -361,6 +370,78 @@ class _LocalBackupTile extends ConsumerWidget {
               ? const Icon(Icons.check_circle_rounded)
               : Badge(label: Text('$pending')),
       onTap: () => ref.read(syncControllerProvider.notifier).syncNow(),
+    );
+  }
+}
+
+/// The reminder set new calendar events start with.
+class _DefaultRemindersTile extends ConsumerWidget {
+  const _DefaultRemindersTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reminders = ref.watch(defaultRemindersProvider);
+    return ListTile(
+      minTileHeight: 64,
+      leading: const Icon(Icons.notifications_active_outlined),
+      title: const Text('Varsayılan hatırlatmalar'),
+      subtitle: Text(reminders.isEmpty ? 'Yok' : reminders.map(reminderLabel).join(', ')),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (_) => const _DefaultRemindersSheet(),
+      ),
+    );
+  }
+}
+
+class _DefaultRemindersSheet extends ConsumerWidget {
+  const _DefaultRemindersSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Varsayılan hatırlatmalar', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text('Yeni etkinlikler bu hatırlatmalarla başlar.', style: TextStyle(color: LbTokens.of(context).muted)),
+            const SizedBox(height: 16),
+            ReminderListEditor(
+              reminders: ref.watch(defaultRemindersProvider),
+              allowFixedTime: false,
+              onChanged: ref.read(defaultRemindersProvider.notifier).set,
+            ),
+          ]),
+        ),
+      );
+}
+
+/// Without the exact-alarm grant Android may deliver reminders late.
+class _ExactAlarmTile extends ConsumerWidget {
+  const _ExactAlarmTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final port = ref.watch(notificationPortProvider).value;
+    if (port == null) return const SizedBox.shrink();
+    final exact = port.exactAlarms;
+    return ListTile(
+      minTileHeight: 64,
+      leading: Icon(exact ? Icons.alarm_on_rounded : Icons.alarm_rounded),
+      title: const Text('Tam zamanlı hatırlatma'),
+      subtitle: Text(exact ? 'Açık · hatırlatmalar dakikasında gelir' : 'Kapalı · birkaç dakika gecikebilir'),
+      trailing: exact ? const Icon(Icons.check_circle_rounded) : const Icon(Icons.chevron_right),
+      onTap: exact
+          ? null
+          : () async {
+              await port.requestExactAlarms();
+              // Re-read the grant and re-plan reminders with the new mode.
+              ref.invalidate(notificationPortProvider);
+              ref.invalidate(calendarReminderSyncProvider);
+            },
     );
   }
 }

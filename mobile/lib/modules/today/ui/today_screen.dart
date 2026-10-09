@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/calendar/calendar_event.dart';
+import '../../../core/calendar/calendar_store.dart';
 import '../../../core/models/agenda.dart';
 import '../../../core/platform/device_calendar.dart';
+import '../../../core/routes.dart';
 import '../data/today_controller.dart';
 
 class TodayScreen extends ConsumerWidget {
@@ -17,6 +21,11 @@ class TodayScreen extends ConsumerWidget {
     final agenda = ref.watch(todayAgendaProvider);
     final today = DateUtils.dateOnly(DateTime.now());
     final google = ref.watch(deviceEventsProvider((from: today, to: today))).value ?? const <AgendaItem>[];
+    // Calendar events live on the device; Google and LifeBase events side by side.
+    final events = [
+      ...occurrencesIn(ref.watch(localEventsProvider).value ?? const [], today, today).map(occurrenceToAgendaItem),
+      ...google,
+    ];
     final t = LbTokens.of(context);
     return ModuleScaffold(
       module: LbModule.today,
@@ -36,7 +45,7 @@ class TodayScreen extends ConsumerWidget {
             Center(child: Text('Gündem alınamadı. Yenilemek için aşağı çek.', style: TextStyle(color: t.muted))),
           ]),
           data: (data) {
-            final timeline = mergeTimeline(data.timeline, google);
+            final timeline = mergeTimeline(data.timeline.where(_fromServer).toList(), events);
             return ListView(
             padding: moduleListPadding(context),
             children: [
@@ -48,7 +57,7 @@ class TodayScreen extends ConsumerWidget {
                     child: Chip(avatar: const Icon(Icons.cloud_off_rounded, size: 16), label: const Text('Çevrimdışı')),
                   ),
                 ),
-              _NextCard(item: nextItem(data.nextItem, google, DateTime.now())),
+              _NextCard(item: nextItem(data.nextItem != null && _fromServer(data.nextItem!) ? data.nextItem : null, events, DateTime.now())),
               if (data.overdue.isNotEmpty) ...[
                 const SizedBox(height: 28),
                 _SectionTitle('Gecikenler', count: data.overdue.length, color: t.danger),
@@ -72,13 +81,29 @@ class TodayScreen extends ConsumerWidget {
   }
 }
 
-/// Today's server timeline plus Google events: all-day first, then by time.
+/// Server agenda kinds that are not calendar events (those are local now).
+bool _fromServer(AgendaItem item) => item.kind != 'event' && item.kind != 'routine';
+
+/// A local calendar occurrence shown in Bugün's timeline.
+AgendaItem occurrenceToAgendaItem(EventOccurrence occurrence) => AgendaItem(
+      id: 'local:${occurrence.key}',
+      sourceId: occurrence.event.id,
+      kind: 'event',
+      title: occurrence.event.title,
+      day: DateTime(occurrence.start.year, occurrence.start.month, occurrence.start.day),
+      startsAt: occurrence.event.allDay ? null : occurrence.start,
+      endsAt: occurrence.event.allDay ? null : occurrence.end,
+      isAllDay: occurrence.event.allDay,
+      isImportant: occurrence.event.important,
+    );
+
+/// Today's server timeline plus calendar events: all-day first, then by time.
 List<AgendaItem> mergeTimeline(List<AgendaItem> server, List<AgendaItem> google) {
   int key(AgendaItem item) => item.startsAt == null ? -1 : item.startsAt!.toLocal().hour * 60 + item.startsAt!.toLocal().minute;
   return [...server, ...google]..sort((a, b) => key(a).compareTo(key(b)));
 }
 
-/// The server's next item, unless a Google event starts sooner.
+/// The server's next item, unless a calendar event starts sooner.
 AgendaItem? nextItem(AgendaItem? server, List<AgendaItem> google, DateTime now) {
   final upcoming = google.where((item) => item.startsAt != null && item.startsAt!.isAfter(now)).toList()
     ..sort((a, b) => a.startsAt!.compareTo(b.startsAt!));
@@ -153,6 +178,7 @@ class _AgendaTile extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
+        onTap: item.kind == 'event' || item.kind == googleKind ? () => context.go(AppRoutes.calendar) : null,
         onLongPress: item.kind == 'medication' && !completed
             ? () => ref.read(quickActionProvider).snooze(item, 10)
             : null,
