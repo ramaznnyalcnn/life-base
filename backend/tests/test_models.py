@@ -61,6 +61,8 @@ def test_metadata_can_create_schema():
         "recurring_events",
         "reminders",
         "scheduled_payments",
+        "sync_cursors",
+        "sync_documents",
         "tasks",
         "transfers",
         "transactions",

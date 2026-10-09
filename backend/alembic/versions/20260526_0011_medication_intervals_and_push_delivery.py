@@ -28,7 +28,13 @@ def upgrade() -> None:
         sa.Column("sent_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(["push_subscription_id"], ["push_subscriptions.id"], name="fk_medication_push_deliveries_push_subscription_id_push_subscriptions"),
+        # Postgres truncates identifiers to 63 chars; spelling out the truncated
+        # name keeps fresh installs identical to existing databases.
+        sa.ForeignKeyConstraint(
+            ["push_subscription_id"],
+            ["push_subscriptions.id"],
+            name="fk_medication_push_deliveries_push_subscription_id_push_subscri",
+        ),
         sa.ForeignKeyConstraint(["medication_id"], ["medications.id"], name="fk_medication_push_deliveries_medication_id_medications"),
         sa.UniqueConstraint(
             "push_subscription_id",

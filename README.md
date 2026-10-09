@@ -76,6 +76,8 @@ See [Android architecture](docs/mobile-android.md) for device setup, offline beh
 
 ```bash
 cd backend && pytest -q
+# Row-locking checks need a migrated Postgres:
+LIFEBASE_TEST_POSTGRES_URL=postgresql+psycopg://... pytest -q tests/test_postgres_concurrency.py
 cd frontend && npm run test
 cd mobile && flutter test && flutter analyze
 ```

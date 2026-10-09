@@ -10,6 +10,7 @@ from app.api.routes.medications import router as medications_router
 from app.api.routes.notifications import router as notifications_router
 from app.api.routes.operations_v2 import router as operations_v2_router
 from app.api.routes.recurring_events import router as recurring_events_router
+from app.api.routes.sync_v3 import router as sync_v3_router
 from app.api.routes.transfers import router as transfers_router
 from app.api.routes.transactions import router as transactions_router
 from app.api.routes.wallet import router as wallet_router
@@ -28,4 +29,5 @@ __all__ = [
     "wallet_router",
     "notifications_router",
     "operations_v2_router",
+    "sync_v3_router",
 ]

@@ -20,6 +20,20 @@ def test_alembic_files_exist():
     assert (base / "versions" / "20260526_0011_medication_intervals_and_push_delivery.py").exists()
     assert (base / "versions" / "20260915_0012_operation_core.py").exists()
     assert (base / "versions" / "20260915_0013_reminder_sources.py").exists()
+    assert (base / "versions" / "20261009_0015_sync_documents.py").exists()
+
+
+def test_migration_constraint_names_fit_postgres_identifier_limit():
+    # Postgres caps identifiers at 63 chars; SQLAlchemy 2 refuses longer names.
+    import re
+
+    names = [
+        name
+        for path in (REPO_ROOT / "backend" / "alembic" / "versions").glob("*.py")
+        for name in re.findall(r'name="([^"]+)"', path.read_text())
+    ]
+    assert names
+    assert [name for name in names if len(name) > 63] == []
 
 
 def test_initial_migration_contains_core_tables():
