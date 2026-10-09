@@ -45,24 +45,52 @@ path. `test/architecture_test.dart` enforces this.
 
 ## Offline and conflict behavior
 
-The last successful daily agenda is cached in Drift. Every mutation is stored
-first as an operation envelope with a UUID, then sent FIFO:
+**Calendar and medications are local-first.** They live in Drift tables
+(`local_events`, `local_medications`, `local_dose_logs`) and are backed up to
+`/api/v3/sync` as opaque JSON documents:
 
-- network failure or HTTP 5xx: keep pending and retry;
-- HTTP 401: pause the queue until the user signs in again;
-- HTTP 409: retain the server snapshot for a user conflict decision;
-- other validation errors: mark failed instead of retrying forever.
+- every write stamps the row (milliseconds, always moving forward) and marks
+  it dirty; the sync engine pushes dirty rows, then pulls by cursor;
+- the newest write wins; deletions are final and never resurrected by a stale
+  device; an edit made while a push is in flight stays dirty;
+- sync runs at start, when the network returns, on resume and two seconds
+  after an edit. Signing out clears this account's local rows (after warning
+  about anything not yet backed up).
 
-Planning completion is reflected after the next cached agenda refresh. Finance
-operations never alter a local balance before the server confirms them.
+**Other data (tasks, wallet, server agenda)** still uses the operation queue:
+every mutation is stored first as an operation envelope with a UUID, then sent
+FIFO (5xx/network: retry; 401: pause; 409: keep the server snapshot for a
+decision; other 4xx: mark failed).
+
+## Calendar
+
+- Month grid with colour dots, week strip and 24-hour day timeline; LifeBase
+  and Google events side by side (filterable).
+- Events: title, notes, all-day, start/end, colour, importance, repetition
+  (daily/weekly with weekdays/monthly/yearly, every N, until a date) and any
+  number of reminders (offset or fixed time, normal or high priority). New
+  events start with the default reminder set from settings.
+- Editing or deleting a repeating event asks: only this, this and following,
+  or the whole series.
+- Reminders are scheduled locally with `flutter_local_notifications` for the
+  next 14 days (max 300) and re-planned whenever events change or the app
+  resumes; they fire offline and survive reboots. Without the exact-alarm
+  grant (settings) Android may deliver them a few minutes late.
+- Server-side events and routines are imported on-device once.
 
 ## Android integration
 
-The user chooses a writable Google or device calendar. `CalendarSyncer` projects
-the `-30/+180` day agenda in API-safe chunks, keeps stable source mappings,
-prefixes completed records with `✓`, copies reminders, and removes deleted
-records. WorkManager runs every 15 minutes and immediately after calendar
-selection or a widget action.
+**Google calendar, both ways, own account only.** Settings connect the
+phone's Google account. LifeBase reads events from calendars that account
+owns (holiday, birthday, shared/group calendars and other accounts are
+excluded) and writes its own events into the account's primary calendar: one
+provider event per LifeBase event, repeating ones as `RRULE`/`EXDATE`, without
+copying reminders (LifeBase notifies itself). Projected events are never read
+back.
+
+`CalendarSyncer` still projects the remaining server agenda kinds (tasks,
+medication doses, payments) and feeds the widget; WorkManager runs it every 15
+minutes and after a widget action.
 
 The Glance widget scales with launcher space and shows the next item and open
 count. Its quick button completes the first task or records the first medication

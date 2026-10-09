@@ -75,13 +75,14 @@ private release signing key before producing a distributable release build.
 
 - **Bugün:** next item, overdue work, tasks, and hourly timeline.
 - **Cüzdan:** overview and account cards; its own add flow.
-- **Takvim:** day/week/month views and domain filters; its own add flow.
+- **Takvim:** local-first events with month/week/day views, notes, repetition,
+  any number of offline reminders, and two-way sync with the user's own Google
+  calendar.
 - **İlaç:** upcoming doses and medication program; its own add flow.
 - **Hesap ve ayarlar** (profile button): colour scheme, light/dark mode,
   reduce motion, queue/conflict status, writable calendar, and logout.
 
-Module add pages are placeholders until their phase lands (Takvim → İlaç →
-Cüzdan).
+İlaç and Cüzdan add pages are placeholders until their phases land.
 
 The app caches read surfaces with Drift and queues UUID operations FIFO. Native
 WorkManager refreshes the selected Android calendar, Glance widget, and local
