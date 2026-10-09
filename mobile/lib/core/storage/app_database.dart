@@ -3,6 +3,9 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 import '../models/operation.dart';
 import '../sync/queue_policy.dart';
+import 'local_tables.dart';
+
+export 'local_tables.dart';
 
 part 'app_database.g.dart';
 
@@ -28,13 +31,47 @@ class QueuedOperations extends Table {
   Set<Column<Object>> get primaryKey => {requestId};
 }
 
-@DriftDatabase(tables: [CachedDocuments, QueuedOperations])
+@DriftDatabase(tables: [
+  CachedDocuments,
+  QueuedOperations,
+  LocalEvents,
+  LocalMedications,
+  LocalDoseLogs,
+  SyncStates,
+])
 class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor})
       : super(executor ?? driftDatabase(name: 'lifebase'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (migrator, from, to) async {
+          if (from < 2) {
+            // Local-first calendar and medication data.
+            await migrator.createTable(localEvents);
+            await migrator.createTable(localMedications);
+            await migrator.createTable(localDoseLogs);
+            await migrator.createTable(syncStates);
+          }
+        },
+      );
+
+  Future<String?> syncState(String key) async =>
+      (await (select(syncStates)..where((row) => row.key.equals(key))).getSingleOrNull())?.value;
+
+  Future<void> setSyncState(String key, String value) =>
+      into(syncStates).insertOnConflictUpdate(SyncStatesCompanion.insert(key: key, value: value));
+
+  /// Removes all local-first data, e.g. when signing out.
+  Future<void> clearLocalData() => transaction(() async {
+        await delete(localEvents).go();
+        await delete(localMedications).go();
+        await delete(localDoseLogs).go();
+        await delete(syncStates).go();
+      });
 
   Future<void> cache(String key, String payload) => into(cachedDocuments)
       .insertOnConflictUpdate(CachedDocumentsCompanion.insert(

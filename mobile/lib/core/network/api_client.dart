@@ -104,6 +104,12 @@ class ApiClient {
     return response.data!;
   }
 
+  Future<Map<String, Object?>> syncPush(List<Map<String, Object?>> changes) async =>
+      (await _dio.post<Map<String, Object?>>('/api/v3/sync/push', data: {'changes': changes})).data!;
+
+  Future<Map<String, Object?>> syncPull(int since) async =>
+      (await _dio.get<Map<String, Object?>>('/api/v3/sync/pull', queryParameters: {'since': since})).data!;
+
   Future<Map<String, Object?>> walletSummary() => _cachedMap(
         'finance-overview',
         () async => (await _dio.get<Map<String, Object?>>('/api/v2/finance/overview')).data!,

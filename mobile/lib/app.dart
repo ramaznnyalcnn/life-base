@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/design_system/app_theme.dart';
 import 'core/design_system/appearance.dart';
+import 'core/sync/sync_controller.dart';
 import 'modules/account/data/session_controller.dart';
 import 'modules/account/ui/onboarding_screen.dart';
 import 'shell/router.dart';
@@ -25,6 +26,9 @@ class LifeBaseApp extends ConsumerWidget {
     // the whole app frame instead of redirecting inside it.
     final ready = session.value?.ready ?? false;
     if (ready) {
+      // Keeps local-first data syncing for as long as the session lasts,
+      // without rebuilding the app on every sync status change.
+      ref.listen(syncControllerProvider, (_, _) {});
       return MaterialApp.router(
         title: 'LifeBase',
         debugShowCheckedModeBanner: false,

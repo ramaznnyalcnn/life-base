@@ -100,6 +100,8 @@ class SessionController extends AsyncNotifier<SessionState> {
     await ref.read(credentialStoreProvider).clearToken();
     await ref.read(platformBridgeProvider).clearSession();
     await ref.read(databaseProvider).clearCache();
+    // Local-first data belongs to this account; the server keeps the backup.
+    await ref.read(databaseProvider).clearLocalData();
     ref.read(connectionProvider.notifier).state = null;
     state = const AsyncData(SessionState.signedOut());
   }

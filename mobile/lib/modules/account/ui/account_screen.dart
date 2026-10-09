@@ -8,6 +8,7 @@ import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
 import '../../../core/platform/device_calendar.dart';
 import '../../../core/providers.dart';
+import '../../../core/sync/sync_controller.dart';
 import '../data/session_controller.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -33,6 +34,8 @@ class AccountScreen extends ConsumerWidget {
         Card(child: Column(children: [
           const _GoogleCalendarTile(),
           const Divider(height: 1),
+          const _LocalBackupTile(),
+          const Divider(height: 1),
           ListTile(
             minTileHeight: 64,
             leading: const Icon(Icons.sync_rounded),
@@ -56,14 +59,36 @@ class AccountScreen extends ConsumerWidget {
         ])),
         const SizedBox(height: 24),
         OutlinedButton.icon(
-          onPressed: () async {
-            await ref.read(sessionControllerProvider.notifier).logout();
-          },
+          onPressed: () => _logout(context, ref),
           icon: const Icon(Icons.logout_rounded),
           label: const Text('Çıkış yap'),
         ),
       ]),
     );
+  }
+
+  /// Signing out removes this account's local data, so unsynced changes get
+  /// one more sync attempt and then an explicit warning.
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    if ((ref.read(localPendingCountProvider).value ?? 0) > 0) {
+      await ref.read(syncControllerProvider.notifier).syncNow();
+    }
+    final pending = await ref.read(localPendingCountProvider.future);
+    if (pending > 0 && context.mounted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Yedeklenmemiş kayıtlar var'),
+          content: Text('$pending kayıt henüz sunucuya yedeklenmedi. Çıkış yaparsan bu cihazdan silinecek.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Vazgeç')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Yine de çık')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    await ref.read(sessionControllerProvider.notifier).logout();
   }
 
   Future<void> _showConflicts(BuildContext context, WidgetRef ref) async {
@@ -302,5 +327,40 @@ class _GoogleCalendarTile extends ConsumerWidget {
     messenger.showSnackBar(SnackBar(
       content: Text(connected ? '$account bağlandı.' : 'Bu hesapta yazılabilir takvim bulunamadı.'),
     ));
+  }
+}
+
+/// Backup state of local-first data (calendar, medications, doses).
+class _LocalBackupTile extends ConsumerWidget {
+  const _LocalBackupTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(syncControllerProvider);
+    final pending = ref.watch(localPendingCountProvider).value ?? 0;
+    final last = status.lastSyncedAt;
+    final subtitle = switch (status.phase) {
+      SyncPhase.syncing => 'Eşitleniyor…',
+      SyncPhase.offline => 'Çevrimdışı · $pending kayıt bekliyor',
+      SyncPhase.unauthorized => 'Oturum yenilenmeli',
+      SyncPhase.failed when status.statusCode == 404 => 'Sunucu bu sürümü desteklemiyor · güncellenmeli',
+      SyncPhase.failed => 'Sunucu isteği reddetti (${status.statusCode})',
+      SyncPhase.idle when pending > 0 => '$pending kayıt bekliyor',
+      SyncPhase.idle when last != null =>
+        'Yedeklendi · ${last.hour.toString().padLeft(2, '0')}:${last.minute.toString().padLeft(2, '0')}',
+      SyncPhase.idle => 'Henüz eşitlenmedi',
+    };
+    return ListTile(
+      minTileHeight: 64,
+      leading: const Icon(Icons.cloud_sync_rounded),
+      title: const Text('Takvim ve ilaç yedeği'),
+      subtitle: Text(subtitle),
+      trailing: status.phase == SyncPhase.syncing
+          ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          : pending == 0 && status.phase == SyncPhase.idle
+              ? const Icon(Icons.check_circle_rounded)
+              : Badge(label: Text('$pending')),
+      onTap: () => ref.read(syncControllerProvider.notifier).syncNow(),
+    );
   }
 }
