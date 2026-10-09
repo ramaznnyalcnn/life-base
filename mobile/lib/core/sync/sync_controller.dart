@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
 import '../storage/sync_collections.dart';
+import '../wallet/wallet_store.dart';
+import '../wallet/wallet_sync.dart';
 import 'api_sync_transport.dart';
 import 'local_sync.dart';
 
@@ -26,15 +28,16 @@ final localSyncEngineProvider = Provider<LocalSyncEngine?>((ref) {
   return LocalSyncEngine(database: db, transport: ApiSyncTransport(api), collections: localSyncCollections(db));
 });
 
-/// Rows (events, medications, dose logs) not yet backed up to the server.
+/// Rows (events, medications, dose logs, wallet writes) not yet backed up to the server.
 final localPendingCountProvider = StreamProvider<int>((ref) {
   final db = ref.watch(databaseProvider);
   return db
       .customSelect(
         'SELECT (SELECT COUNT(*) FROM local_events WHERE dirty = 1)'
         ' + (SELECT COUNT(*) FROM local_medications WHERE dirty = 1)'
-        ' + (SELECT COUNT(*) FROM local_dose_logs WHERE dirty = 1) AS c',
-        readsFrom: {db.localEvents, db.localMedications, db.localDoseLogs},
+        ' + (SELECT COUNT(*) FROM local_dose_logs WHERE dirty = 1)'
+        " + (SELECT COUNT(*) FROM wallet_outbox WHERE state != 'sent') AS c",
+        readsFrom: {db.localEvents, db.localMedications, db.localDoseLogs, db.walletOutbox},
       )
       .watchSingle()
       .map((row) => row.read<int>('c'));
@@ -72,7 +75,17 @@ class SyncController extends Notifier<SyncStatus> {
     final engine = ref.read(localSyncEngineProvider);
     if (engine == null || !ref.mounted) return null;
     state = SyncStatus(phase: SyncPhase.syncing, lastSyncedAt: state.lastSyncedAt);
-    final outcome = await engine.run();
+    var outcome = await engine.run();
+    // The wallet is server-authoritative: send its queued writes, then pull.
+    final wallet = ref.read(walletSyncEngineProvider);
+    if (wallet != null && outcome.kind == SyncOutcomeKind.synced) {
+      outcome = switch (await wallet.run()) {
+        WalletSyncResult.synced => outcome,
+        WalletSyncResult.offline => const SyncOutcome(SyncOutcomeKind.offline),
+        WalletSyncResult.unauthorized => const SyncOutcome(SyncOutcomeKind.unauthorized),
+        WalletSyncResult.failed => const SyncOutcome(SyncOutcomeKind.failed),
+      };
+    }
     if (!ref.mounted) return outcome;
     state = switch (outcome.kind) {
       SyncOutcomeKind.synced => SyncStatus(lastSyncedAt: DateTime.now()),

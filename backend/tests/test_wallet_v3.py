@@ -100,6 +100,7 @@ def test_editing_moves_the_effect_and_stale_versions_get_the_current_record(setu
     stale = expense("t1", "bank", "10", expected_version=1)
 
     assert moved.status_code == 200
+    assert moved.json()["entities"] == [{"kind": "transaction", "id": "t1", "version": 2}]
     assert stale.status_code == 409
     current = stale.json()["detail"]["current"]
     assert current["account_id"] == "cash" and current["amount"] == "30.00" and current["version"] == 2

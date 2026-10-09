@@ -78,3 +78,120 @@ class SyncStates extends Table {
   @override
   Set<Column<Object>> get primaryKey => {key};
 }
+
+// Wallet: a mirror of the server-authoritative wallet (pull), plus an outbox
+// of writes not yet confirmed. Money is integer kuruş.
+
+@DataClassName('WalletAccountRow')
+class WalletAccounts extends Table {
+  TextColumn get id => text()();
+  IntColumn get serverId => integer().nullable()();
+  IntColumn get ownerId => integer()();
+  TextColumn get name => text()();
+
+  /// cash, bank, credit_card
+  TextColumn get type => text()();
+  TextColumn get bank => text().nullable()();
+  TextColumn get currency => text().withDefault(const Constant('TRY'))();
+
+  /// Cards: minus the debt (available = limit + balance).
+  IntColumn get balanceCents => integer()();
+  IntColumn get openingCents => integer().withDefault(const Constant(0))();
+  IntColumn get limitCents => integer().nullable()();
+  IntColumn get statementDay => integer().nullable()();
+  IntColumn get dueDay => integer().nullable()();
+
+  /// personal, shared
+  TextColumn get visibility => text().withDefault(const Constant('personal'))();
+  TextColumn get last4 => text().nullable()();
+  TextColumn get network => text().nullable()();
+  TextColumn get color => text().nullable()();
+  TextColumn get iban => text().nullable()();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  IntColumn get version => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DataClassName('WalletTransactionRow')
+class WalletTransactions extends Table {
+  TextColumn get id => text()();
+  TextColumn get accountId => text()();
+
+  /// expense, income, payment
+  TextColumn get kind => text()();
+  IntColumn get categoryId => integer().nullable()();
+  TextColumn get category => text().nullable()();
+  IntColumn get amountCents => integer()();
+  DateTimeColumn get occurredAt => dateTime()();
+  DateTimeColumn get statementMonth => dateTime().nullable()();
+  TextColumn get note => text().nullable()();
+  IntColumn get createdBy => integer()();
+  TextColumn get installmentGroup => text().nullable()();
+  IntColumn get installmentIndex => integer().nullable()();
+  IntColumn get installmentCount => integer().nullable()();
+  IntColumn get version => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DataClassName('WalletTransferRow')
+class WalletTransfers extends Table {
+  TextColumn get id => text()();
+  TextColumn get fromAccountId => text()();
+  TextColumn get toAccountId => text()();
+  IntColumn get amountCents => integer()();
+  DateTimeColumn get occurredAt => dateTime()();
+  TextColumn get note => text().nullable()();
+  IntColumn get createdBy => integer()();
+  IntColumn get version => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Manual "paid" override of a card statement; id `<accountId>:<yyyy-MM>`.
+@DataClassName('WalletMarkRow')
+class WalletStatementMarks extends Table {
+  TextColumn get id => text()();
+  TextColumn get accountId => text()();
+  DateTimeColumn get month => dateTime()();
+  BoolColumn get paid => boolean()();
+  IntColumn get version => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Wallet writes waiting for the server, oldest first. Each names the
+/// accounts it touches: a write waits for earlier writes on the same account,
+/// and a conflict or failure holds only those accounts.
+@DataClassName('WalletOutboxRow')
+class WalletOutbox extends Table {
+  TextColumn get requestId => text()();
+
+  /// Queue order (timestamps are only second-precise).
+  IntColumn get seq => integer()();
+  TextColumn get operationKey => text()();
+
+  /// The full operation envelope (request_id, operation_key, values).
+  TextColumn get payload => text()();
+
+  /// Comma-separated account ids.
+  TextColumn get accountKeys => text()();
+
+  /// pending, sent (accepted, waiting for the pull that includes it),
+  /// conflict, failed
+  TextColumn get state => text().withDefault(const Constant('pending'))();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  DateTimeColumn get nextAttemptAt => dateTime().nullable()();
+
+  /// 409: the server's current record; failed: the error message.
+  TextColumn get detail => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {requestId};
+}

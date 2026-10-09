@@ -38,13 +38,18 @@ class QueuedOperations extends Table {
   LocalMedications,
   LocalDoseLogs,
   SyncStates,
+  WalletAccounts,
+  WalletTransactions,
+  WalletTransfers,
+  WalletStatementMarks,
+  WalletOutbox,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor})
       : super(executor ?? driftDatabase(name: 'lifebase'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -55,6 +60,14 @@ class AppDatabase extends _$AppDatabase {
             await migrator.createTable(localMedications);
             await migrator.createTable(localDoseLogs);
             await migrator.createTable(syncStates);
+          }
+          if (from < 3) {
+            // Wallet mirror and outbox.
+            await migrator.createTable(walletAccounts);
+            await migrator.createTable(walletTransactions);
+            await migrator.createTable(walletTransfers);
+            await migrator.createTable(walletStatementMarks);
+            await migrator.createTable(walletOutbox);
           }
         },
       );
@@ -71,6 +84,11 @@ class AppDatabase extends _$AppDatabase {
         await delete(localMedications).go();
         await delete(localDoseLogs).go();
         await delete(syncStates).go();
+        await delete(walletAccounts).go();
+        await delete(walletTransactions).go();
+        await delete(walletTransfers).go();
+        await delete(walletStatementMarks).go();
+        await delete(walletOutbox).go();
       });
 
   Future<void> cache(String key, String payload) => into(cachedDocuments)

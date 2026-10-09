@@ -104,6 +104,26 @@ class ApiClient {
     return response.data!;
   }
 
+  /// A raw operation envelope (wallet outbox).
+  Future<Map<String, Object?>> executeEnvelope(Map<String, Object?> envelope) async =>
+      (await _dio.post<Map<String, Object?>>('/api/v2/operations/execute', data: envelope)).data!;
+
+  Future<Map<String, Object?>> walletPull(int since, String? scope) async => (await _dio.get<Map<String, Object?>>(
+        '/api/v3/wallet/pull',
+        queryParameters: {'since': since, 'scope': ?scope},
+      ))
+          .data!;
+
+  Future<Map<String, Object?>> household() async => (await _dio.get<Map<String, Object?>>('/api/v3/household')).data!;
+
+  Future<Map<String, Object?>> createHouseholdInvite() async =>
+      (await _dio.post<Map<String, Object?>>('/api/v3/household/invites')).data!;
+
+  Future<Map<String, Object?>> joinHousehold(String code) async =>
+      (await _dio.post<Map<String, Object?>>('/api/v3/household/join', data: {'code': code})).data!;
+
+  Future<Map<String, Object?>> leaveHousehold() async => (await _dio.post<Map<String, Object?>>('/api/v3/household/leave')).data!;
+
   Future<Map<String, Object?>> syncPush(List<Map<String, Object?>> changes) async =>
       (await _dio.post<Map<String, Object?>>('/api/v3/sync/push', data: {'changes': changes})).data!;
 

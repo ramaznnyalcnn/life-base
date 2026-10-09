@@ -6,7 +6,7 @@ import 'package:lifebase_mobile/core/storage/app_database.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 void main() {
-  test('a schema v1 database upgrades to v2 and keeps its cache and queue', () async {
+  test('a schema v1 database upgrades to the latest schema and keeps its cache and queue', () async {
     final dir = await Directory.systemTemp.createTemp('lifebase-migration');
     addTearDown(() => dir.delete(recursive: true));
     final file = File('${dir.path}/lifebase.sqlite');
@@ -30,6 +30,8 @@ void main() {
     expect(await db.cached('agenda'), '{}');
     expect((await db.pending()).single.requestId, 'r1');
     expect(await db.select(db.localEvents).get(), isEmpty);
+    expect(await db.select(db.walletOutbox).get(), isEmpty);
+    expect(await db.select(db.walletAccounts).get(), isEmpty);
     await db.setSyncState('sync.cursor', '7');
     expect(await db.syncState('sync.cursor'), '7');
   });

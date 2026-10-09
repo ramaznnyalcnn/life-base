@@ -154,7 +154,7 @@ class AccountSaveOperation(_WalletOperation):
         session.flush()
         apply_balance_deltas(session, deltas)
         record_change(session, owner_scope(session, account), "account", account.client_id)
-        return HandlerResult([EntityRef(kind="account", id=account.client_id)])
+        return HandlerResult([EntityRef(kind="account", id=account.client_id, version=account.entity_version)])
 
 
 class AccountArchiveOperation(_WalletOperation):
@@ -175,7 +175,7 @@ class AccountArchiveOperation(_WalletOperation):
         account.is_active = not payload.archived
         context.session.flush()
         record_change(context.session, owner_scope(context.session, account), "account", account.client_id)
-        return HandlerResult([EntityRef(kind="account", id=account.client_id)])
+        return HandlerResult([EntityRef(kind="account", id=account.client_id, version=account.entity_version)])
 
 
 # Transactions -----------------------------------------------------------
@@ -245,7 +245,7 @@ class TransactionSaveOperation(_WalletOperation):
             deltas[row.account_id] -= transaction_effect(row.type, row.amount)
         rows = {row.client_id: row for row in group}
         count = payload.installments
-        touched: list[str] = []
+        touched: list[Transaction] = []
         for index, amount in enumerate(split_amount(payload.amount, count), start=1):
             client_id = part_id(root, index)
             row = rows.pop(client_id, None)
@@ -268,17 +268,17 @@ class TransactionSaveOperation(_WalletOperation):
             row.installment_index = index if count > 1 else None
             row.installment_count = count if count > 1 else None
             deltas[target.id] += transaction_effect(kind, amount)
-            touched.append(client_id)
+            touched.append(row)
         scope = owner_scope(session, target)
         for leftover in rows.values():
             record_change(session, scope, "transaction", leftover.client_id, deleted=True)
             session.delete(leftover)
         session.flush()
         apply_balance_deltas(session, deltas)
-        for client_id in touched:
-            record_change(session, scope, "transaction", client_id)
+        for row in touched:
+            record_change(session, scope, "transaction", row.client_id)
         _note_accounts(context, accounts, deltas)
-        return HandlerResult([EntityRef(kind="transaction", id=client_id) for client_id in touched])
+        return HandlerResult([EntityRef(kind="transaction", id=row.client_id, version=row.entity_version) for row in touched])
 
 
 class TransactionDeleteOperation(_WalletOperation):
@@ -369,7 +369,7 @@ class TransferSaveOperation(_WalletOperation):
         apply_balance_deltas(session, deltas)
         record_change(session, owner_scope(session, source), "transfer", existing.client_id)
         _note_accounts(context, accounts, deltas)
-        return HandlerResult([EntityRef(kind="transfer", id=existing.client_id)])
+        return HandlerResult([EntityRef(kind="transfer", id=existing.client_id, version=existing.entity_version)])
 
 
 class TransferDeleteOperation(_WalletOperation):

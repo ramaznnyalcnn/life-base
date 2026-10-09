@@ -43,6 +43,8 @@ class OperationDefinition(BaseModel):
 class EntityRef(BaseModel):
     kind: str
     id: int | str
+    # The record's entity_version after the write (lets an outbox chain edits).
+    version: int | None = None
 
 
 class OperationResult(BaseModel):
