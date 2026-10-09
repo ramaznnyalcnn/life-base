@@ -1,45 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-import 'package:go_router/go_router.dart';
 
-import 'core/theme/app_theme.dart';
-import 'features/auth/onboarding_screen.dart';
-import 'features/auth/session_controller.dart';
-import 'features/settings/settings_screen.dart';
-import 'features/shell/app_shell.dart';
-
-final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.dark);
-
-final routerProvider = Provider<GoRouter>((ref) => GoRouter(routes: [
-      GoRoute(path: '/', builder: (context, state) => const SessionGate()),
-      GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
-    ]));
+import 'core/design_system/app_theme.dart';
+import 'core/design_system/appearance.dart';
+import 'modules/account/data/session_controller.dart';
+import 'modules/account/ui/onboarding_screen.dart';
+import 'shell/router.dart';
 
 class LifeBaseApp extends ConsumerWidget {
   const LifeBaseApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appearance = ref.watch(appearanceProvider);
+    final reduceMotion = appearance.reduceMotion ||
+        SchedulerBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations;
+    final light = AppTheme.build(appearance.palette, Brightness.light, reduceMotion: reduceMotion);
+    final dark = AppTheme.build(appearance.palette, Brightness.dark, reduceMotion: reduceMotion);
+    final mode = appearance.palette.darkOnly ? ThemeMode.dark : appearance.mode;
+    final session = ref.watch(sessionControllerProvider);
+
+    // The router only exists for a signed-in session; signing in or out swaps
+    // the whole app frame instead of redirecting inside it.
+    final ready = session.value?.ready ?? false;
+    if (ready) {
+      return MaterialApp.router(
         title: 'LifeBase',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        themeMode: ref.watch(themeModeProvider),
+        theme: light,
+        darkTheme: dark,
+        themeMode: mode,
         routerConfig: ref.watch(routerProvider),
       );
-}
-
-class SessionGate extends ConsumerWidget {
-  const SessionGate({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(sessionControllerProvider);
-    return session.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stackTrace) => const OnboardingScreen(),
-      data: (value) => value.ready ? const AppShell() : const OnboardingScreen(),
+    }
+    return MaterialApp(
+      title: 'LifeBase',
+      debugShowCheckedModeBanner: false,
+      theme: light,
+      darkTheme: dark,
+      themeMode: mode,
+      home: session.isLoading && !session.hasValue
+          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          : const OnboardingScreen(),
     );
   }
 }

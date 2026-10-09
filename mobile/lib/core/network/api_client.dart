@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 
 import '../models/agenda.dart';
-import '../models/catalog.dart';
 import '../models/operation.dart';
 import '../storage/app_database.dart';
 
@@ -95,24 +94,6 @@ class ApiClient {
         .cast<Map>()
         .map((item) => AgendaItem.fromJson(Map<String, Object?>.from(item)))
         .toList();
-  }
-
-  Future<(List<OperationDefinition>, OperationContextData)> operationSetup() async {
-    final body = await _cachedMap('operation-setup', () async {
-      final responses = await Future.wait([
-        _dio.get<List<Object?>>('/api/v2/operations/catalog'),
-        _dio.get<Map<String, Object?>>('/api/v2/operations/context'),
-      ]);
-      return {'catalog': responses[0].data!, 'context': responses[1].data!};
-    });
-    final definitions = (body['catalog'] as List)
-        .cast<Map>()
-        .map((item) => OperationDefinition.fromJson(Map<String, Object?>.from(item)))
-        .toList();
-    final context = OperationContextData.fromJson(
-      Map<String, Object?>.from(body['context']! as Map),
-    );
-    return (definitions, context);
   }
 
   Future<Map<String, Object?>> execute(OperationEnvelope operation) async {

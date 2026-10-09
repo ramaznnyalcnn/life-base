@@ -5,27 +5,34 @@ The Android client in `mobile/` is a Flutter 3.38 application for Android 8.0+
 
 ## Product flow
 
-- Five destinations: **Bugün**, **Takvim**, **Ekle**, **Finans**, **Sağlık**.
-- Domain actions start from the full-screen **Ekle** wizard. The wizard reads
-  `/api/v2/operations/catalog` and `/context`, so choices remain server-driven.
-- Free text is limited to short names and titles. Money and dosage use numeric
-  inputs; dates, times, categories, accounts, recurrence and reminders use
-  pickers or chips.
-- OLED dark mode is the default. An accessible light theme is available in
-  settings; controls use Material 3 and 48dp-or-larger touch targets.
+- Four independent modules behind a floating glass navigation bar:
+  **Bugün**, **Cüzdan**, **Takvim**, **İlaç**. Account and settings open from
+  the profile button in each module's header.
+- Each module owns its add flow (floating add button → container transform
+  into that module's own page). There is no shared "Ekle" wizard.
+- Each tab keeps its own navigation stack (`StatefulShellRoute`). Android back
+  pops inside the current tab first, then returns to Bugün, and on Bugün asks
+  for a second press before leaving the app. Add pages with unsaved input ask
+  before discarding.
+- Neumorphic surfaces with four colour schemes (Kum, Adaçayı, Okyanus, Gece),
+  light/dark/system mode and a reduce-motion switch, all persisted.
+  Transitions: fade-through between tabs, shared-axis inside a tab.
 
 ## Layers
 
 ```text
 lib/
   core/
-    models/       API-facing immutable values
-    network/      Dio client
-    storage/      Drift cache and operation queue
-    sync/         FIFO retry/conflict policy
-    platform/     Flutter ↔ Android method channel
-  features/
-    auth/ today/ calendar/ add/ finance/ health/ settings/ shell/
+    design_system/  tokens, theme, neumorphic surfaces, glass bar, transitions
+    models/         API-facing immutable values
+    network/        Dio client
+    storage/        Drift cache and operation queue
+    sync/           FIFO retry/conflict policy
+    platform/       Flutter ↔ Android method channel
+    routes.dart     route paths shared by shell and modules
+  modules/
+    today/ wallet/ calendar/ meds/ account/   each with ui/ and data/
+  shell/            router and the glass-bar shell
 android/
   CredentialVault.kt   Android Keystore-backed worker credentials
   CalendarSyncer.kt    Calendar Provider rolling-window projection
@@ -33,8 +40,8 @@ android/
   widget/              responsive Jetpack Glance widget and quick action
 ```
 
-Feature screens watch Riverpod providers and keep network/storage/platform work
-outside widgets. GoRouter owns top-level navigation.
+Modules never import one another; they share `core/` and navigate by route
+path. `test/architecture_test.dart` enforces this.
 
 ## Offline and conflict behavior
 

@@ -74,11 +74,14 @@ private release signing key before producing a distributable release build.
 ## Current Scope
 
 - **Bugün:** next item, overdue work, tasks, and hourly timeline.
-- **Takvim:** day/week/month views and domain filters.
-- **Ekle:** catalog-driven finance, planning, and medication wizard without AI/NLP.
-- **Finans:** overview and account cards.
-- **Sağlık:** upcoming doses and medication program.
-- **Ayarlar:** theme, queue/conflict status, writable calendar, and logout.
+- **Cüzdan:** overview and account cards; its own add flow.
+- **Takvim:** day/week/month views and domain filters; its own add flow.
+- **İlaç:** upcoming doses and medication program; its own add flow.
+- **Hesap ve ayarlar** (profile button): colour scheme, light/dark mode,
+  reduce motion, queue/conflict status, writable calendar, and logout.
+
+Module add pages are placeholders until their phase lands (Takvim → İlaç →
+Cüzdan).
 
 The app caches read surfaces with Drift and queues UUID operations FIFO. Native
 WorkManager refreshes the selected Android calendar, Glance widget, and local
