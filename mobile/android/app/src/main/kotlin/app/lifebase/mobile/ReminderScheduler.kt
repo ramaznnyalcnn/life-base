@@ -36,6 +36,7 @@ class ReminderScheduler(private val context: Context) {
         if (triggerAtMillis <= System.currentTimeMillis()) return
         val manager = context.getSystemService(AlarmManager::class.java)
         val intent = Intent(context, ReminderReceiver::class.java)
+            .putExtra("key", key)
             .putExtra("title", title)
         val pending = PendingIntent.getBroadcast(
             context,
@@ -85,7 +86,8 @@ class ReminderReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
-        manager.notify((intent.getStringExtra("title") ?: "lifebase").hashCode(), notification)
+        // One notification per reminder: two items with the same title must not replace each other.
+        manager.notify((intent.getStringExtra("key") ?: intent.getStringExtra("title") ?: "lifebase").hashCode(), notification)
     }
 
     companion object { private const val channelId = "lifebase_reminders" }
