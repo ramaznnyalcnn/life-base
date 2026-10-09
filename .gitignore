@@ -25,9 +25,11 @@ backend/tests/.test.db
 .DS_Store
 .idea/
 .vscode/
+.claude/
 .Codex/
 .codex/
 .agents/
+.playwright-mcp/
 
 # Local artifacts
 2026-03-14_22-26.png

@@ -61,6 +61,18 @@ The Glance widget scales with launcher space and shows the next item and open
 count. Its quick button completes the first task or records the first medication
 dose with a fresh UUID; all other detail work opens in the app.
 
+## Development connectivity
+
+The expected personal deployment path is:
+
+```text
+Flutter Android APK -> Tailscale -> FastAPI backend -> PostgreSQL
+```
+
+Use Tailscale for remote access instead of exposing the API publicly. During
+USB development, `adb reverse tcp:8000 tcp:8000` lets the app connect to
+`http://localhost:8000`. A public deployment should use an HTTPS API URL.
+
 ## Verification
 
 ```bash

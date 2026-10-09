@@ -15,7 +15,6 @@ lifebase/
 ├── backend/          FastAPI + SQLAlchemy + PostgreSQL + Alembic
 ├── frontend/         React 19 + Vite + TypeScript
 ├── mobile/           Flutter + Dart + native Android integrations
-├── shared/           Shared contracts between frontend and backend
 └── infra/            Docker Compose + deployment scripts
 ```
 
@@ -83,7 +82,7 @@ cd mobile && flutter test && flutter analyze
 
 ## Design Decisions
 
-- **Monorepo** — backend, web, and mobile in one repo with shared payload contracts
+- **Monorepo** — backend, web, and mobile in one repository with versioned HTTP contracts
 - **PostgreSQL over SQLite** — production-grade persistence with Alembic schema evolution
 - **Async FastAPI** — non-blocking I/O throughout
 - **Flutter Android** — mobile-first UI with native calendar, reminder, background sync, and widget support
