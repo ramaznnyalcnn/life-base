@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CalendarPage from "./Calendar";
@@ -269,10 +269,18 @@ describe("CalendarPage", () => {
     await screen.findByRole("group", { name: /takvimi/ });
     const shell = document.querySelector(".shell--calendar");
 
-    fireEvent.wheel(shell, { deltaY: 900, deltaX: 0 });
-    expect(shell).toHaveAttribute("data-scene", "week");
-    fireEvent.wheel(shell, { deltaY: 900, deltaX: 0 });
-    expect(shell).toHaveAttribute("data-scene", "medication");
+    Object.defineProperties(shell, {
+      scrollHeight: { value: 300, configurable: true },
+      clientHeight: { value: 100, configurable: true }
+    });
+
+    shell.scrollTop = 100;
+    fireEvent.scroll(shell);
+    await waitFor(() => expect(shell).toHaveAttribute("data-scene", "week"));
+
+    shell.scrollTop = 200;
+    fireEvent.scroll(shell);
+    await waitFor(() => expect(shell).toHaveAttribute("data-scene", "medication"));
   });
 
   it("shows medication doses and marks a dose as taken", async () => {

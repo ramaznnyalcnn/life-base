@@ -156,15 +156,22 @@ describe("ManagePage", () => {
     const focusedCard = document.querySelector(".manage-focused-card");
     expect(focusedCard).not.toBeNull();
 
-    fireEvent.touchStart(focusedCard, {
-      touches: [{ clientX: 200, clientY: 100 }]
-    });
-    fireEvent.touchMove(focusedCard, {
-      touches: [{ clientX: 120, clientY: 102 }]
-    });
-    fireEvent.touchEnd(focusedCard, {
-      changedTouches: [{ clientX: 120, clientY: 102 }]
-    });
+    // jsdom lacks PointerEvent; MouseEvent carries clientX/clientY for pointer types.
+    const firePointerEvent = (element, type, clientX, clientY) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX,
+        clientY
+      });
+      Object.defineProperty(event, "pointerId", { value: 1 });
+      Object.defineProperty(event, "pointerType", { value: "touch" });
+      element.dispatchEvent(event);
+    };
+
+    firePointerEvent(focusedCard, "pointerdown", 200, 100);
+    firePointerEvent(focusedCard, "pointermove", 120, 102);
+    firePointerEvent(focusedCard, "pointerup", 120, 102);
 
     expect(await screen.findAllByText("Bonus Gold")).not.toHaveLength(0);
     expect(screen.getAllByText("₺1.100,00")).not.toHaveLength(0);

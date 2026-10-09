@@ -157,7 +157,6 @@ body {
 .app-frame {
   display: flex;
   flex-direction: column;
-  height: 100vh;
   height: 100dvh;
   width: 100vw;
   background-color: var(--wf-bg);
@@ -171,6 +170,9 @@ body {
   position: relative;
   padding-bottom: calc(var(--dock-height) + var(--safe-bottom) + 32px);
 }
+/* :has() dependency: relies on .shell--calendar being a direct/descendant marker
+   rendered by the calendar route so this container can switch to a non-scrolling
+   layout; keep that class name in sync with CalendarPage's shell markup. */
 .app-content:has(.shell--calendar) {
   overflow: hidden !important;
   padding: 0 !important;
@@ -230,7 +232,9 @@ body {
   cursor: pointer;
   color: var(--wf-text-secondary);
   font-size: 1.25rem;
-  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    background-color 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    color 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   position: relative;
 }
 
@@ -341,7 +345,7 @@ body {
   font-weight: 600;
   color: var(--wf-text-primary);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.2s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1), color 0.2s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .secondary-button:active {
@@ -360,7 +364,7 @@ body {
   border-radius: var(--app-radius);
   padding: 24px;
   background-color: var(--wf-surface);
-  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.3s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.3s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   opacity: 0;
   animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   position: relative;
@@ -694,7 +698,7 @@ body {
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
 .add-type-chip--active {
@@ -902,51 +906,10 @@ body {
 }
 
 /* Calendar View Stacking Architecture */
-.shell--calendar {
-  height: 100%;
-  min-height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  -webkit-overflow-scrolling: touch;
-  padding: 16px 16px 120px 16px;
-}
-
-.calendar-transition-shell {
-  width: 100%;
-  max-width: 620px;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.calendar-transition-stage {
-  width: 100%;
-  min-height: 100%;
-  position: relative;
-  overflow: hidden;
-  padding: 0;
-  background: var(--wf-bg);
-}
-
-.calendar-transition-stage__glow {
-  position: absolute;
-  inset: 8% 12%;
-  border-radius: 32px;
-  background: radial-gradient(circle, var(--wf-accent-glow), transparent 68%);
-  filter: blur(28px);
-  pointer-events: none;
-  display: none;
-}
-
-.calendar-transition-layer {
-  position: absolute;
-  inset: 0;
-  padding: 28px 20px 24px 20px;
-  will-change: transform, opacity, filter;
-}
+/* NOTE: .shell--calendar, .calendar-transition-shell, .calendar-transition-stage,
+   .calendar-transition-stage__glow, and .calendar-transition-layer are canonically
+   defined below in the "CALENDAR CUSTOM ANIMATION LAYERS" section; declarations
+   from this section were merged there to avoid duplicate/conflicting rules. */
 
 .calendar-month-stage__focus {
   width: 100%;
@@ -958,17 +921,9 @@ body {
 }
 
 /* Spiral Notebook Effect */
-.calendar-entry__scene {
-  width: 100%;
-  max-width: 600px;
-  position: relative;
-  background-color: var(--wf-surface);
-  border: 1px solid var(--wf-border);
-  border-radius: var(--app-radius);
-  background: var(--wf-card-grad);
-  box-shadow: var(--wf-shadow-card);
-  perspective: 1500px;
-}
+/* NOTE: .calendar-entry__scene is canonically defined below (near the medication
+   editor styles); its unique declarations (border, perspective, background-color)
+   were merged there to avoid a duplicate/conflicting rule. */
 
 /* The actual physical bindings (Refined 3D Spiral Rings) */
 .calendar-entry__scene::before {
@@ -1035,7 +990,8 @@ body {
   color: var(--wf-text-primary);
   font-weight: 500;
   font-size: 1rem;
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, background-color 0.2s ease,
+    border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
   position: relative;
 }
 
@@ -1157,7 +1113,6 @@ body {
 
 .shell--calendar[data-scene="week"] {
   height: auto;
-  min-height: calc(100vh - var(--safe-top) - 64px - var(--dock-height) - 16px);
   min-height: calc(100dvh - var(--safe-top) - 64px - var(--dock-height) - 16px);
   overflow-y: auto;
   overflow-x: hidden;
@@ -1198,7 +1153,7 @@ body {
   border-radius: var(--app-radius);
   background-color: var(--wf-surface);
   overflow: hidden;
-  transition: all 0.3s;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .calendar-day-panel--open {
@@ -1365,7 +1320,7 @@ body {
   font-weight: 600;
   color: var(--wf-text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .ghost-button:hover, .ghost-button:active {
@@ -1386,19 +1341,26 @@ body {
 .calendar-transition-shell {
   position: relative;
   width: 100%;
+  max-width: 620px;
   height: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
 .calendar-transition-stage {
   position: relative;
   width: 100%;
+  min-height: 100%;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  background: var(--wf-bg);
 }
 .calendar-transition-layer {
   position: absolute;
@@ -1408,7 +1370,7 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  will-change: transform, opacity, filter;
+  padding: 28px 20px 24px 20px;
 }
 .calendar-month-stage__focus {
   z-index: 10;
@@ -1419,10 +1381,13 @@ body {
   left: 50%;
   width: 120%;
   height: 120%;
+  border-radius: 32px;
   background: radial-gradient(circle at center, rgba(100, 100, 255, 0.05) 0%, transparent 60%);
+  filter: blur(28px);
   transform: translate(-50%, -50%);
   z-index: 1;
   pointer-events: none;
+  display: none;
 }
 .calendar-week-shell {
   z-index: 20;
@@ -1430,8 +1395,14 @@ body {
   padding-bottom: 120px;
 }
 .shell--calendar {
-  height: calc(100vh - var(--safe-top) - 64px - var(--dock-height) - 16px);
+  height: calc(100dvh - var(--safe-top) - 64px - var(--dock-height) - 16px);
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 120px 16px;
 }
 .shell--calendar[data-scene="week"] .calendar-transition-shell {
   height: auto;
@@ -1547,13 +1518,16 @@ body {
   margin-top: 20px;
 }
 .calendar-entry__scene {
-  background: var(--wf-card-grad);
-  border-radius: var(--app-radius);
-  box-shadow: var(--wf-shadow-card);
   position: relative;
   width: 100%;
   max-width: 600px;
   margin: 0 auto;
+  background-color: var(--wf-surface);
+  border: 1px solid var(--wf-border);
+  border-radius: var(--app-radius);
+  background: var(--wf-card-grad);
+  box-shadow: var(--wf-shadow-card);
+  perspective: 1500px;
 }
 
 /* --- ANALYSIS REDESIGN (HistoryPage) --- */
@@ -1589,7 +1563,7 @@ body {
   color: var(--wf-text-secondary);
   background: transparent;
   border: none;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: center;
   cursor: pointer;
 }
@@ -1765,17 +1739,46 @@ body {
 }
 
 .analysis-scroll-shell {
-  height: calc(100vh - var(--safe-top) - 64px - var(--dock-height) - 16px);
-  overflow: hidden;
+  height: calc(100dvh - var(--safe-top) - 64px - var(--dock-height) - 16px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
 
+.analysis-scroll-shell::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Sticky stage overlays the snap spacers below it. The stage keeps its own
+ * scroll-snap-align:start so the container rests on the overview at scrollTop 0,
+ * while the trailing full-height spacer provides the second (history) snap stop.
+ * Total content height is ~3 screens (stage + 2 spacers) => a 2-screen scroll
+ * range with exactly two snap positions.
+ */
 .analysis-scroll-stage {
-  position: relative;
+  position: sticky;
+  top: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
+  scroll-snap-align: start;
   overscroll-behavior-x: none;
   touch-action: pan-y;
+  z-index: 1;
+}
+
+.analysis-scroll-snap {
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+}
+
+.analysis-scroll-snap--end {
+  scroll-snap-align: start;
 }
 
 .analysis-scroll-stage__glow {
@@ -1793,18 +1796,54 @@ body {
   inset: 0;
   padding: 0 20px 24px 20px;
   overflow-x: clip;
-  will-change: transform, opacity, filter;
 }
 
+/*
+ * Cross-fade is driven entirely by the passive --scene-progress variable
+ * (0 = overview, 1 = history) using compositor-only properties. No filter,
+ * no perspective/rotateX.
+ */
 .analysis-scroll-layer--overview {
   z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  opacity: clamp(0, calc(1 - (var(--scene-progress, 0) - 0.3) / 0.3), 1);
+  transform:
+    translateY(calc(var(--scene-progress, 0) * -20px))
+    scale(calc(1 + var(--scene-progress, 0) * 0.08));
+  transform-origin: 50% 20%;
 }
 
 .analysis-scroll-layer--detail {
   z-index: 2;
+  opacity: clamp(0, calc((var(--scene-progress, 0) - 0.35) / 0.3), 1);
+  transform:
+    translateY(calc((1 - var(--scene-progress, 0)) * 24px))
+    scale(calc(1.12 - var(--scene-progress, 0) * 0.12));
+  transform-origin: 50% 18%;
+}
+
+/* Pointer-events gating: only the active scene is interactive. */
+.analysis-scroll-shell[data-scene="overview"] .analysis-scroll-layer--detail {
+  pointer-events: none;
+}
+
+.analysis-scroll-shell[data-scene="history"] .analysis-scroll-layer--overview {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analysis-scroll-layer {
+  }
+
+  .analysis-scroll-layer--overview {
+    transform: none;
+  }
+
+  .analysis-scroll-layer--detail {
+    transform: none;
+  }
 }
 
 .analysis-overview-shell {
@@ -2199,4 +2238,141 @@ body {
   font-size: 0.9rem;
   outline: none;
   width: 100%;
+}
+
+/* --- CALENDAR NATIVE SCROLL STAGE --- */
+.shell--calendar,
+.shell--calendar[data-scene="week"],
+.shell--calendar[data-scene="medication"] {
+  height: calc(100dvh - var(--safe-top) - 64px - var(--dock-height) - 16px);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  display: block;
+  padding: 0 16px;
+}
+
+.shell--calendar::-webkit-scrollbar {
+  display: none;
+}
+
+.calendar-transition-shell,
+.shell--calendar[data-scene="week"] .calendar-transition-shell,
+.shell--calendar[data-scene="medication"] .calendar-transition-shell {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  max-width: 620px;
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  overflow: visible;
+  scroll-snap-align: start;
+  display: block;
+}
+
+.calendar-transition-stage,
+.shell--calendar[data-scene="week"] .calendar-transition-stage,
+.shell--calendar[data-scene="medication"] .calendar-transition-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: block;
+  background: var(--wf-bg);
+}
+
+.calendar-scroll-snap {
+  width: 100%;
+  height: 100%;
+  scroll-snap-align: start;
+  pointer-events: none;
+}
+
+.calendar-transition-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 28px 20px 120px 20px;
+  transition: none;
+}
+
+.calendar-month-stage__focus {
+  opacity: clamp(0, calc(1 - (var(--scene-progress, 0) - 0.35) / 0.35), 1);
+  transform: translateY(calc(clamp(0, var(--scene-progress, 0), 1) * -20px)) scale(calc(1 + clamp(0, var(--scene-progress, 0), 1) * 0.1));
+  filter: none;
+  transition: none;
+}
+
+.calendar-month-grid-camera {
+  transform: scale(calc(1 + clamp(0, var(--scene-progress, 0), 1) * 0.6)) translateY(calc(clamp(0, var(--scene-progress, 0), 1) * 8px));
+}
+
+.calendar-week-shell,
+.shell--calendar[data-scene="week"] .calendar-transition-layer.calendar-week-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  opacity: clamp(0, calc((var(--scene-progress, 0) - 0.35) / 0.35), calc(1 - (var(--scene-progress, 0) - 1.35) / 0.35));
+  transform: translateY(calc((1 - clamp(0, var(--scene-progress, 0), 1)) * 24px)) scale(calc(1.12 - clamp(0, var(--scene-progress, 0), 1) * 0.12));
+  filter: none;
+  padding-bottom: 120px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.calendar-medication-shell,
+.shell--calendar[data-scene="medication"] .calendar-medication-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  opacity: clamp(0, calc((var(--scene-progress, 0) - 1.35) / 0.35), 1);
+  transform: translateY(calc((2 - clamp(1, var(--scene-progress, 0), 2)) * 24px)) scale(calc(1.08 - (clamp(1, var(--scene-progress, 0), 2) - 1) * 0.08));
+  padding-bottom: 120px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.calendar-transition-stage__glow {
+  opacity: 0.25;
+  transform: translate(-50%, -50%) scale(calc(1 + clamp(0, var(--scene-progress, 0), 2) * 0.04));
+  filter: blur(28px);
+}
+
+.shell--calendar[data-scene="month"] .calendar-week-shell,
+.shell--calendar[data-scene="month"] .calendar-medication-shell,
+.shell--calendar[data-scene="week"] .calendar-month-stage__focus,
+.shell--calendar[data-scene="week"] .calendar-medication-shell,
+.shell--calendar[data-scene="medication"] .calendar-month-stage__focus,
+.shell--calendar[data-scene="medication"] .calendar-week-shell {
+  pointer-events: none;
+}
+
+.calendar-week-section,
+.shell--calendar[data-scene="week"] .calendar-week-section,
+.shell--calendar[data-scene="week"] .calendar-day-stack {
+  height: auto;
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-month-stage__focus,
+  .calendar-week-shell,
+  .calendar-medication-shell,
+  .calendar-month-grid-camera {
+    transform: none;
+  }
 }

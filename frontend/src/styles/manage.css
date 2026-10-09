@@ -137,7 +137,7 @@
   background: var(--wf-overlay-strong);
   border: none;
   padding: 0;
-  transition: all 0.3s ease;
+  transition: width 0.3s ease, background-color 0.3s ease;
 }
 
 .manage-carousel-dot.active {
@@ -232,7 +232,7 @@
   justify-content: center;
   gap: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s, border-color 0.2s, color 0.2s;
   box-shadow: var(--wf-shadow-soft);
 }
 .manage-action-btn:active {
@@ -345,7 +345,7 @@
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   background: rgba(0,0,0,0.5);
   z-index: 100;
   backdrop-filter: blur(4px);
@@ -417,7 +417,7 @@
   border-radius: 16px;
   font-size: 1rem;
   color: var(--wf-text-primary);
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
   outline: none;
 }
 .manage-input:focus {
@@ -430,7 +430,7 @@
   left: 16px;
   font-size: 1rem;
   color: var(--wf-text-secondary);
-  transition: all 0.2s ease;
+  transition: top 0.2s ease, font-size 0.2s ease, color 0.2s ease;
   pointer-events: none;
 }
 .manage-input:focus ~ .manage-floating-label,

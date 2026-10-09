@@ -1,11 +1,11 @@
 # Mobile Deployment Notes
 
-The mobile app is implemented in `mobile/` with Expo React Native. It does not embed the backend or database. The expected runtime is:
+The mobile app is implemented in `mobile/` with Flutter for Android. It does not embed the backend or PostgreSQL database. The expected runtime is:
 
 ```text
-Android APK -> Tailscale -> FastAPI backend -> PostgreSQL
+Flutter Android APK -> Tailscale or USB forwarding -> FastAPI backend -> PostgreSQL
 ```
 
-Use Tailscale for personal remote access instead of exposing the API publicly. If you later move to a public domain, switch the app server URL from `http://...:8000` to `https://...` and remove the need for Android cleartext traffic.
+Use Tailscale for personal remote access instead of exposing the API publicly. For USB development, `adb reverse tcp:8000 tcp:8000` lets the app connect to `http://localhost:8000`. If you later move to a public domain, switch the app server URL to HTTPS.
 
-Native reminder notifications are local Android schedules. They are synchronized from backend pending reminders when the app saves events/routines or when the user taps "Senkronize et" in Ayarlar.
+Native reminders, Android Calendar Provider synchronization, background work, encrypted credentials, offline operations, and the Glance widget are documented in [Android architecture](mobile-android.md).

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import useSceneScroll from "../hooks/useSceneScroll";
 import { fetchAccounts } from "../api/accounts";
 import {
   deleteTransaction,
@@ -72,9 +73,6 @@ const ANALYSIS_SEGMENT_OPTIONS = [
   { id: "year", label: "Bu Yil" }
 ];
 
-const ANALYSIS_WHEEL_GESTURE_DIVISOR = 420;
-const ANALYSIS_TOUCH_GESTURE_DIVISOR = 240;
-
 /* Odometer Hook for Premium Transitions */
 function useOdometer(value, duration = 1200, resetKey = "") {
   const [displayValue, setDisplayValue] = useState(0);
@@ -97,7 +95,17 @@ function useOdometer(value, duration = 1200, resetKey = "") {
     startValue.current = originValue;
     setDisplayValue(originValue);
 
-    if (import.meta.env.MODE === "test") {
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const shouldSkipAnimation =
+      import.meta.env.MODE === "test" ||
+      document.hidden ||
+      prefersReducedMotion ||
+      targetValue === originValue;
+
+    if (shouldSkipAnimation) {
       setDisplayValue(targetValue);
       return undefined;
     }
@@ -492,12 +500,7 @@ export default function HistoryPage() {
   const [analysisFilters, setAnalysisFilters] = useState(INITIAL_ANALYSIS_FILTERS);
   const [activeAppTab, setActiveAppTab] = useState("overview"); // "overview" | "history"
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
-  const [analysisTransitionProgress, setAnalysisTransitionProgress] = useState(0);
   const analysisShellRef = useRef(null);
-  const overviewScrollRef = useRef(null);
-  const historyScrollRef = useRef(null);
-  const analysisGestureProgressRef = useRef(0);
-  const analysisTouchStartYRef = useRef(null);
   const accountMap = useMemo(
     () => new Map(accounts.map((account) => [account.id, account])),
     [accounts]
@@ -832,137 +835,11 @@ export default function HistoryPage() {
     loadData();
   }, []);
 
-  useEffect(() => {
-    analysisGestureProgressRef.current = analysisTransitionProgress;
-  }, [analysisTransitionProgress]);
+  const handleSceneChange = useCallback((scene) => {
+    setActiveAppTab(scene >= 1 ? "history" : "overview");
+  }, []);
 
-  useEffect(() => {
-    const shellNode = analysisShellRef.current;
-
-    if (!shellNode || loading) {
-      return undefined;
-    }
-
-    function applyGestureDelta(rawDelta) {
-      const next = Math.max(0, Math.min(1, analysisGestureProgressRef.current + rawDelta));
-      analysisGestureProgressRef.current = next;
-      setAnalysisTransitionProgress(next);
-      setActiveAppTab(next >= 0.5 ? "history" : "overview");
-    }
-
-    function shouldAllowHistoryScroll(deltaY) {
-      const detailNode = historyScrollRef.current;
-
-      if (!detailNode || analysisGestureProgressRef.current < 0.98) {
-        return false;
-      }
-
-      const atTop = detailNode.scrollTop <= 0;
-      const atBottom = detailNode.scrollTop + detailNode.clientHeight >= detailNode.scrollHeight - 1;
-
-      if (deltaY > 0) {
-        return !atBottom;
-      }
-
-      if (deltaY < 0) {
-        return !atTop;
-      }
-
-      return false;
-    }
-
-    function shouldAllowOverviewScroll(deltaY) {
-      const overviewNode = overviewScrollRef.current;
-
-      if (!overviewNode || analysisGestureProgressRef.current > 0.02) {
-        return false;
-      }
-
-      const canScroll = overviewNode.scrollHeight > overviewNode.clientHeight + 1;
-
-      if (!canScroll) {
-        return false;
-      }
-
-      const atTop = overviewNode.scrollTop <= 0;
-      const atBottom =
-        overviewNode.scrollTop + overviewNode.clientHeight >= overviewNode.scrollHeight - 1;
-
-      if (deltaY > 0) {
-        return !atBottom;
-      }
-
-      if (deltaY < 0) {
-        return !atTop;
-      }
-
-      return false;
-    }
-
-    function handleWheel(event) {
-      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
-        return;
-      }
-
-      if (shouldAllowOverviewScroll(event.deltaY)) {
-        return;
-      }
-
-      if (shouldAllowHistoryScroll(event.deltaY)) {
-        return;
-      }
-
-      event.preventDefault();
-      applyGestureDelta(event.deltaY / ANALYSIS_WHEEL_GESTURE_DIVISOR);
-    }
-
-    function handleTouchStart(event) {
-      analysisTouchStartYRef.current = event.touches[0]?.clientY ?? null;
-    }
-
-    function handleTouchMove(event) {
-      if (analysisTouchStartYRef.current == null) {
-        return;
-      }
-
-      const currentY = event.touches[0]?.clientY ?? analysisTouchStartYRef.current;
-      const deltaY = analysisTouchStartYRef.current - currentY;
-
-      if (Math.abs(deltaY) < 2) {
-        return;
-      }
-
-      if (shouldAllowOverviewScroll(deltaY)) {
-        analysisTouchStartYRef.current = currentY;
-        return;
-      }
-
-      if (shouldAllowHistoryScroll(deltaY)) {
-        analysisTouchStartYRef.current = currentY;
-        return;
-      }
-
-      event.preventDefault();
-      applyGestureDelta(deltaY / ANALYSIS_TOUCH_GESTURE_DIVISOR);
-      analysisTouchStartYRef.current = currentY;
-    }
-
-    function handleTouchEnd() {
-      analysisTouchStartYRef.current = null;
-    }
-
-    shellNode.addEventListener("wheel", handleWheel, { passive: false });
-    shellNode.addEventListener("touchstart", handleTouchStart, { passive: true });
-    shellNode.addEventListener("touchmove", handleTouchMove, { passive: false });
-    shellNode.addEventListener("touchend", handleTouchEnd, { passive: true });
-
-    return () => {
-      shellNode.removeEventListener("wheel", handleWheel);
-      shellNode.removeEventListener("touchstart", handleTouchStart);
-      shellNode.removeEventListener("touchmove", handleTouchMove);
-      shellNode.removeEventListener("touchend", handleTouchEnd);
-    };
-  }, [loading]);
+  useSceneScroll(analysisShellRef, { scenes: 2, onSceneChange: handleSceneChange });
 
   function handleFilterChange(field, value) {
     setFilters((current) => ({
@@ -1067,30 +944,6 @@ export default function HistoryPage() {
     thisMonthData.analysis.totalOutgoing,
     thisMonthData.analysis.totalPayments
   ].join("|");
-  const analysisOverviewZoomProgress = Math.min(1, analysisTransitionProgress / 0.54);
-  const analysisViewSwapProgress = Math.max(0, Math.min(1, (analysisTransitionProgress - 0.34) / 0.3));
-  const analysisDetailGrowProgress = Math.max(0, Math.min(1, (analysisTransitionProgress - 0.46) / 0.54));
-  const analysisOverviewSceneStyle = {
-    transform: `perspective(1200px) translateY(${analysisOverviewZoomProgress * -20}px) scale(${1 + analysisOverviewZoomProgress * 0.18}) rotateX(${analysisOverviewZoomProgress * -8}deg)`,
-    opacity: Math.max(0, 1 - analysisViewSwapProgress * 1.2),
-    filter: `saturate(${1 - analysisViewSwapProgress * 0.18}) blur(${analysisViewSwapProgress * 5}px)`,
-    pointerEvents: analysisTransitionProgress < 0.5 ? "auto" : "none"
-  };
-  const analysisDetailSceneStyle = {
-    opacity: Math.max(0, (analysisTransitionProgress - 0.28) / 0.5),
-    transformOrigin: "50% 18%",
-    transform: `perspective(1200px) translateY(${-28 + analysisDetailGrowProgress * 28}px) scale(${1.52 - analysisDetailGrowProgress * 0.52}) rotateX(${12 - analysisDetailGrowProgress * 12}deg)`,
-    filter: `blur(${(1 - analysisDetailGrowProgress) * 7}px)`,
-    pointerEvents: analysisTransitionProgress > 0.52 ? "auto" : "none"
-  };
-  const analysisGlowStyle = {
-    transform: `scale(${1 + analysisTransitionProgress * 0.08})`,
-    opacity: Math.sin(analysisTransitionProgress * Math.PI) * 0.5
-  };
-  const analysisCueStyle = {
-    opacity: Math.max(0, 1 - analysisTransitionProgress * 1.8),
-    transform: `translateY(${analysisTransitionProgress * 10}px)`
-  };
   const activityRingsCard = (
     <article className="history-chart-card" style={{ marginTop: "16px" }}>
       <ActivityRings
@@ -1613,16 +1466,13 @@ export default function HistoryPage() {
           <article className="account-card">Yukleniyor...</article>
         </section>
       ) : (
-        <div className="history-tab-overview slide-in-bottom" data-scene={activeAppTab}>
-          <div className="analysis-scroll-shell" ref={analysisShellRef}>
+        <div className="history-tab-overview slide-in-bottom">
+          <div className="analysis-scroll-shell" ref={analysisShellRef} data-scene={activeAppTab}>
             <div className="analysis-scroll-stage">
-              <div className="analysis-scroll-stage__glow" aria-hidden="true" style={analysisGlowStyle} />
+              <div className="analysis-scroll-stage__glow" aria-hidden="true" />
 
-              <section
-                className="analysis-scroll-layer analysis-scroll-layer--overview"
-                style={analysisOverviewSceneStyle}
-              >
-                <div className="analysis-overview-shell" ref={overviewScrollRef}>
+              <section className="analysis-scroll-layer analysis-scroll-layer--overview">
+                <div className="analysis-overview-shell">
                   <section className="accounts-panel history-hero-panel">
                     <div className="history-hero-layout" style={{ marginTop: "12px" }}>
                       <div className="history-hero-main">
@@ -1707,12 +1557,15 @@ export default function HistoryPage() {
                 </div>
               </section>
 
-              <section className="analysis-scroll-layer analysis-scroll-layer--detail" style={analysisDetailSceneStyle}>
-                <div className="analysis-detail-shell" ref={historyScrollRef}>
+              <section className="analysis-scroll-layer analysis-scroll-layer--detail">
+                <div className="analysis-detail-shell">
                   {historyLayerContent}
                 </div>
               </section>
             </div>
+
+            <div className="analysis-scroll-snap" aria-hidden="true" />
+            <div className="analysis-scroll-snap analysis-scroll-snap--end" aria-hidden="true" />
           </div>
         </div>
       )}

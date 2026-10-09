@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { deleteEvent, fetchCalendarDashboard, updateEvent } from "../api/events";
+import useSceneScroll from "../hooks/useSceneScroll";
 import {
   fetchMedicationDashboard,
   fetchMedicationSchedule,
@@ -17,9 +18,9 @@ const INITIAL_EDIT_FORM = {
 };
 
 const MONTH_FLIP_MS = 380;
-const MAX_TRANSITION_PROGRESS = 2;
 const IS_TEST_MODE = import.meta.env.MODE === "test";
 const WEEKDAY_LABELS = ["Pzt", "Sal", "Car", "Per", "Cum", "Cmt", "Paz"];
+const CALENDAR_SCENE_LABELS = ["month", "week", "medication"];
 
 function addDays(value, amount) {
   const nextDate = new Date(value);
@@ -266,7 +267,7 @@ export default function CalendarPage() {
   const [error, setError] = useState("");
   const [editingEventId, setEditingEventId] = useState(null);
   const [editForm, setEditForm] = useState(INITIAL_EDIT_FORM);
-  const [transitionProgress, setTransitionProgress] = useState(0);
+  const [calendarSceneIndex, setCalendarSceneIndex] = useState(0);
   const [openDays, setOpenDays] = useState(() => getTodayOpenState());
   const [selectedDateKey, setSelectedDateKey] = useState(toDateKey(new Date()));
   const [viewingDate, setViewingDate] = useState(() => new Date());
@@ -276,8 +277,6 @@ export default function CalendarPage() {
   const shellRef = useRef(null);
   const monthFlipTimerRef = useRef(null);
   const monthFlipResetTimerRef = useRef(null);
-  const gestureProgressRef = useRef(0);
-  const touchStartYRef = useRef(null);
 
   async function loadDashboard() {
     setLoading(true);
@@ -327,114 +326,11 @@ export default function CalendarPage() {
     []
   );
 
-  useEffect(() => {
-    gestureProgressRef.current = transitionProgress;
-  }, [transitionProgress]);
-
-  useEffect(() => {
-    const shellNode = shellRef.current;
-
-    if (!shellNode) {
-      return undefined;
-    }
-
-    function applyGestureDelta(rawDelta) {
-      const currentProgress = gestureProgressRef.current;
-      let nextProgress = Math.max(0, Math.min(MAX_TRANSITION_PROGRESS, currentProgress + rawDelta));
-      if (currentProgress < 1 && nextProgress > 1) nextProgress = 1;
-      if (currentProgress > 1 && nextProgress < 1) nextProgress = 1;
-      gestureProgressRef.current = nextProgress;
-      setTransitionProgress(nextProgress);
-    }
-
-    function shouldAllowWeekScroll(deltaY) {
-      if (!shellNode || gestureProgressRef.current < 0.98) {
-        return false;
-      }
-
-      if (gestureProgressRef.current > 1.02 && gestureProgressRef.current < 1.98) {
-        return false;
-      }
-
-      if (gestureProgressRef.current <= 1.02 && deltaY > 0) {
-        return false;
-      }
-
-      const canScroll = shellNode.scrollHeight > shellNode.clientHeight + 1;
-
-      if (!canScroll) {
-        return false;
-      }
-
-      const atTop = shellNode.scrollTop <= 0;
-      const atBottom = shellNode.scrollTop + shellNode.clientHeight >= shellNode.scrollHeight - 1;
-
-      if (deltaY > 0) {
-        return !atBottom;
-      }
-
-      if (deltaY < 0) {
-        return !atTop;
-      }
-
-      return false;
-    }
-
-    function handleWheel(event) {
-      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
-        return;
-      }
-
-      if (shouldAllowWeekScroll(event.deltaY)) {
-        return;
-      }
-
-      event.preventDefault();
-      applyGestureDelta(event.deltaY / 900);
-    }
-
-    function handleTouchStart(event) {
-      touchStartYRef.current = event.touches[0]?.clientY ?? null;
-    }
-
-    function handleTouchMove(event) {
-      if (touchStartYRef.current == null) {
-        return;
-      }
-
-      const currentY = event.touches[0]?.clientY ?? touchStartYRef.current;
-      const deltaY = touchStartYRef.current - currentY;
-
-      if (Math.abs(deltaY) < 2) {
-        return;
-      }
-
-      if (shouldAllowWeekScroll(deltaY)) {
-        touchStartYRef.current = currentY;
-        return;
-      }
-
-      event.preventDefault();
-      applyGestureDelta(deltaY / 520);
-      touchStartYRef.current = currentY;
-    }
-
-    function handleTouchEnd() {
-      touchStartYRef.current = null;
-    }
-
-    shellNode.addEventListener("wheel", handleWheel, { passive: false });
-    shellNode.addEventListener("touchstart", handleTouchStart, { passive: true });
-    shellNode.addEventListener("touchmove", handleTouchMove, { passive: false });
-    shellNode.addEventListener("touchend", handleTouchEnd, { passive: true });
-
-    return () => {
-      shellNode.removeEventListener("wheel", handleWheel);
-      shellNode.removeEventListener("touchstart", handleTouchStart);
-      shellNode.removeEventListener("touchmove", handleTouchMove);
-      shellNode.removeEventListener("touchend", handleTouchEnd);
-    };
+  const handleSceneChange = useCallback((sceneIndex) => {
+    setCalendarSceneIndex(sceneIndex);
   }, []);
+
+  useSceneScroll(shellRef, { scenes: 3, onSceneChange: handleSceneChange });
 
   const allEvents = useMemo(() => {
     if (!dashboard) {
@@ -909,39 +805,12 @@ export default function CalendarPage() {
   const todayAgendaIndex = agendaDays.findIndex((day) => day.key === todayKey);
   const weekOriginY = ((Math.max(todayAgendaIndex, 0) + 0.5) / agendaDays.length) * 100;
   const flipClass = flipState.phase !== "idle" ? `calendar-flip-${flipState.phase}-${flipState.direction}` : "";
-  const firstTransitionProgress = Math.min(1, transitionProgress);
-  const medicationSwapProgress = Math.max(0, Math.min(1, (transitionProgress - 1.2) / 0.5));
-  const calendarScene = transitionProgress > 1.5 ? "medication" : transitionProgress > 0.5 ? "week" : "month";
-  const monthZoomProgress = Math.min(1, firstTransitionProgress / 0.54);
-  const viewSwapProgress = Math.max(0, Math.min(1, (firstTransitionProgress - 0.36) / 0.28));
-  const weekGrowProgress = Math.max(0, Math.min(1, (firstTransitionProgress - 0.48) / 0.52));
-  const monthSceneStyle = {
-    transform: `perspective(1200px) translateY(${monthZoomProgress * -20}px) scale(${1 + monthZoomProgress * 0.18}) rotateX(${monthZoomProgress * -8}deg)`,
-    opacity: Math.max(0, 1 - viewSwapProgress * 1.2),
-    filter: `saturate(${1 - viewSwapProgress * 0.18}) blur(${viewSwapProgress * 5}px)`,
-    pointerEvents: IS_TEST_MODE ? "auto" : transitionProgress < 0.5 ? "auto" : "none"
-  };
+  const calendarScene = CALENDAR_SCENE_LABELS[calendarSceneIndex] ?? "month";
   const monthCameraStyle = {
-    transformOrigin: `${focusOriginX}% ${focusOriginY}%`,
-    transform: `scale(${1 + monthZoomProgress * 1.05}) translateY(${monthZoomProgress * 10}px)`
+    transformOrigin: `${focusOriginX}% ${focusOriginY}%`
   };
   const weekShellStyle = {
-    opacity: IS_TEST_MODE ? 1 : Math.max(0, (firstTransitionProgress - 0.28) / 0.5) * (1 - medicationSwapProgress),
-    transformOrigin: `50% ${weekOriginY}%`,
-    transform: IS_TEST_MODE
-      ? "none"
-      : `perspective(1200px) translateY(${-26 + weekGrowProgress * 26}px) scale(${1.52 - weekGrowProgress * 0.52}) rotateX(${12 - weekGrowProgress * 12}deg)`,
-    filter: IS_TEST_MODE ? "none" : `blur(${(1 - weekGrowProgress) * 7}px)`,
-    pointerEvents: IS_TEST_MODE ? "auto" : transitionProgress > 0.5 && transitionProgress < 1.5 ? "auto" : "none"
-  };
-  const medicationSceneStyle = {
-    opacity: IS_TEST_MODE ? 1 : medicationSwapProgress,
-    transform: IS_TEST_MODE ? "none" : `translateY(${(1 - medicationSwapProgress) * 30}px) scale(${0.96 + medicationSwapProgress * 0.04})`,
-    pointerEvents: IS_TEST_MODE ? "auto" : transitionProgress > 1.5 ? "auto" : "none"
-  };
-  const stageGlowStyle = {
-    transform: `scale(${1 + firstTransitionProgress * 0.08})`,
-    opacity: Math.sin(firstTransitionProgress * Math.PI) * 0.5
+    transformOrigin: `50% ${weekOriginY}%`
   };
 
   return (
@@ -956,12 +825,11 @@ export default function CalendarPage() {
       {dashboard && (
         <div className="calendar-transition-shell">
           <div className="calendar-transition-stage">
-            <div className="calendar-transition-stage__glow" aria-hidden="true" style={stageGlowStyle} />
+            <div className="calendar-transition-stage__glow" aria-hidden="true" />
 
             <div
-              aria-hidden={IS_TEST_MODE ? undefined : transitionProgress > 0.5}
+              aria-hidden={IS_TEST_MODE ? undefined : calendarScene !== "month"}
               className="calendar-month-stage__focus calendar-transition-layer"
-              style={monthSceneStyle}
             >
               <div className="calendar-entry__scene">
                 <section className="calendar-month-panel">
@@ -1068,7 +936,7 @@ export default function CalendarPage() {
             </div>
 
             <section
-              aria-hidden={IS_TEST_MODE ? undefined : transitionProgress <= 0.5}
+              aria-hidden={IS_TEST_MODE ? undefined : calendarScene !== "week"}
               className="calendar-transition-layer calendar-week-shell"
               style={weekShellStyle}
             >
@@ -1121,9 +989,8 @@ export default function CalendarPage() {
             </section>
 
             <section
-              aria-hidden={IS_TEST_MODE ? undefined : transitionProgress <= 1.5}
+              aria-hidden={IS_TEST_MODE ? undefined : calendarScene !== "medication"}
               className="calendar-transition-layer calendar-medication-shell"
-              style={medicationSceneStyle}
             >
               <section className="calendar-medication-section">
                 <header className="calendar-medication-header">
@@ -1190,6 +1057,8 @@ export default function CalendarPage() {
             </section>
 
           </div>
+          <div className="calendar-scroll-snap calendar-scroll-snap--week" aria-hidden="true" />
+          <div className="calendar-scroll-snap calendar-scroll-snap--medication" aria-hidden="true" />
         </div>
       )}
     </main>

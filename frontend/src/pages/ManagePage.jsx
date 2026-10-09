@@ -309,38 +309,6 @@ export default function ManagePage() {
     resetSwipe();
   }
 
-  function handleCardTouchStart(event) {
-    if (creditAccounts.length <= 1) {
-      return;
-    }
-
-    if (event.target.closest("button, input, select, textarea, a, label")) {
-      return;
-    }
-
-    const touch = event.touches[0];
-
-    if (!touch) {
-      return;
-    }
-
-    startSwipeGesture("touch", touch.clientX, touch.clientY);
-  }
-
-  function handleCardTouchMove(event) {
-    const touch = event.touches[0];
-
-    if (!touch) {
-      return;
-    }
-
-    moveSwipeGesture(touch.clientX, touch.clientY, () => event.preventDefault());
-  }
-
-  function handleCardTouchEnd() {
-    completeSwipeGesture();
-  }
-
   return (
     <main className="shell shell--wallet">
       {/* Wallet Global Header */}
@@ -392,9 +360,6 @@ export default function ManagePage() {
                 onPointerMove={handleCardPointerMove}
                 onPointerUp={handleCardPointerEnd}
                 onPointerCancel={handleCardPointerCancel}
-                onTouchStart={handleCardTouchStart}
-                onTouchMove={handleCardTouchMove}
-                onTouchEnd={handleCardTouchEnd}
                 style={{
                   transform: `translateX(${cardDragOffset}px)`,
                   opacity: 1 - Math.min(0.22, Math.abs(cardDragOffset) / 320)

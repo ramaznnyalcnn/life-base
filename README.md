@@ -1,69 +1,93 @@
-# Life OS
+# Life OS — Full-Stack Personal Productivity Platform
 
-Cloud-ready, Android-first rewrite of Life OS.
+![Python](https://img.shields.io/badge/Python-FastAPI-blue)
+![React](https://img.shields.io/badge/React-19-61DAFB)
+![Flutter](https://img.shields.io/badge/Flutter-Android-02569B)
+![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791)
+![Docker](https://img.shields.io/badge/Deploy-Docker-2496ED)
 
-This repository contains the migrated finance/event backend, a React web
-frontend, and a Flutter Android client.
-The new system is designed around PostgreSQL, not SQLite.
+A cloud-ready monorepo personal life management platform — FastAPI backend, React 19 web frontend, and a Flutter Android app sharing a PostgreSQL database with Alembic migrations.
 
-## Initial Structure
+## Architecture
 
-```text
-backend/
-  app/
-    api/routes/
-    core/
-    db/
-    models/
-    schemas/
-    services/
-  tests/
-frontend/
-  public/
-  src/
-    api/
-    app/
-    components/
-    features/
-    hooks/
-    lib/
-    pages/
-    styles/
-mobile/
-  lib/
-  android/
-shared/
-  contracts/
-docs/
-infra/
+```
+lifebase/
+├── backend/          FastAPI + SQLAlchemy + PostgreSQL + Alembic
+├── frontend/         React 19 + Vite + TypeScript
+├── mobile/           Flutter + Dart + native Android integrations
+├── shared/           Shared contracts between frontend and backend
+└── infra/            Docker Compose + deployment scripts
 ```
 
-## Directory Intent
+**Stack:**
+- **Backend:** Python, FastAPI (async), SQLAlchemy ORM, Alembic migrations, pytest
+- **Web:** React 19, Vite, TypeScript, vitest
+- **Mobile:** Flutter, Dart, Riverpod, GoRouter, Drift, Android Calendar Provider, WorkManager, Keystore, and Glance
+- **Database:** PostgreSQL (migrated from SQLite for production readiness)
+- **DevOps:** Docker, Docker Compose
 
-- `backend/app/api/routes`: FastAPI routers
-- `backend/app/core`: config, security, settings
-- `backend/app/db`: PostgreSQL session and persistence helpers
-- `backend/app/models`: ORM models
-- `backend/app/operations`: class-based, transactional application operations
-- `backend/app/schemas`: request/response schemas
-- `backend/app/services`: business logic
-- `frontend/src/api`: frontend API clients
-- `frontend/src/app`: app shell, routing, providers
-- `frontend/src/features`: feature-specific UI and state
-- `mobile/lib`: Flutter feature-first MVVM client
-- `mobile/android`: Calendar Provider, WorkManager, Keystore, and Glance widget
-- `shared/contracts`: shared payload contracts and migration notes
-- `docs`: architecture and migration documentation
-- `infra`: deployment files
+## Quick Start
 
-## Backend Hardening Notes
+```bash
+cp .env.example .env
+docker compose up --build
+./infra/scripts/backend-migrate.sh
+# API: http://localhost:8000
+# Web: http://localhost:5173
+```
 
-- Copy `.env.example` to `.env` before first production boot.
-- Run DB migrations via `./infra/scripts/backend-migrate.sh`.
-- Start the API via `./infra/scripts/backend-start.sh`.
-- Set `APP_API_TOKEN` to protect all `/api/v1/*` endpoints with `X-App-Token` or `Authorization: Bearer ...`.
-- Run reminder dispatch without HTTP via `python -m app.cli.dispatch_reminders`.
-- Run the periodic worker via `python -m app.cli.run_reminder_worker --interval 60`.
-- Provision a DB-backed bearer token via `python -m app.cli.issue_token --email owner@example.com --name "Owner"`.
-- See [Structured Operation API](docs/operation-api.md) for the `/api/v2` mobile and widget contract.
-- See [Android architecture](docs/mobile-android.md) for client setup, offline behavior, and native sync.
+## Backend
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+./infra/scripts/backend-start.sh
+```
+
+All `/api/v1/*` endpoints require `X-App-Token` or `Authorization: Bearer ...`.
+
+Provision a token:
+```bash
+python -m app.cli.issue_token --email owner@example.com --name "Owner"
+```
+
+Run reminder dispatch:
+```bash
+python -m app.cli.run_reminder_worker --interval 60
+```
+
+## Web Frontend
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+## Mobile
+
+```bash
+cd mobile
+flutter pub get
+flutter run
+```
+
+See [Android architecture](docs/mobile-android.md) for device setup, offline behavior, calendar sync, reminders, and the home-screen widget.
+
+## Testing
+
+```bash
+cd backend && pytest -q
+cd frontend && npm run test
+cd mobile && flutter test && flutter analyze
+```
+
+## Design Decisions
+
+- **Monorepo** — backend, web, and mobile in one repo with shared payload contracts
+- **PostgreSQL over SQLite** — production-grade persistence with Alembic schema evolution
+- **Async FastAPI** — non-blocking I/O throughout
+- **Flutter Android** — mobile-first UI with native calendar, reminder, background sync, and widget support
+- **Selection-first operations** — structured `/api/v2` actions replace natural-language command entry
+- **Keystore + Drift** — encrypted credentials and an offline operation queue on device
+
+See [Structured Operation API](docs/operation-api.md) for the class-based backend operation contract.
