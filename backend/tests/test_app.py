@@ -14,7 +14,6 @@ def test_settings_defaults():
     assert settings.single_user_mode is True
     assert settings.app_locale == "tr-TR"
     assert settings.database_url.startswith("postgresql+psycopg://")
-    assert settings.openrouter_base_url == "https://openrouter.ai/api/v1"
     assert isinstance(settings.vapid_public_key, str)
     assert isinstance(settings.app_api_token, str)
     assert "http://localhost:5173" in settings.cors_origins
@@ -22,12 +21,8 @@ def test_settings_defaults():
 
 def test_settings_parse_json_list_and_web_app_origin(monkeypatch):
     monkeypatch.setenv(
-        "OPENROUTER_MODELS",
-        '["stepfun/step-3.5-flash:free", "openrouter/free"]',
-    )
-    monkeypatch.setenv(
         "CORS_ORIGINS",
-        "https://admin.example.com,https://api.example.com",
+        '["https://admin.example.com", "https://api.example.com"]',
     )
     monkeypatch.setenv("WEB_APP_URL", "https://app.example.com/dashboard")
     get_settings.cache_clear()
@@ -35,10 +30,6 @@ def test_settings_parse_json_list_and_web_app_origin(monkeypatch):
     try:
         settings = Settings()
 
-        assert settings.openrouter_models == [
-            "stepfun/step-3.5-flash:free",
-            "openrouter/free",
-        ]
         assert settings.cors_origins == [
             "https://admin.example.com",
             "https://api.example.com",
@@ -59,18 +50,17 @@ def test_health_endpoint_reports_expected_backend_mode():
     body = asyncio.run(health())
 
     assert body["status"] == "healthy"
-    assert body["ai"]["provider"] == "openrouter"
+    assert "ai" not in body
     assert body["mode"]["single_user"] is True
     assert body["mode"]["locale"] == "tr-TR"
     assert isinstance(body["notifications"]["vapid_configured"], bool)
     assert isinstance(body["security"]["app_token_enabled"], bool)
 
 
-def test_legacy_ai_routes_are_marked_deprecated_in_openapi():
-    schema = app.openapi()
+def test_ai_routes_are_removed():
+    paths = app.openapi()["paths"]
 
-    assert schema["paths"]["/api/v1/ai/parse"]["post"]["deprecated"] is True
-    assert schema["paths"]["/api/v1/ai/execute"]["post"]["deprecated"] is True
+    assert not any(path.startswith("/api/v1/ai") for path in paths)
 
 
 def test_api_requires_app_token_when_configured(monkeypatch):

@@ -10,7 +10,6 @@ from psycopg.errors import UndefinedColumn
 from sqlalchemy.exc import ProgrammingError
 
 from app.api.routes import (
-    ai_router,
     accounts_router,
     activity_templates_v2_router,
     agenda_v2_router,
@@ -71,7 +70,6 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(auth_router, prefix="/api/v2")
-app.include_router(ai_router, prefix=settings.api_v1_prefix)
 app.include_router(accounts_router, prefix=settings.api_v1_prefix)
 app.include_router(events_router, prefix=settings.api_v1_prefix)
 app.include_router(medications_router, prefix=settings.api_v1_prefix)
@@ -124,11 +122,6 @@ async def health() -> dict[str, object]:
         },
         "security": {
             "app_token_enabled": bool(settings.app_api_token),
-        },
-        "ai": {
-            "provider": "openrouter",
-            "model": settings.openrouter_model,
-            "configured": bool(settings.openrouter_api_key),
         },
         "mode": {
             "single_user": settings.single_user_mode,

@@ -53,29 +53,6 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
 
-    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
-    openrouter_base_url: str = Field(
-        default="https://openrouter.ai/api/v1",
-        alias="OPENROUTER_BASE_URL",
-    )
-    openrouter_model: str = Field(
-        default="stepfun/step-3.5-flash:free",
-        alias="OPENROUTER_MODEL",
-    )
-    openrouter_models: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: [
-            "stepfun/step-3.5-flash:free",
-            "arcee-ai/trinity-large-preview:free",
-            "nvidia/nemotron-3-nano-30b-a3b:free",
-            "arcee-ai/trinity-mini:free",
-            "nvidia/nemotron-nano-9b-v2:free",
-            "qwen/qwen3-4b:free",
-            "liquid/lfm-2.5-1.2b-instruct:free",
-            "openrouter/free",
-        ],
-        alias="OPENROUTER_MODELS",
-    )
-
     web_app_url: str = Field(
         default="http://localhost:5173",
         alias="WEB_APP_URL",
@@ -98,11 +75,6 @@ class Settings(BaseSettings):
         alias="REMINDER_DISPATCH_INTERVAL_SECONDS",
     )
     reminder_dispatch_limit: int = Field(default=20, alias="REMINDER_DISPATCH_LIMIT")
-
-    @field_validator("openrouter_models", mode="before")
-    @classmethod
-    def parse_openrouter_models(cls, value):
-        return _parse_list_env(value)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

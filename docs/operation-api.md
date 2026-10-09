@@ -1,8 +1,7 @@
 # Structured Operation API
 
 The `/api/v2` API is the backend contract for the Android-first client. It uses
-selected values and typed numeric/date inputs. Natural-language parsing remains
-available under deprecated `/api/v1/ai/*` routes during the client migration.
+selected values and typed numeric/date inputs.
 
 ## Request flow
 

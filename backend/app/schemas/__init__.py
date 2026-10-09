@@ -4,17 +4,6 @@ from app.schemas.account import AccountCreate, AccountRead, AccountUpdate
 from app.schemas.activity_template import ActivityTemplateCreate, ActivityTemplateRead, ActivityTemplateUpdate
 from app.schemas.agenda import AgendaItem, AgendaRange, AgendaToday
 from app.schemas.auth import AuthSessionRead, LoginRequest, UserRead
-from app.schemas.ai import (
-    AIAction,
-    AIEventPayload,
-    AIParseRequest,
-    AIParseResponse,
-    AISummaryPayload,
-    AITransactionPayload,
-    SummaryMetric,
-    SummaryRange,
-)
-from app.schemas.ai_execution import AIClarificationRequest, AIExecutionResponse, AIExecutionStatus
 from app.schemas.calendar import CalendarDashboard, CalendarReminderItem
 from app.schemas.event import EventCreate, EventRead, EventUpdate, ReminderCreate, ReminderRead
 from app.schemas.medication import (
@@ -60,17 +49,6 @@ __all__ = [
     "AgendaRange",
     "AgendaToday",
     "AuthSessionRead",
-    "AIAction",
-    "AIParseRequest",
-    "AIParseResponse",
-    "AIClarificationRequest",
-    "AIExecutionResponse",
-    "AIExecutionStatus",
-    "AITransactionPayload",
-    "AIEventPayload",
-    "AISummaryPayload",
-    "SummaryRange",
-    "SummaryMetric",
     "LoginRequest",
     "UserRead",
     "EventCreate",

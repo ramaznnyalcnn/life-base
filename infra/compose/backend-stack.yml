@@ -17,7 +17,6 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://lifeos:lifeos@db:5432/lifeos
       APP_API_TOKEN: bootstrap-token
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       WEB_APP_URL: http://localhost:5173
       ENABLE_WEB_PUSH: ${ENABLE_WEB_PUSH:-false}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
@@ -33,7 +32,6 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://lifeos:lifeos@db:5432/lifeos
       APP_API_TOKEN: bootstrap-token
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       WEB_APP_URL: http://localhost:5173
       ENABLE_WEB_PUSH: ${ENABLE_WEB_PUSH:-false}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
@@ -53,7 +51,6 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://lifeos:lifeos@db:5432/lifeos
       APP_API_TOKEN: bootstrap-token
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       WEB_APP_URL: http://localhost:5173
       ENABLE_WEB_PUSH: ${ENABLE_WEB_PUSH:-false}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}

@@ -24,7 +24,6 @@ ENVIRONMENT=production
 DATABASE_URL=postgresql+psycopg://lifeos:strong-password@127.0.0.1:5432/lifeos
 WEB_APP_URL=https://app.example.com
 CORS_ORIGINS=https://app.example.com
-OPENROUTER_API_KEY=...
 ENABLE_WEB_PUSH=true
 VAPID_PUBLIC_KEY=...
 VAPID_PRIVATE_KEY=...
@@ -35,7 +34,6 @@ Notes:
 
 - frontend now defaults to `/api/v1`, so same-origin nginx proxy works without `VITE_API_BASE_URL`
 - if frontend and API are on different origins, build frontend with `VITE_API_BASE_URL=https://api.example.com/api/v1`
-- `OPENROUTER_MODELS` can be comma-separated or JSON array
 
 ## Server bootstrap
 

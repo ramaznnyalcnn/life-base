@@ -9,7 +9,7 @@
 ## Recommended Docker path
 
 1. Copy `.env.example` to `.env`
-2. Fill production secrets and review `POSTGRES_*`, `WEB_APP_URL`, `VAPID_*`, `OPENROUTER_*`
+2. Fill production secrets and review `POSTGRES_*`, `WEB_APP_URL`, `VAPID_*`
 3. Start the stack with `docker compose -f infra/compose/prod-stack.yml up -d --build`
 4. Verify `http://SERVER_IP:${WEB_PORT:-8080}/health`
 5. When the app is stable, put TLS in front of the `web` service and map `WEB_PORT=80`
