@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/design_system/app_theme.dart';
 import 'core/design_system/appearance.dart';
+import 'core/notifications/reminder_sync.dart';
 import 'core/sync/sync_controller.dart';
 import 'modules/account/data/session_controller.dart';
 import 'modules/account/ui/onboarding_screen.dart';
@@ -29,6 +30,8 @@ class LifeBaseApp extends ConsumerWidget {
       // Keeps local-first data syncing for as long as the session lasts,
       // without rebuilding the app on every sync status change.
       ref.listen(syncControllerProvider, (_, _) {});
+      // Local reminders work offline; they are re-planned whenever events change.
+      ref.listen(calendarReminderSyncProvider, (_, _) {});
       return MaterialApp.router(
         title: 'LifeBase',
         debugShowCheckedModeBanner: false,

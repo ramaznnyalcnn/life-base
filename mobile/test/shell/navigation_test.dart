@@ -8,7 +8,7 @@ import 'package:lifebase_mobile/core/design_system/app_theme.dart';
 import 'package:lifebase_mobile/core/design_system/tokens.dart';
 import 'package:lifebase_mobile/core/routes.dart';
 import 'package:lifebase_mobile/modules/account/ui/account_screen.dart';
-import 'package:lifebase_mobile/modules/calendar/ui/calendar_add_page.dart';
+import 'package:lifebase_mobile/modules/calendar/ui/event_edit_page.dart';
 import 'package:lifebase_mobile/shell/router.dart';
 
 void main() {
@@ -70,11 +70,11 @@ void main() {
     await openTab(tester, 'Takvim');
     await tester.tap(find.byKey(const ValueKey('add-calendar')));
     await tester.pumpAndSettle();
-    expect(find.byType(CalendarAddPage), findsOneWidget);
+    expect(find.byType(EventEditPage), findsOneWidget);
 
     await pressBack(tester);
 
-    expect(find.byType(CalendarAddPage), findsNothing);
+    expect(find.byType(EventEditPage), findsNothing);
     expect(location(), AppRoutes.calendar);
   });
 
@@ -112,10 +112,10 @@ void main() {
     await tester.pumpAndSettle();
 
     await openTab(tester, 'Cüzdan');
-    expect(find.byType(CalendarAddPage), findsNothing);
+    expect(find.byType(EventEditPage), findsNothing);
 
     await openTab(tester, 'Takvim');
-    expect(find.byType(CalendarAddPage), findsOneWidget);
+    expect(find.byType(EventEditPage), findsOneWidget);
   });
 
   testWidgets('profile button opens account above the shell and back returns', (tester) async {

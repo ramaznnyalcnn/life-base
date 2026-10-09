@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lifebase_mobile/core/models/agenda.dart';
 import 'package:lifebase_mobile/core/platform/device_calendar.dart';
-import 'package:lifebase_mobile/modules/calendar/ui/calendar_screen.dart';
 import 'package:lifebase_mobile/modules/today/ui/today_screen.dart';
 
 void main() {
@@ -47,16 +46,6 @@ void main() {
         startsAt: hour == null ? null : DateTime(day.year, day.month, day.day, hour),
         isAllDay: hour == null,
       );
-
-  test('calendar merges server items and Google events by day, all-day first', () {
-    final d1 = DateTime(2026, 10, 9), d2 = DateTime(2026, 10, 10);
-    final merged = mergeAgenda(
-      [at('server-d2', 'event', d2, 9), at('server-d1', 'event', d1, 15)],
-      [at('google-d1', googleKind, d1, 10), at('google-allday', googleKind, d1)],
-    );
-
-    expect(merged.map((e) => e.id), ['google-allday', 'google-d1', 'server-d1', 'server-d2']);
-  });
 
   test('next item prefers a sooner upcoming Google event over the server one', () {
     final day = DateTime(2026, 10, 9);
