@@ -65,15 +65,12 @@ void main() {
     expect(planMedReminders([prn], const {}, now), isEmpty);
   });
 
-  test('payloads carry the dose id; answered doses are silenced on screen', () {
+  test('payloads carry the dose id; answered doses are silenced on screen by id', () {
     final planned = planMedReminders([vitamin], const {}, now, horizon: const Duration(hours: 12));
     expect(doseIdFromPayload(planned[1].payload), dose.id);
     expect(doseIdFromPayload('cal|x|1'), isNull);
 
-    final shown = [
-      (id: planned.first.id, payload: planned.first.payload),
-      (id: 99, payload: 'cal|e1|0|calendar|0'),
-    ];
+    final shown = [planned.first.id, 99];
     final at = DateTime(2026, 10, 9, 9, 1);
     expect(answeredShownAlarms(shown, const {}, at), isEmpty);
     expect(answeredShownAlarms(shown, {dose.id: log('taken')}, at), [planned.first.id]);

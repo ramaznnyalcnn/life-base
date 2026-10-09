@@ -379,7 +379,7 @@ class _MedEditPageState extends ConsumerState<MedEditPage> {
             _Stepper(
               text: _med.alarm.maxRepeats == 0 ? 'Tekrar yok' : '${_med.alarm.maxRepeats} kez tekrar',
               onMinus: _med.alarm.maxRepeats > 0 ? () => setState(() => _med = _med.copyWith(alarm: _med.alarm.copyWith(maxRepeats: _med.alarm.maxRepeats - 1))) : null,
-              onPlus: _med.alarm.maxRepeats < 10 ? () => setState(() => _med = _med.copyWith(alarm: _med.alarm.copyWith(maxRepeats: _med.alarm.maxRepeats + 1))) : null,
+              onPlus: _med.alarm.maxRepeats < maxAlarmRepeats ? () => setState(() => _med = _med.copyWith(alarm: _med.alarm.copyWith(maxRepeats: _med.alarm.maxRepeats + 1))) : null,
             ),
           ]),
         ],

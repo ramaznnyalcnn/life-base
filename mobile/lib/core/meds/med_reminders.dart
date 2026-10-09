@@ -60,12 +60,19 @@ String doseAlarmBody(ScheduledDose dose, {bool repeat = false}) {
 }
 
 /// Ids of dose alarms still on screen (ringing) whose dose has been answered
-/// since: taken, skipped or snoozed doses stop ringing everywhere.
-List<int> answeredShownAlarms(List<({int id, String? payload})> shown, Map<String, LocalDoseLog> logs, DateTime now) => [
-      for (final n in shown)
-        if (doseIdFromPayload(n.payload ?? '') case final doseId?)
-          if (logs[doseId] case final log? when log.deletedAtMs == null && _answered(log, now)) n.id,
-    ];
+/// since: taken, skipped or snoozed doses stop ringing everywhere. Matched by
+/// id, since every ring's id derives from its dose id.
+List<int> answeredShownAlarms(List<int> shown, Map<String, LocalDoseLog> logs, DateTime now) {
+  final onScreen = shown.toSet();
+  if (onScreen.isEmpty) return const [];
+  final since = now.subtract(const Duration(days: 1));
+  return [
+    for (final log in logs.values)
+      if (log.deletedAtMs == null && log.scheduledFor.isAfter(since) && _answered(log, now))
+        for (var i = 0; i <= maxAlarmRepeats; i++)
+          if (notificationId('$medNotificationGroup|${log.id}#$i') case final id when onScreen.contains(id)) id,
+  ];
+}
 
 bool _answered(LocalDoseLog log, DateTime now) =>
     log.status == 'taken' || log.status == 'skipped' || (log.status == 'snoozed' && (log.snoozedUntil?.isAfter(now) ?? false));

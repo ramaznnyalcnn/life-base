@@ -67,8 +67,9 @@ int notificationId(String key) {
 abstract interface class NotificationPort {
   Future<List<({int id, String? payload})>> pending();
 
-  /// Notifications currently on screen (already fired).
-  Future<List<({int id, String? payload})>> shown();
+  /// Ids of notifications currently on screen (already fired). Android does
+  /// not hand back their payloads.
+  Future<List<int>> shown();
   Future<void> schedule(PlannedNotification notification);
   Future<void> cancel(int id);
 }
@@ -172,9 +173,9 @@ class PluginNotificationPort implements NotificationPort {
       [for (final p in await _plugin.pendingNotificationRequests()) (id: p.id, payload: p.payload)];
 
   @override
-  Future<List<({int id, String? payload})>> shown() async => [
+  Future<List<int>> shown() async => [
         for (final n in await _android.getActiveNotifications())
-          if (n.id != null) (id: n.id!, payload: n.payload),
+          if (n.id != null) n.id!,
       ];
 
   @override

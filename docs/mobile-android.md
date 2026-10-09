@@ -96,7 +96,9 @@ decision; other 4xx: mark failed).
 **Alarms.** Doses ring on the `meds_alarm` channel with the alarm sound and
 alarm volume, keep ringing until answered (up to three minutes), and repeat
 every few minutes while unanswered. The notification has Aldım / Ertele / Atla
-buttons; the full-screen intent opens `/alarm/<doseId>` above the lock screen.
+buttons; the full-screen intent opens `/alarm/<doseId>` above the lock screen,
+and when the app is already open the page opens in-app at the ring time
+(Android shows neither the full-screen alert nor always a heads-up then).
 Only that page may show over the lock screen: the activity turns
 `showWhenLocked` off as soon as it closes or a button answers. Answering a
 dose anywhere (alarm, list, another device after sync) cancels its remaining

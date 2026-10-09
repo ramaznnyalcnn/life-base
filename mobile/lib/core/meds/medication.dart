@@ -54,6 +54,9 @@ class MedSchedule {
   static bool _validTime(String value) => RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(value);
 }
 
+/// Upper bound for [AlarmSettings.maxRepeats].
+const maxAlarmRepeats = 10;
+
 /// How the dose alarm behaves.
 @immutable
 class AlarmSettings {
@@ -63,7 +66,7 @@ class AlarmSettings {
         fullScreen: json['fullScreen'] != false,
         snoozeMinutes: ((json['snoozeMinutes'] as num?)?.toInt() ?? 10).clamp(1, 240),
         repeatEveryMinutes: ((json['repeatEveryMinutes'] as num?)?.toInt() ?? 5).clamp(1, 120),
-        maxRepeats: ((json['maxRepeats'] as num?)?.toInt() ?? 3).clamp(0, 10),
+        maxRepeats: ((json['maxRepeats'] as num?)?.toInt() ?? 3).clamp(0, maxAlarmRepeats),
       );
 
   /// Open over the lock screen like an alarm clock.

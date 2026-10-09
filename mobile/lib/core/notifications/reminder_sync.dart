@@ -11,7 +11,8 @@ import '../meds/meds_store.dart';
 import '../providers.dart';
 import 'notifications.dart';
 
-/// The last notification (or notification button) the user tapped.
+/// The last notification (or notification button) the user tapped, or a
+/// dose alarm that rang while the app was open.
 typedef NotificationTap = ({String? actionId, String payload, int at});
 
 final notificationTapProvider = StateProvider<NotificationTap?>((ref) => null);
@@ -50,25 +51,42 @@ final calendarReminderSyncProvider = Provider<void>((ref) {
   });
 });
 
-/// Keeps dose alarms in step with medications and dose logs.
+/// Keeps dose alarms in step with medications and dose logs. While the app
+/// is open, Android neither opens the full-screen alarm nor always shows a
+/// heads-up, so the alarm page is opened in-app at each ring.
 final medReminderSyncProvider = Provider<void>((ref) {
   Timer? debounce;
+  Timer? nextRing;
+  late void Function() schedule;
   Future<void> run() async {
     final port = await ref.read(notificationPortProvider.future);
     final meds = ref.read(localMedicationsProvider).value;
     final logs = ref.read(doseLogsProvider).value;
     if (port == null || meds == null || logs == null) return;
     final now = DateTime.now();
-    await reconcileNotifications(port, medNotificationGroup, planMedReminders(meds, logs, now));
+    // Silence answered alarms first: a snoozed dose's next ring reuses the
+    // id of the one on screen, and cancelling afterwards would drop it.
     for (final id in answeredShownAlarms(await port.shown(), logs, now)) {
       await port.cancel(id);
     }
+    final planned = planMedReminders(meds, logs, now);
+    await reconcileNotifications(port, medNotificationGroup, planned);
+    nextRing?.cancel();
+    final next = planned.where((n) => n.at.isAfter(now)).firstOrNull;
+    if (next == null) return;
+    nextRing = Timer(next.at.difference(now), () {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        ref.read(notificationTapProvider.notifier).state =
+            (actionId: null, payload: next.payload, at: DateTime.now().microsecondsSinceEpoch);
+      }
+      schedule();
+    });
   }
 
-  void schedule() {
+  schedule = () {
     debounce?.cancel();
     debounce = Timer(const Duration(milliseconds: 400), run);
-  }
+  };
 
   ref.listen(localMedicationsProvider, (_, next) {
     if (next.hasValue) schedule();
@@ -79,6 +97,7 @@ final medReminderSyncProvider = Provider<void>((ref) {
   final lifecycle = AppLifecycleListener(onResume: schedule);
   ref.onDispose(() {
     debounce?.cancel();
+    nextRing?.cancel();
     lifecycle.dispose();
   });
 });

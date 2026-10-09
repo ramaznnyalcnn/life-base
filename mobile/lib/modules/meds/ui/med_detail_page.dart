@@ -188,7 +188,7 @@ class MedDetailPage extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('İlaç silinsin mi?'),
-        content: Text('${med.name} ve alarmları silinir. Bitirdiysen "Durdur" geçmişi korur.'),
+        content: Text('${med.name} ve alarmları silinir. Bitirdiysen "Bitir" geçmişi korur.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Vazgeç')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Sil')),
