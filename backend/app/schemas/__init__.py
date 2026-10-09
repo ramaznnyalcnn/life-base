@@ -1,6 +1,8 @@
 """Request and response schemas."""
 
 from app.schemas.account import AccountCreate, AccountRead, AccountUpdate
+from app.schemas.activity_template import ActivityTemplateCreate, ActivityTemplateRead, ActivityTemplateUpdate
+from app.schemas.agenda import AgendaItem, AgendaRange, AgendaToday
 from app.schemas.auth import AuthSessionRead, LoginRequest, UserRead
 from app.schemas.ai import (
     AIAction,
@@ -33,6 +35,8 @@ from app.schemas.notification import (
     PushSubscriptionKeys,
     PushSubscriptionRead,
 )
+from app.schemas.operation import ChoiceOption, EntityRef, OperationContextResponse, OperationDefinition, OperationFieldDefinition, OperationFieldKind, OperationResult
+from app.schemas.operation_inputs import OperationExecuteInput
 from app.schemas.recurring_event import RecurringEventCreate, RecurringEventRead
 from app.schemas.transaction import (
     SummaryPeriod,
@@ -49,6 +53,12 @@ __all__ = [
     "AccountCreate",
     "AccountRead",
     "AccountUpdate",
+    "ActivityTemplateCreate",
+    "ActivityTemplateRead",
+    "ActivityTemplateUpdate",
+    "AgendaItem",
+    "AgendaRange",
+    "AgendaToday",
     "AuthSessionRead",
     "AIAction",
     "AIParseRequest",
@@ -84,6 +94,14 @@ __all__ = [
     "PushSubscriptionDelete",
     "PushSubscriptionKeys",
     "PushSubscriptionRead",
+    "EntityRef",
+    "OperationDefinition",
+    "OperationFieldDefinition",
+    "OperationFieldKind",
+    "OperationResult",
+    "OperationExecuteInput",
+    "ChoiceOption",
+    "OperationContextResponse",
     "CalendarDashboard",
     "CalendarReminderItem",
     "TransactionCreate",

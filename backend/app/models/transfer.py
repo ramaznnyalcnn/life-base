@@ -8,10 +8,10 @@ from decimal import Decimal
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 
 
-class Transfer(TimestampMixin, Base):
+class Transfer(EntityVersionMixin, TimestampMixin, Base):
     """Money moved between owned accounts without creating expense/income."""
 
     __tablename__ = "transfers"

@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, Enum as SqlEnum, ForeignKey, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum as SqlEnum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 
 
 def enum_values(enum_cls: type[Enum]) -> list[str]:
@@ -20,7 +20,7 @@ class ReminderChannel(str, Enum):
     TELEGRAM = "telegram"
 
 
-class Event(TimestampMixin, Base):
+class Event(EntityVersionMixin, TimestampMixin, Base):
     """User events and scheduled items."""
 
     __tablename__ = "events"
@@ -28,6 +28,9 @@ class Event(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     device_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("activity_templates.id"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(160), index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
@@ -37,6 +40,7 @@ class Event(TimestampMixin, Base):
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
     user = relationship("User", back_populates="events")
+    template = relationship("ActivityTemplate", back_populates="events")
     reminders = relationship(
         "Reminder",
         back_populates="event",
@@ -49,9 +53,21 @@ class Reminder(TimestampMixin, Base):
     """Scheduled reminders for events."""
 
     __tablename__ = "reminders"
+    __table_args__ = (
+        CheckConstraint(
+            "(CASE WHEN event_id IS NOT NULL THEN 1 ELSE 0 END) + "
+            "(CASE WHEN task_id IS NOT NULL THEN 1 ELSE 0 END) + "
+            "(CASE WHEN scheduled_payment_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
+            name="ck_reminders_exactly_one_source",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), index=True)
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("events.id"), nullable=True, index=True)
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
+    scheduled_payment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("scheduled_payments.id"), nullable=True, index=True
+    )
     remind_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -65,3 +81,5 @@ class Reminder(TimestampMixin, Base):
     is_sent: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
     event = relationship("Event", back_populates="reminders")
+    task = relationship("Task", back_populates="reminders")
+    scheduled_payment = relationship("ScheduledPayment", back_populates="reminders")

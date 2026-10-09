@@ -66,6 +66,13 @@ def test_health_endpoint_reports_expected_backend_mode():
     assert isinstance(body["security"]["app_token_enabled"], bool)
 
 
+def test_legacy_ai_routes_are_marked_deprecated_in_openapi():
+    schema = app.openapi()
+
+    assert schema["paths"]["/api/v1/ai/parse"]["post"]["deprecated"] is True
+    assert schema["paths"]["/api/v1/ai/execute"]["post"]["deprecated"] is True
+
+
 def test_api_requires_app_token_when_configured(monkeypatch):
     monkeypatch.setenv("APP_API_TOKEN", "secret-token")
     get_settings.cache_clear()

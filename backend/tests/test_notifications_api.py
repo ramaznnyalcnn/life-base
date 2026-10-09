@@ -14,7 +14,8 @@ from app.api.routes.notifications import (
     send_test_push,
 )
 from app.main import app
-from app.models import Event, Reminder, ReminderChannel
+from app.models import Account, AccountType, Event, Reminder, ReminderChannel, ScheduledPayment, Task
+from app.services.auth import ensure_default_user
 from app.schemas import (
     PushMessageRequest,
     MedicationCreate,
@@ -161,6 +162,34 @@ def test_dispatch_due_reminders_marks_sent_when_push_succeeds(db_session):
     assert result.sent_count == 1
     assert result.reminder_count == 1
     assert db_session.get(Reminder, reminder.id).is_sent is True
+
+
+def test_dispatch_due_reminders_includes_tasks_and_scheduled_payments(db_session):
+    owner = ensure_default_user(db_session)
+    create_or_update_subscription(sample_payload(), db_session, "device-a")
+    source = Account(user_id=owner.id, name="Banka", type=AccountType.BANK, balance=1000)
+    target = Account(user_id=owner.id, name="Kart", type=AccountType.CREDIT_CARD, balance=0)
+    task = Task(user_id=owner.id, device_id="device-a", title="Market", due_on=date.today())
+    payment = ScheduledPayment(
+        user_id=owner.id, device_id="device-a", source_account=source, destination_account=target,
+        amount=250, due_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([task, payment])
+    db_session.flush()
+    db_session.add_all([
+        Reminder(task_id=task.id, remind_at=datetime.now(timezone.utc) - timedelta(minutes=5)),
+        Reminder(scheduled_payment_id=payment.id, remind_at=datetime.now(timezone.utc) - timedelta(minutes=5)),
+    ])
+    db_session.commit()
+    gateway = FakeGateway()
+
+    result = dispatch_due_reminders(
+        db_session, now=datetime.now(timezone.utc), gateway=gateway, settings=push_settings()
+    )
+
+    assert result.reminder_count == 2
+    assert result.sent_count == 2
+    assert {call[1]["title"] for call in gateway.calls} == {"Market", "250.00 TRY odeme"}
 
 
 def test_dispatch_due_medication_dose_sends_once_to_web_subscription(db_session):

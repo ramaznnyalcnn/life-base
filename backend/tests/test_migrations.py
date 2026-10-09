@@ -18,6 +18,8 @@ def test_alembic_files_exist():
     assert (base / "versions" / "20260316_0009_user_passwords_and_admins.py").exists()
     assert (base / "versions" / "20260517_0010_medication_reminders.py").exists()
     assert (base / "versions" / "20260526_0011_medication_intervals_and_push_delivery.py").exists()
+    assert (base / "versions" / "20260915_0012_operation_core.py").exists()
+    assert (base / "versions" / "20260915_0013_reminder_sources.py").exists()
 
 
 def test_initial_migration_contains_core_tables():
@@ -100,3 +102,26 @@ def test_medication_interval_migration_contains_schedule_mode_and_push_delivery(
     assert "schedule_mode" in migration
     assert "interval_days" in migration
     assert "medication_push_deliveries" in migration
+
+
+def test_operation_core_migration_contains_new_domain_tables():
+    migration = (
+        REPO_ROOT / "backend" / "alembic" / "versions" / "20260915_0012_operation_core.py"
+    ).read_text()
+
+    assert "activity_templates" in migration
+    assert "tasks" in migration
+    assert "scheduled_payments" in migration
+    assert "operation_executions" in migration
+    assert "agenda_revisions" in migration
+    assert "template_id" in migration
+
+
+def test_reminder_sources_migration_enforces_exactly_one_owner():
+    migration = (
+        REPO_ROOT / "backend" / "alembic" / "versions" / "20260915_0013_reminder_sources.py"
+    ).read_text()
+
+    assert "task_id" in migration
+    assert "scheduled_payment_id" in migration
+    assert "ck_reminders_exactly_one_source" in migration

@@ -8,7 +8,7 @@ from enum import Enum
 from sqlalchemy import Boolean, Enum as SqlEnum, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, EntityVersionMixin, TimestampMixin
 
 
 def enum_values(enum_cls: type[Enum]) -> list[str]:
@@ -26,7 +26,7 @@ class CategoryType(str, Enum):
     EXPENSE = "expense"
 
 
-class Account(TimestampMixin, Base):
+class Account(EntityVersionMixin, TimestampMixin, Base):
     """Financial accounts and cards."""
 
     __tablename__ = "accounts"
@@ -61,7 +61,7 @@ class Account(TimestampMixin, Base):
     )
 
 
-class Category(TimestampMixin, Base):
+class Category(EntityVersionMixin, TimestampMixin, Base):
     """Transaction categories."""
 
     __tablename__ = "categories"
@@ -75,6 +75,7 @@ class Category(TimestampMixin, Base):
         index=True,
     )
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
     user = relationship("User", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")

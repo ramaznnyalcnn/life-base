@@ -12,7 +12,7 @@ from app.services.ai_execution import AIExecutionService, get_ai_execution_servi
 from app.services.ai_parser import AIParserService, get_ai_parser_service
 
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+router = APIRouter(prefix="/ai", tags=["ai"], deprecated=True)
 
 
 def _device_id(value: str | None) -> str | None:

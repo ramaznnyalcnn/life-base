@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">LifeBase</string>
+    <string name="widget_description">Bugünün görevlerini ve saatlik akışını gösterir.</string>
+</resources>
