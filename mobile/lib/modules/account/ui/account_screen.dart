@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/design_system/appearance.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/platform/device_calendar.dart';
 import '../../../core/providers.dart';
 import '../data/session_controller.dart';
 
@@ -30,44 +31,7 @@ class AccountScreen extends ConsumerWidget {
         const SizedBox(height: 24),
         const _SectionLabel('Eşitleme'),
         Card(child: Column(children: [
-          ListTile(
-            minTileHeight: 64,
-            leading: const Icon(Icons.calendar_month_rounded),
-            title: const Text('Android takvimi'),
-            subtitle: const Text('LifeBase kayıtlarını cihaz takvimine eşitle'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () async {
-              final granted = await ref.read(platformBridgeProvider).requestCalendarAccess();
-              if (!context.mounted) return;
-              if (!granted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Takvim izni istendi. İzin verdikten sonra yeniden seç.')));
-                return;
-              }
-              final calendars = await ref.read(platformBridgeProvider).writableCalendars();
-              if (!context.mounted) return;
-              await showModalBottomSheet<void>(
-                context: context,
-                showDragHandle: true,
-                builder: (sheetContext) => SafeArea(child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Eşitlenecek takvim', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 8),
-                    ...calendars.map((calendar) => ListTile(
-                      title: Text(calendar['name'] as String? ?? 'Takvim'),
-                      subtitle: Text(calendar['account'] as String? ?? ''),
-                      trailing: calendar['selected'] == true ? const Icon(Icons.check_circle_rounded) : null,
-                      onTap: () async {
-                        await ref.read(platformBridgeProvider).selectCalendar(calendar['id'] as int);
-                        if (sheetContext.mounted) Navigator.pop(sheetContext);
-                      },
-                    )),
-                    const SizedBox(height: 16),
-                  ],
-                )),
-              );
-            },
-          ),
+          const _GoogleCalendarTile(),
           const Divider(height: 1),
           ListTile(
             minTileHeight: 64,
@@ -277,4 +241,66 @@ class _SwatchPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SwatchPainter oldDelegate) => oldDelegate.tokens != tokens;
+}
+
+/// Connects the user's own Google calendar both ways: its events show in
+/// LifeBase, and LifeBase events are written into its primary calendar.
+class _GoogleCalendarTile extends ConsumerWidget {
+  const _GoogleCalendarTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final account = ref.watch(googleCalendarStatusProvider).value?.account;
+    return ListTile(
+      minTileHeight: 64,
+      leading: const Icon(Icons.event_available_rounded),
+      title: const Text('Google takvimi'),
+      subtitle: Text(account ?? 'Bağlı değil · iki yönlü eşitleme'),
+      trailing: account == null ? const Icon(Icons.chevron_right) : const Icon(Icons.check_circle_rounded),
+      onTap: () => _connect(context, ref),
+    );
+  }
+
+  Future<void> _connect(BuildContext context, WidgetRef ref) async {
+    final bridge = ref.read(platformBridgeProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    if (!await bridge.requestCalendarAccess()) {
+      messenger.showSnackBar(const SnackBar(content: Text('Takvim izni olmadan Google takvimi bağlanamaz.')));
+      return;
+    }
+    final accounts = await bridge.googleAccounts();
+    if (!context.mounted) return;
+    if (accounts.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('Telefonda Google hesabı bulunamadı.')));
+      return;
+    }
+    final account = accounts.length == 1
+        ? accounts.single
+        : await showModalBottomSheet<String>(
+            context: context,
+            showDragHandle: true,
+            builder: (sheetContext) => SafeArea(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text('Google hesabı', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                ),
+                for (final value in accounts)
+                  ListTile(
+                    leading: const Icon(Icons.account_circle_rounded),
+                    title: Text(value),
+                    onTap: () => Navigator.pop(sheetContext, value),
+                  ),
+                const SizedBox(height: 12),
+              ]),
+            ),
+          );
+    if (account == null) return;
+    final connected = await bridge.connectGoogle(account);
+    ref.invalidate(googleCalendarStatusProvider);
+    ref.invalidate(deviceEventsProvider);
+    messenger.showSnackBar(SnackBar(
+      content: Text(connected ? '$account bağlandı.' : 'Bu hesapta yazılabilir takvim bulunamadı.'),
+    ));
+  }
 }

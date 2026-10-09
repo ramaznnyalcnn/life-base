@@ -7,6 +7,7 @@ import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
 import '../../../core/models/agenda.dart';
+import '../../../core/platform/device_calendar.dart';
 import '../../../core/providers.dart';
 import 'calendar_add_page.dart';
 
@@ -30,9 +31,29 @@ final calendarItemsProvider = FutureProvider<List<AgendaItem>>((ref) async {
     CalendarSpan.week => from.add(const Duration(days: 6)),
     CalendarSpan.month => DateTime(date.year, date.month + 1, 0),
   };
-  final values = await ref.watch(apiClientProvider)!.agendaRange(from, to);
+  final google = await ref.watch(deviceEventsProvider((from: from, to: to)).future);
+  List<AgendaItem> server;
+  try {
+    server = await ref.watch(apiClientProvider)!.agendaRange(from, to);
+  } on Object {
+    // Offline with no cache: the Google calendar is still on the device.
+    if (google.isEmpty) rethrow;
+    server = const [];
+  }
+  final values = mergeAgenda(server, google);
   return kind == 'all' ? values : values.where((item) => item.kind == kind).toList();
 });
+
+/// Server items and Google events in one list, ordered by day then time
+/// (all-day entries first within a day).
+List<AgendaItem> mergeAgenda(List<AgendaItem> server, List<AgendaItem> google) {
+  int key(AgendaItem item) => item.startsAt == null ? -1 : item.startsAt!.toLocal().hour * 60 + item.startsAt!.toLocal().minute;
+  return [...server, ...google]
+    ..sort((a, b) {
+      final day = a.day.compareTo(b.day);
+      return day != 0 ? day : key(a).compareTo(key(b));
+    });
+}
 
 class CalendarScreen extends ConsumerWidget {
   const CalendarScreen({super.key});
@@ -76,7 +97,7 @@ class CalendarScreen extends ConsumerWidget {
             height: 40,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              children: ['all', 'task', 'event', 'routine', 'medication', 'scheduled_payment']
+              children: ['all', 'event', googleKind, 'task', 'routine', 'medication', 'scheduled_payment']
                   .map((kind) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
@@ -116,11 +137,24 @@ class CalendarScreen extends ConsumerWidget {
                             ]),
                           ),
                           const SizedBox(width: 12),
+                          if (item.kind == googleKind) ...[
+                            Container(
+                              width: 4,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: item.metadata['color'] is int ? Color(item.metadata['color']! as int) : t.module(LbModule.calendar),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
                           Expanded(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text(item.displayTitle, style: TextStyle(fontWeight: FontWeight.w700, color: t.onBase)),
                               Text(
-                                item.startsAt == null ? _label(item.kind) : '${DateFormat('HH:mm').format(item.startsAt!.toLocal())} · ${_label(item.kind)}',
+                                item.startsAt == null
+                                    ? '${item.isAllDay ? 'Tüm gün · ' : ''}${_label(item.kind)}'
+                                    : '${DateFormat('HH:mm').format(item.startsAt!.toLocal())} · ${_label(item.kind)}',
                                 style: TextStyle(color: t.muted, fontSize: 12),
                               ),
                             ]),
@@ -147,6 +181,6 @@ class CalendarScreen extends ConsumerWidget {
   }
 
   static String _label(String value) => switch (value) {
-        'all' => 'Tümü', 'task' => 'Görev', 'event' => 'Etkinlik', 'routine' => 'Rutin', 'medication' => 'İlaç', 'scheduled_payment' => 'Ödeme', _ => value,
+        'all' => 'Tümü', googleKind => 'Google', 'task' => 'Görev', 'event' => 'Etkinlik', 'routine' => 'Rutin', 'medication' => 'İlaç', 'scheduled_payment' => 'Ödeme', _ => value,
       };
 }

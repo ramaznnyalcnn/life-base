@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : FlutterActivity() {
     private val channelName = "app.lifebase.mobile/platform"
+    private val calendarRequestCode = 4201
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -38,11 +39,21 @@ class MainActivity : FlutterActivity() {
                         SessionCleaner.clear(this)
                         result.success(true)
                     }
-                    "listCalendars" -> result.success(CalendarSyncer(this).writableCalendars())
-                    "selectCalendar" -> {
-                        CredentialVault(this).saveCalendar(call.argument<Number>("id")!!.toLong())
-                        WorkManager.getInstance(this).enqueue(CalendarSyncer.oneTimeRequest())
-                        result.success(true)
+                    "googleAccounts" -> result.success(CalendarSyncer(this).googleAccounts())
+                    "googleStatus" -> result.success(CalendarSyncer(this).googleStatus())
+                    "connectGoogle" -> {
+                        val connected = CalendarSyncer(this).connectGoogle(call.argument<String>("account").orEmpty())
+                        if (connected) WorkManager.getInstance(this).enqueue(CalendarSyncer.oneTimeRequest())
+                        result.success(connected)
+                    }
+                    "deviceEvents" -> {
+                        val from = call.argument<Number>("from")!!.toLong()
+                        val to = call.argument<Number>("to")!!.toLong()
+                        // Calendar provider queries can be slow; keep them off the UI thread.
+                        Thread {
+                            val events = runCatching { CalendarSyncer(this).deviceEvents(from, to) }.getOrDefault(emptyList())
+                            runOnUiThread { result.success(events) }
+                        }.start()
                     }
                     "saveSyncConfig" -> {
                         CredentialVault(this).save(
@@ -65,15 +76,29 @@ class MainActivity : FlutterActivity() {
         ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
 
+    private var pendingCalendarResult: MethodChannel.Result? = null
+
+    /** Answers only after the user has responded to the permission dialog. */
     private fun requestCalendarAccess(result: MethodChannel.Result) {
-        if (!hasCalendarAccess()) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR),
-                4201,
-            )
+        if (hasCalendarAccess()) {
+            result.success(true)
+            return
         }
-        result.success(hasCalendarAccess())
+        pendingCalendarResult?.success(false)
+        pendingCalendarResult = result
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR),
+            calendarRequestCode,
+        )
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == calendarRequestCode) {
+            pendingCalendarResult?.success(hasCalendarAccess())
+            pendingCalendarResult = null
+        }
     }
 
     private fun requestNotificationAccess(result: MethodChannel.Result) {

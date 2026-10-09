@@ -27,13 +27,27 @@ class PlatformBridge {
 
   Future<void> clearSession() => _channel.invokeMethod<void>('clearSession');
 
-  Future<List<Map<String, Object?>>> writableCalendars() async {
-    final values = await _channel.invokeListMethod<Object?>('listCalendars') ?? const [];
-    return values.cast<Map>().map((item) => Map<String, Object?>.from(item)).toList();
+  /// Google accounts that have calendars on this device.
+  Future<List<String>> googleAccounts() async =>
+      (await _channel.invokeListMethod<Object?>('googleAccounts') ?? const []).cast<String>();
+
+  /// Reads from the account's own calendars and writes into its primary one.
+  Future<bool> connectGoogle(String account) async =>
+      await _channel.invokeMethod<bool>('connectGoogle', {'account': account}) ?? false;
+
+  Future<({String? account, bool permission})> googleStatus() async {
+    final raw = await _channel.invokeMapMethod<String, Object?>('googleStatus') ?? const {};
+    return (account: raw['account'] as String?, permission: raw['permission'] == true);
   }
 
-  Future<void> selectCalendar(int id) =>
-      _channel.invokeMethod<void>('selectCalendar', {'id': id});
+  Future<List<Map<String, Object?>>> deviceEvents(DateTime from, DateTime to) async {
+    final values = await _channel.invokeListMethod<Object?>('deviceEvents', {
+          'from': from.millisecondsSinceEpoch,
+          'to': to.millisecondsSinceEpoch,
+        }) ??
+        const [];
+    return values.cast<Map>().map((item) => Map<String, Object?>.from(item)).toList();
+  }
 
   Future<void> saveSyncConfig({required String serverUrl, required String token}) =>
       _channel.invokeMethod<void>('saveSyncConfig', {

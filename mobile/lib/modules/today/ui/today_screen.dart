@@ -6,6 +6,7 @@ import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
 import '../../../core/models/agenda.dart';
+import '../../../core/platform/device_calendar.dart';
 import '../data/today_controller.dart';
 
 class TodayScreen extends ConsumerWidget {
@@ -14,13 +15,18 @@ class TodayScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final agenda = ref.watch(todayAgendaProvider);
+    final today = DateUtils.dateOnly(DateTime.now());
+    final google = ref.watch(deviceEventsProvider((from: today, to: today))).value ?? const <AgendaItem>[];
     final t = LbTokens.of(context);
     return ModuleScaffold(
       module: LbModule.today,
       title: 'Bugün',
       subtitle: DateFormat('d MMMM, EEEE', 'tr_TR').format(DateTime.now()),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(todayAgendaProvider.future),
+        onRefresh: () {
+          ref.invalidate(deviceEventsProvider);
+          return ref.refresh(todayAgendaProvider.future);
+        },
         child: agenda.when(
           loading: () => ListView(children: const [SizedBox(height: 240), Center(child: CircularProgressIndicator())]),
           error: (error, _) => ListView(padding: moduleListPadding(context), children: [
@@ -29,7 +35,9 @@ class TodayScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Center(child: Text('Gündem alınamadı. Yenilemek için aşağı çek.', style: TextStyle(color: t.muted))),
           ]),
-          data: (data) => ListView(
+          data: (data) {
+            final timeline = mergeTimeline(data.timeline, google);
+            return ListView(
             padding: moduleListPadding(context),
             children: [
               if (data.fromCache)
@@ -40,7 +48,7 @@ class TodayScreen extends ConsumerWidget {
                     child: Chip(avatar: const Icon(Icons.cloud_off_rounded, size: 16), label: const Text('Çevrimdışı')),
                   ),
                 ),
-              _NextCard(item: data.nextItem),
+              _NextCard(item: nextItem(data.nextItem, google, DateTime.now())),
               if (data.overdue.isNotEmpty) ...[
                 const SizedBox(height: 28),
                 _SectionTitle('Gecikenler', count: data.overdue.length, color: t.danger),
@@ -52,15 +60,32 @@ class TodayScreen extends ConsumerWidget {
                 ...data.tasks.map((item) => _AgendaTile(item: item)),
               ],
               const SizedBox(height: 28),
-              _SectionTitle('Saat saat', count: data.timeline.length),
-              if (data.timeline.isEmpty) const _Empty(text: 'Bugün sakin.'),
-              ...data.timeline.map((item) => _AgendaTile(item: item, showTime: true)),
+              _SectionTitle('Saat saat', count: timeline.length),
+              if (timeline.isEmpty) const _Empty(text: 'Bugün sakin.'),
+              ...timeline.map((item) => _AgendaTile(item: item, showTime: true)),
             ],
-          ),
+          );
+          },
         ),
       ),
     );
   }
+}
+
+/// Today's server timeline plus Google events: all-day first, then by time.
+List<AgendaItem> mergeTimeline(List<AgendaItem> server, List<AgendaItem> google) {
+  int key(AgendaItem item) => item.startsAt == null ? -1 : item.startsAt!.toLocal().hour * 60 + item.startsAt!.toLocal().minute;
+  return [...server, ...google]..sort((a, b) => key(a).compareTo(key(b)));
+}
+
+/// The server's next item, unless a Google event starts sooner.
+AgendaItem? nextItem(AgendaItem? server, List<AgendaItem> google, DateTime now) {
+  final upcoming = google.where((item) => item.startsAt != null && item.startsAt!.isAfter(now)).toList()
+    ..sort((a, b) => a.startsAt!.compareTo(b.startsAt!));
+  final candidate = upcoming.firstOrNull;
+  if (candidate == null) return server;
+  if (server?.startsAt == null) return server ?? candidate;
+  return candidate.startsAt!.isBefore(server!.startsAt!) ? candidate : server;
 }
 
 class _NextCard extends StatelessWidget {
@@ -177,6 +202,7 @@ class _AgendaTile extends ConsumerWidget {
         'scheduled_payment' => Icons.payments_rounded,
         'task' => Icons.task_alt_rounded,
         'routine' => Icons.repeat_rounded,
+        googleKind => Icons.event_available_rounded,
         _ => Icons.event_rounded,
       };
 
@@ -185,6 +211,7 @@ class _AgendaTile extends ConsumerWidget {
         'scheduled_payment' => 'Ödeme',
         'task' => 'Görev',
         'routine' => 'Rutin',
+        googleKind => 'Google',
         _ => 'Etkinlik',
       };
 }

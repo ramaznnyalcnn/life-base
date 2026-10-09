@@ -19,6 +19,13 @@ void main() {
     WidgetController.hitTestWarningShouldBeFatal = true;
   });
 
+  // No device calendar in tests: the Android channel answers "nothing here"
+  // (an unmocked channel would never reply inside fake async time).
+  setUp(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('app.lifebase.mobile/platform'),
+        (call) async => call.method == 'googleStatus' ? <String, Object?>{} : <Object?>[],
+      ));
+
   late GoRouter router;
 
   Future<void> pumpApp(WidgetTester tester) async {

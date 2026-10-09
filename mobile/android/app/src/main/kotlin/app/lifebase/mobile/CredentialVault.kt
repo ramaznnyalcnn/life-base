@@ -39,6 +39,8 @@ class CredentialVault(context: Context) {
     fun widget(): String = preferences.getString("widget_snapshot", null).orEmpty()
     fun saveCalendar(id: Long) = preferences.edit().putLong("calendar_id", id).apply()
     fun calendarId(): Long? = preferences.getLong("calendar_id", -1).takeIf { it >= 0 }
+    fun saveGoogleAccount(account: String) = preferences.edit().putString("google_account", account).apply()
+    fun googleAccount(): String? = preferences.getString("google_account", null)
     fun mappings() = preferences
     fun clearSession() {
         preferences.edit()
