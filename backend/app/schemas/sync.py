@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-SYNC_COLLECTIONS = frozenset({"events", "medications", "dose_logs"})
+SYNC_COLLECTIONS = frozenset({"events", "medications", "dose_logs", "notes", "note_items"})
 MAX_BODY_BYTES = 64 * 1024
 MAX_PUSH_CHANGES = 500
 

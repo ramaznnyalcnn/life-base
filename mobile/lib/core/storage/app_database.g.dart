@@ -6659,6 +6659,1316 @@ class WalletOutboxCompanion extends UpdateCompanion<WalletOutboxRow> {
   }
 }
 
+class $LocalNotesTable extends LocalNotes
+    with TableInfo<$LocalNotesTable, LocalNote> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalNotesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
+  @override
+  late final GeneratedColumn<bool> dirty = GeneratedColumn<bool>(
+    'dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+    'body',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('note'),
+  );
+  static const VerificationMeta _pinnedMeta = const VerificationMeta('pinned');
+  @override
+  late final GeneratedColumn<bool> pinned = GeneratedColumn<bool>(
+    'pinned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("pinned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<int> color = GeneratedColumn<int>(
+    'color',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  @override
+  late final GeneratedColumn<String> eventId = GeneratedColumn<String>(
+    'event_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _archivedMeta = const VerificationMeta(
+    'archived',
+  );
+  @override
+  late final GeneratedColumn<bool> archived = GeneratedColumn<bool>(
+    'archived',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("archived" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _spaceMeta = const VerificationMeta('space');
+  @override
+  late final GeneratedColumn<String> space = GeneratedColumn<String>(
+    'space',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('me'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    updatedAtMs,
+    deletedAtMs,
+    dirty,
+    title,
+    body,
+    kind,
+    pinned,
+    color,
+    eventId,
+    archived,
+    space,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_notes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalNote> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMsMeta);
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dirty')) {
+      context.handle(
+        _dirtyMeta,
+        dirty.isAcceptableOrUnknown(data['dirty']!, _dirtyMeta),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+        _bodyMeta,
+        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+      );
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    }
+    if (data.containsKey('pinned')) {
+      context.handle(
+        _pinnedMeta,
+        pinned.isAcceptableOrUnknown(data['pinned']!, _pinnedMeta),
+      );
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
+      );
+    }
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    }
+    if (data.containsKey('archived')) {
+      context.handle(
+        _archivedMeta,
+        archived.isAcceptableOrUnknown(data['archived']!, _archivedMeta),
+      );
+    }
+    if (data.containsKey('space')) {
+      context.handle(
+        _spaceMeta,
+        space.isAcceptableOrUnknown(data['space']!, _spaceMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalNote map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalNote(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
+      dirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dirty'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      body: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      pinned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}pinned'],
+      )!,
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}color'],
+      ),
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_id'],
+      ),
+      archived: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}archived'],
+      )!,
+      space: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}space'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalNotesTable createAlias(String alias) {
+    return $LocalNotesTable(attachedDatabase, alias);
+  }
+}
+
+class LocalNote extends DataClass implements Insertable<LocalNote> {
+  final String id;
+  final int updatedAtMs;
+  final int? deletedAtMs;
+  final bool dirty;
+  final String title;
+  final String body;
+
+  /// note, list
+  final String kind;
+  final bool pinned;
+  final int? color;
+
+  /// The calendar event made from this note, if any.
+  final String? eventId;
+  final bool archived;
+  final String space;
+  const LocalNote({
+    required this.id,
+    required this.updatedAtMs,
+    this.deletedAtMs,
+    required this.dirty,
+    required this.title,
+    required this.body,
+    required this.kind,
+    required this.pinned,
+    this.color,
+    this.eventId,
+    required this.archived,
+    required this.space,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
+    map['dirty'] = Variable<bool>(dirty);
+    map['title'] = Variable<String>(title);
+    map['body'] = Variable<String>(body);
+    map['kind'] = Variable<String>(kind);
+    map['pinned'] = Variable<bool>(pinned);
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<int>(color);
+    }
+    if (!nullToAbsent || eventId != null) {
+      map['event_id'] = Variable<String>(eventId);
+    }
+    map['archived'] = Variable<bool>(archived);
+    map['space'] = Variable<String>(space);
+    return map;
+  }
+
+  LocalNotesCompanion toCompanion(bool nullToAbsent) {
+    return LocalNotesCompanion(
+      id: Value(id),
+      updatedAtMs: Value(updatedAtMs),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
+      dirty: Value(dirty),
+      title: Value(title),
+      body: Value(body),
+      kind: Value(kind),
+      pinned: Value(pinned),
+      color: color == null && nullToAbsent
+          ? const Value.absent()
+          : Value(color),
+      eventId: eventId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(eventId),
+      archived: Value(archived),
+      space: Value(space),
+    );
+  }
+
+  factory LocalNote.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalNote(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
+      dirty: serializer.fromJson<bool>(json['dirty']),
+      title: serializer.fromJson<String>(json['title']),
+      body: serializer.fromJson<String>(json['body']),
+      kind: serializer.fromJson<String>(json['kind']),
+      pinned: serializer.fromJson<bool>(json['pinned']),
+      color: serializer.fromJson<int?>(json['color']),
+      eventId: serializer.fromJson<String?>(json['eventId']),
+      archived: serializer.fromJson<bool>(json['archived']),
+      space: serializer.fromJson<String>(json['space']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
+      'dirty': serializer.toJson<bool>(dirty),
+      'title': serializer.toJson<String>(title),
+      'body': serializer.toJson<String>(body),
+      'kind': serializer.toJson<String>(kind),
+      'pinned': serializer.toJson<bool>(pinned),
+      'color': serializer.toJson<int?>(color),
+      'eventId': serializer.toJson<String?>(eventId),
+      'archived': serializer.toJson<bool>(archived),
+      'space': serializer.toJson<String>(space),
+    };
+  }
+
+  LocalNote copyWith({
+    String? id,
+    int? updatedAtMs,
+    Value<int?> deletedAtMs = const Value.absent(),
+    bool? dirty,
+    String? title,
+    String? body,
+    String? kind,
+    bool? pinned,
+    Value<int?> color = const Value.absent(),
+    Value<String?> eventId = const Value.absent(),
+    bool? archived,
+    String? space,
+  }) => LocalNote(
+    id: id ?? this.id,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
+    dirty: dirty ?? this.dirty,
+    title: title ?? this.title,
+    body: body ?? this.body,
+    kind: kind ?? this.kind,
+    pinned: pinned ?? this.pinned,
+    color: color.present ? color.value : this.color,
+    eventId: eventId.present ? eventId.value : this.eventId,
+    archived: archived ?? this.archived,
+    space: space ?? this.space,
+  );
+  LocalNote copyWithCompanion(LocalNotesCompanion data) {
+    return LocalNote(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+      dirty: data.dirty.present ? data.dirty.value : this.dirty,
+      title: data.title.present ? data.title.value : this.title,
+      body: data.body.present ? data.body.value : this.body,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      pinned: data.pinned.present ? data.pinned.value : this.pinned,
+      color: data.color.present ? data.color.value : this.color,
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      archived: data.archived.present ? data.archived.value : this.archived,
+      space: data.space.present ? data.space.value : this.space,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalNote(')
+          ..write('id: $id, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('dirty: $dirty, ')
+          ..write('title: $title, ')
+          ..write('body: $body, ')
+          ..write('kind: $kind, ')
+          ..write('pinned: $pinned, ')
+          ..write('color: $color, ')
+          ..write('eventId: $eventId, ')
+          ..write('archived: $archived, ')
+          ..write('space: $space')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    updatedAtMs,
+    deletedAtMs,
+    dirty,
+    title,
+    body,
+    kind,
+    pinned,
+    color,
+    eventId,
+    archived,
+    space,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalNote &&
+          other.id == this.id &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.deletedAtMs == this.deletedAtMs &&
+          other.dirty == this.dirty &&
+          other.title == this.title &&
+          other.body == this.body &&
+          other.kind == this.kind &&
+          other.pinned == this.pinned &&
+          other.color == this.color &&
+          other.eventId == this.eventId &&
+          other.archived == this.archived &&
+          other.space == this.space);
+}
+
+class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
+  final Value<String> id;
+  final Value<int> updatedAtMs;
+  final Value<int?> deletedAtMs;
+  final Value<bool> dirty;
+  final Value<String> title;
+  final Value<String> body;
+  final Value<String> kind;
+  final Value<bool> pinned;
+  final Value<int?> color;
+  final Value<String?> eventId;
+  final Value<bool> archived;
+  final Value<String> space;
+  final Value<int> rowid;
+  const LocalNotesCompanion({
+    this.id = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.dirty = const Value.absent(),
+    this.title = const Value.absent(),
+    this.body = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.pinned = const Value.absent(),
+    this.color = const Value.absent(),
+    this.eventId = const Value.absent(),
+    this.archived = const Value.absent(),
+    this.space = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalNotesCompanion.insert({
+    required String id,
+    required int updatedAtMs,
+    this.deletedAtMs = const Value.absent(),
+    this.dirty = const Value.absent(),
+    this.title = const Value.absent(),
+    this.body = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.pinned = const Value.absent(),
+    this.color = const Value.absent(),
+    this.eventId = const Value.absent(),
+    this.archived = const Value.absent(),
+    this.space = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       updatedAtMs = Value(updatedAtMs);
+  static Insertable<LocalNote> custom({
+    Expression<String>? id,
+    Expression<int>? updatedAtMs,
+    Expression<int>? deletedAtMs,
+    Expression<bool>? dirty,
+    Expression<String>? title,
+    Expression<String>? body,
+    Expression<String>? kind,
+    Expression<bool>? pinned,
+    Expression<int>? color,
+    Expression<String>? eventId,
+    Expression<bool>? archived,
+    Expression<String>? space,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (dirty != null) 'dirty': dirty,
+      if (title != null) 'title': title,
+      if (body != null) 'body': body,
+      if (kind != null) 'kind': kind,
+      if (pinned != null) 'pinned': pinned,
+      if (color != null) 'color': color,
+      if (eventId != null) 'event_id': eventId,
+      if (archived != null) 'archived': archived,
+      if (space != null) 'space': space,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalNotesCompanion copyWith({
+    Value<String>? id,
+    Value<int>? updatedAtMs,
+    Value<int?>? deletedAtMs,
+    Value<bool>? dirty,
+    Value<String>? title,
+    Value<String>? body,
+    Value<String>? kind,
+    Value<bool>? pinned,
+    Value<int?>? color,
+    Value<String?>? eventId,
+    Value<bool>? archived,
+    Value<String>? space,
+    Value<int>? rowid,
+  }) {
+    return LocalNotesCompanion(
+      id: id ?? this.id,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      dirty: dirty ?? this.dirty,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      kind: kind ?? this.kind,
+      pinned: pinned ?? this.pinned,
+      color: color ?? this.color,
+      eventId: eventId ?? this.eventId,
+      archived: archived ?? this.archived,
+      space: space ?? this.space,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (dirty.present) {
+      map['dirty'] = Variable<bool>(dirty.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (pinned.present) {
+      map['pinned'] = Variable<bool>(pinned.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<int>(color.value);
+    }
+    if (eventId.present) {
+      map['event_id'] = Variable<String>(eventId.value);
+    }
+    if (archived.present) {
+      map['archived'] = Variable<bool>(archived.value);
+    }
+    if (space.present) {
+      map['space'] = Variable<String>(space.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalNotesCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('dirty: $dirty, ')
+          ..write('title: $title, ')
+          ..write('body: $body, ')
+          ..write('kind: $kind, ')
+          ..write('pinned: $pinned, ')
+          ..write('color: $color, ')
+          ..write('eventId: $eventId, ')
+          ..write('archived: $archived, ')
+          ..write('space: $space, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LocalNoteItemsTable extends LocalNoteItems
+    with TableInfo<$LocalNoteItemsTable, LocalNoteItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalNoteItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
+  @override
+  late final GeneratedColumn<bool> dirty = GeneratedColumn<bool>(
+    'dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _doneMeta = const VerificationMeta('done');
+  @override
+  late final GeneratedColumn<bool> done = GeneratedColumn<bool>(
+    'done',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("done" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<double> position = GeneratedColumn<double>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _doneByMeta = const VerificationMeta('doneBy');
+  @override
+  late final GeneratedColumn<int> doneBy = GeneratedColumn<int>(
+    'done_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _spaceMeta = const VerificationMeta('space');
+  @override
+  late final GeneratedColumn<String> space = GeneratedColumn<String>(
+    'space',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('me'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    updatedAtMs,
+    deletedAtMs,
+    dirty,
+    noteId,
+    content,
+    done,
+    position,
+    doneBy,
+    space,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_note_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalNoteItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMsMeta);
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dirty')) {
+      context.handle(
+        _dirtyMeta,
+        dirty.isAcceptableOrUnknown(data['dirty']!, _dirtyMeta),
+      );
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteIdMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    }
+    if (data.containsKey('done')) {
+      context.handle(
+        _doneMeta,
+        done.isAcceptableOrUnknown(data['done']!, _doneMeta),
+      );
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    }
+    if (data.containsKey('done_by')) {
+      context.handle(
+        _doneByMeta,
+        doneBy.isAcceptableOrUnknown(data['done_by']!, _doneByMeta),
+      );
+    }
+    if (data.containsKey('space')) {
+      context.handle(
+        _spaceMeta,
+        space.isAcceptableOrUnknown(data['space']!, _spaceMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalNoteItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalNoteItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
+      dirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dirty'],
+      )!,
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      done: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}done'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}position'],
+      )!,
+      doneBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}done_by'],
+      ),
+      space: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}space'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalNoteItemsTable createAlias(String alias) {
+    return $LocalNoteItemsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalNoteItem extends DataClass implements Insertable<LocalNoteItem> {
+  final String id;
+  final int updatedAtMs;
+  final int? deletedAtMs;
+  final bool dirty;
+  final String noteId;
+  final String content;
+  final bool done;
+  final double position;
+
+  /// User id that ticked it (shared lists).
+  final int? doneBy;
+  final String space;
+  const LocalNoteItem({
+    required this.id,
+    required this.updatedAtMs,
+    this.deletedAtMs,
+    required this.dirty,
+    required this.noteId,
+    required this.content,
+    required this.done,
+    required this.position,
+    this.doneBy,
+    required this.space,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
+    map['dirty'] = Variable<bool>(dirty);
+    map['note_id'] = Variable<String>(noteId);
+    map['content'] = Variable<String>(content);
+    map['done'] = Variable<bool>(done);
+    map['position'] = Variable<double>(position);
+    if (!nullToAbsent || doneBy != null) {
+      map['done_by'] = Variable<int>(doneBy);
+    }
+    map['space'] = Variable<String>(space);
+    return map;
+  }
+
+  LocalNoteItemsCompanion toCompanion(bool nullToAbsent) {
+    return LocalNoteItemsCompanion(
+      id: Value(id),
+      updatedAtMs: Value(updatedAtMs),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
+      dirty: Value(dirty),
+      noteId: Value(noteId),
+      content: Value(content),
+      done: Value(done),
+      position: Value(position),
+      doneBy: doneBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(doneBy),
+      space: Value(space),
+    );
+  }
+
+  factory LocalNoteItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalNoteItem(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
+      dirty: serializer.fromJson<bool>(json['dirty']),
+      noteId: serializer.fromJson<String>(json['noteId']),
+      content: serializer.fromJson<String>(json['content']),
+      done: serializer.fromJson<bool>(json['done']),
+      position: serializer.fromJson<double>(json['position']),
+      doneBy: serializer.fromJson<int?>(json['doneBy']),
+      space: serializer.fromJson<String>(json['space']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
+      'dirty': serializer.toJson<bool>(dirty),
+      'noteId': serializer.toJson<String>(noteId),
+      'content': serializer.toJson<String>(content),
+      'done': serializer.toJson<bool>(done),
+      'position': serializer.toJson<double>(position),
+      'doneBy': serializer.toJson<int?>(doneBy),
+      'space': serializer.toJson<String>(space),
+    };
+  }
+
+  LocalNoteItem copyWith({
+    String? id,
+    int? updatedAtMs,
+    Value<int?> deletedAtMs = const Value.absent(),
+    bool? dirty,
+    String? noteId,
+    String? content,
+    bool? done,
+    double? position,
+    Value<int?> doneBy = const Value.absent(),
+    String? space,
+  }) => LocalNoteItem(
+    id: id ?? this.id,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
+    dirty: dirty ?? this.dirty,
+    noteId: noteId ?? this.noteId,
+    content: content ?? this.content,
+    done: done ?? this.done,
+    position: position ?? this.position,
+    doneBy: doneBy.present ? doneBy.value : this.doneBy,
+    space: space ?? this.space,
+  );
+  LocalNoteItem copyWithCompanion(LocalNoteItemsCompanion data) {
+    return LocalNoteItem(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+      dirty: data.dirty.present ? data.dirty.value : this.dirty,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      content: data.content.present ? data.content.value : this.content,
+      done: data.done.present ? data.done.value : this.done,
+      position: data.position.present ? data.position.value : this.position,
+      doneBy: data.doneBy.present ? data.doneBy.value : this.doneBy,
+      space: data.space.present ? data.space.value : this.space,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalNoteItem(')
+          ..write('id: $id, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('dirty: $dirty, ')
+          ..write('noteId: $noteId, ')
+          ..write('content: $content, ')
+          ..write('done: $done, ')
+          ..write('position: $position, ')
+          ..write('doneBy: $doneBy, ')
+          ..write('space: $space')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    updatedAtMs,
+    deletedAtMs,
+    dirty,
+    noteId,
+    content,
+    done,
+    position,
+    doneBy,
+    space,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalNoteItem &&
+          other.id == this.id &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.deletedAtMs == this.deletedAtMs &&
+          other.dirty == this.dirty &&
+          other.noteId == this.noteId &&
+          other.content == this.content &&
+          other.done == this.done &&
+          other.position == this.position &&
+          other.doneBy == this.doneBy &&
+          other.space == this.space);
+}
+
+class LocalNoteItemsCompanion extends UpdateCompanion<LocalNoteItem> {
+  final Value<String> id;
+  final Value<int> updatedAtMs;
+  final Value<int?> deletedAtMs;
+  final Value<bool> dirty;
+  final Value<String> noteId;
+  final Value<String> content;
+  final Value<bool> done;
+  final Value<double> position;
+  final Value<int?> doneBy;
+  final Value<String> space;
+  final Value<int> rowid;
+  const LocalNoteItemsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.dirty = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.content = const Value.absent(),
+    this.done = const Value.absent(),
+    this.position = const Value.absent(),
+    this.doneBy = const Value.absent(),
+    this.space = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalNoteItemsCompanion.insert({
+    required String id,
+    required int updatedAtMs,
+    this.deletedAtMs = const Value.absent(),
+    this.dirty = const Value.absent(),
+    required String noteId,
+    this.content = const Value.absent(),
+    this.done = const Value.absent(),
+    this.position = const Value.absent(),
+    this.doneBy = const Value.absent(),
+    this.space = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       updatedAtMs = Value(updatedAtMs),
+       noteId = Value(noteId);
+  static Insertable<LocalNoteItem> custom({
+    Expression<String>? id,
+    Expression<int>? updatedAtMs,
+    Expression<int>? deletedAtMs,
+    Expression<bool>? dirty,
+    Expression<String>? noteId,
+    Expression<String>? content,
+    Expression<bool>? done,
+    Expression<double>? position,
+    Expression<int>? doneBy,
+    Expression<String>? space,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (dirty != null) 'dirty': dirty,
+      if (noteId != null) 'note_id': noteId,
+      if (content != null) 'content': content,
+      if (done != null) 'done': done,
+      if (position != null) 'position': position,
+      if (doneBy != null) 'done_by': doneBy,
+      if (space != null) 'space': space,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalNoteItemsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? updatedAtMs,
+    Value<int?>? deletedAtMs,
+    Value<bool>? dirty,
+    Value<String>? noteId,
+    Value<String>? content,
+    Value<bool>? done,
+    Value<double>? position,
+    Value<int?>? doneBy,
+    Value<String>? space,
+    Value<int>? rowid,
+  }) {
+    return LocalNoteItemsCompanion(
+      id: id ?? this.id,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      dirty: dirty ?? this.dirty,
+      noteId: noteId ?? this.noteId,
+      content: content ?? this.content,
+      done: done ?? this.done,
+      position: position ?? this.position,
+      doneBy: doneBy ?? this.doneBy,
+      space: space ?? this.space,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (dirty.present) {
+      map['dirty'] = Variable<bool>(dirty.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (done.present) {
+      map['done'] = Variable<bool>(done.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<double>(position.value);
+    }
+    if (doneBy.present) {
+      map['done_by'] = Variable<int>(doneBy.value);
+    }
+    if (space.present) {
+      map['space'] = Variable<String>(space.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalNoteItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('dirty: $dirty, ')
+          ..write('noteId: $noteId, ')
+          ..write('content: $content, ')
+          ..write('done: $done, ')
+          ..write('position: $position, ')
+          ..write('doneBy: $doneBy, ')
+          ..write('space: $space, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6683,6 +7993,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $WalletStatementMarksTable walletStatementMarks =
       $WalletStatementMarksTable(this);
   late final $WalletOutboxTable walletOutbox = $WalletOutboxTable(this);
+  late final $LocalNotesTable localNotes = $LocalNotesTable(this);
+  late final $LocalNoteItemsTable localNoteItems = $LocalNoteItemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6699,6 +8011,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     walletTransfers,
     walletStatementMarks,
     walletOutbox,
+    localNotes,
+    localNoteItems,
   ];
 }
 
@@ -10010,6 +11324,641 @@ typedef $$WalletOutboxTableProcessedTableManager =
       WalletOutboxRow,
       PrefetchHooks Function()
     >;
+typedef $$LocalNotesTableCreateCompanionBuilder =
+    LocalNotesCompanion Function({
+      required String id,
+      required int updatedAtMs,
+      Value<int?> deletedAtMs,
+      Value<bool> dirty,
+      Value<String> title,
+      Value<String> body,
+      Value<String> kind,
+      Value<bool> pinned,
+      Value<int?> color,
+      Value<String?> eventId,
+      Value<bool> archived,
+      Value<String> space,
+      Value<int> rowid,
+    });
+typedef $$LocalNotesTableUpdateCompanionBuilder =
+    LocalNotesCompanion Function({
+      Value<String> id,
+      Value<int> updatedAtMs,
+      Value<int?> deletedAtMs,
+      Value<bool> dirty,
+      Value<String> title,
+      Value<String> body,
+      Value<String> kind,
+      Value<bool> pinned,
+      Value<int?> color,
+      Value<String?> eventId,
+      Value<bool> archived,
+      Value<String> space,
+      Value<int> rowid,
+    });
+
+class $$LocalNotesTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalNotesTable> {
+  $$LocalNotesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get pinned => $composableBuilder(
+    column: $table.pinned,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get archived => $composableBuilder(
+    column: $table.archived,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get space => $composableBuilder(
+    column: $table.space,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalNotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalNotesTable> {
+  $$LocalNotesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get pinned => $composableBuilder(
+    column: $table.pinned,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get archived => $composableBuilder(
+    column: $table.archived,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get space => $composableBuilder(
+    column: $table.space,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalNotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalNotesTable> {
+  $$LocalNotesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get dirty =>
+      $composableBuilder(column: $table.dirty, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<bool> get pinned =>
+      $composableBuilder(column: $table.pinned, builder: (column) => column);
+
+  GeneratedColumn<int> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
+  GeneratedColumn<bool> get archived =>
+      $composableBuilder(column: $table.archived, builder: (column) => column);
+
+  GeneratedColumn<String> get space =>
+      $composableBuilder(column: $table.space, builder: (column) => column);
+}
+
+class $$LocalNotesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalNotesTable,
+          LocalNote,
+          $$LocalNotesTableFilterComposer,
+          $$LocalNotesTableOrderingComposer,
+          $$LocalNotesTableAnnotationComposer,
+          $$LocalNotesTableCreateCompanionBuilder,
+          $$LocalNotesTableUpdateCompanionBuilder,
+          (
+            LocalNote,
+            BaseReferences<_$AppDatabase, $LocalNotesTable, LocalNote>,
+          ),
+          LocalNote,
+          PrefetchHooks Function()
+        > {
+  $$LocalNotesTableTableManager(_$AppDatabase db, $LocalNotesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalNotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalNotesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalNotesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<bool> pinned = const Value.absent(),
+                Value<int?> color = const Value.absent(),
+                Value<String?> eventId = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
+                Value<String> space = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalNotesCompanion(
+                id: id,
+                updatedAtMs: updatedAtMs,
+                deletedAtMs: deletedAtMs,
+                dirty: dirty,
+                title: title,
+                body: body,
+                kind: kind,
+                pinned: pinned,
+                color: color,
+                eventId: eventId,
+                archived: archived,
+                space: space,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int updatedAtMs,
+                Value<int?> deletedAtMs = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<bool> pinned = const Value.absent(),
+                Value<int?> color = const Value.absent(),
+                Value<String?> eventId = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
+                Value<String> space = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalNotesCompanion.insert(
+                id: id,
+                updatedAtMs: updatedAtMs,
+                deletedAtMs: deletedAtMs,
+                dirty: dirty,
+                title: title,
+                body: body,
+                kind: kind,
+                pinned: pinned,
+                color: color,
+                eventId: eventId,
+                archived: archived,
+                space: space,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalNotesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalNotesTable,
+      LocalNote,
+      $$LocalNotesTableFilterComposer,
+      $$LocalNotesTableOrderingComposer,
+      $$LocalNotesTableAnnotationComposer,
+      $$LocalNotesTableCreateCompanionBuilder,
+      $$LocalNotesTableUpdateCompanionBuilder,
+      (LocalNote, BaseReferences<_$AppDatabase, $LocalNotesTable, LocalNote>),
+      LocalNote,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalNoteItemsTableCreateCompanionBuilder =
+    LocalNoteItemsCompanion Function({
+      required String id,
+      required int updatedAtMs,
+      Value<int?> deletedAtMs,
+      Value<bool> dirty,
+      required String noteId,
+      Value<String> content,
+      Value<bool> done,
+      Value<double> position,
+      Value<int?> doneBy,
+      Value<String> space,
+      Value<int> rowid,
+    });
+typedef $$LocalNoteItemsTableUpdateCompanionBuilder =
+    LocalNoteItemsCompanion Function({
+      Value<String> id,
+      Value<int> updatedAtMs,
+      Value<int?> deletedAtMs,
+      Value<bool> dirty,
+      Value<String> noteId,
+      Value<String> content,
+      Value<bool> done,
+      Value<double> position,
+      Value<int?> doneBy,
+      Value<String> space,
+      Value<int> rowid,
+    });
+
+class $$LocalNoteItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalNoteItemsTable> {
+  $$LocalNoteItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get doneBy => $composableBuilder(
+    column: $table.doneBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get space => $composableBuilder(
+    column: $table.space,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalNoteItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalNoteItemsTable> {
+  $$LocalNoteItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get doneBy => $composableBuilder(
+    column: $table.doneBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get space => $composableBuilder(
+    column: $table.space,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalNoteItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalNoteItemsTable> {
+  $$LocalNoteItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get dirty =>
+      $composableBuilder(column: $table.dirty, builder: (column) => column);
+
+  GeneratedColumn<String> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<bool> get done =>
+      $composableBuilder(column: $table.done, builder: (column) => column);
+
+  GeneratedColumn<double> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<int> get doneBy =>
+      $composableBuilder(column: $table.doneBy, builder: (column) => column);
+
+  GeneratedColumn<String> get space =>
+      $composableBuilder(column: $table.space, builder: (column) => column);
+}
+
+class $$LocalNoteItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalNoteItemsTable,
+          LocalNoteItem,
+          $$LocalNoteItemsTableFilterComposer,
+          $$LocalNoteItemsTableOrderingComposer,
+          $$LocalNoteItemsTableAnnotationComposer,
+          $$LocalNoteItemsTableCreateCompanionBuilder,
+          $$LocalNoteItemsTableUpdateCompanionBuilder,
+          (
+            LocalNoteItem,
+            BaseReferences<_$AppDatabase, $LocalNoteItemsTable, LocalNoteItem>,
+          ),
+          LocalNoteItem,
+          PrefetchHooks Function()
+        > {
+  $$LocalNoteItemsTableTableManager(
+    _$AppDatabase db,
+    $LocalNoteItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalNoteItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalNoteItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalNoteItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                Value<String> noteId = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<double> position = const Value.absent(),
+                Value<int?> doneBy = const Value.absent(),
+                Value<String> space = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalNoteItemsCompanion(
+                id: id,
+                updatedAtMs: updatedAtMs,
+                deletedAtMs: deletedAtMs,
+                dirty: dirty,
+                noteId: noteId,
+                content: content,
+                done: done,
+                position: position,
+                doneBy: doneBy,
+                space: space,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int updatedAtMs,
+                Value<int?> deletedAtMs = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                required String noteId,
+                Value<String> content = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<double> position = const Value.absent(),
+                Value<int?> doneBy = const Value.absent(),
+                Value<String> space = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalNoteItemsCompanion.insert(
+                id: id,
+                updatedAtMs: updatedAtMs,
+                deletedAtMs: deletedAtMs,
+                dirty: dirty,
+                noteId: noteId,
+                content: content,
+                done: done,
+                position: position,
+                doneBy: doneBy,
+                space: space,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalNoteItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalNoteItemsTable,
+      LocalNoteItem,
+      $$LocalNoteItemsTableFilterComposer,
+      $$LocalNoteItemsTableOrderingComposer,
+      $$LocalNoteItemsTableAnnotationComposer,
+      $$LocalNoteItemsTableCreateCompanionBuilder,
+      $$LocalNoteItemsTableUpdateCompanionBuilder,
+      (
+        LocalNoteItem,
+        BaseReferences<_$AppDatabase, $LocalNoteItemsTable, LocalNoteItem>,
+      ),
+      LocalNoteItem,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10036,4 +11985,8 @@ class $AppDatabaseManager {
       $$WalletStatementMarksTableTableManager(_db, _db.walletStatementMarks);
   $$WalletOutboxTableTableManager get walletOutbox =>
       $$WalletOutboxTableTableManager(_db, _db.walletOutbox);
+  $$LocalNotesTableTableManager get localNotes =>
+      $$LocalNotesTableTableManager(_db, _db.localNotes);
+  $$LocalNoteItemsTableTableManager get localNoteItems =>
+      $$LocalNoteItemsTableTableManager(_db, _db.localNoteItems);
 }

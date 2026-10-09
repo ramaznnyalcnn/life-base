@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../data/events_repository.dart';
+import '../../../core/calendar/events_repository.dart';
 
 /// For a repeating event: apply to this occurrence, this and later ones, or
 /// the whole series. Returns null when cancelled.

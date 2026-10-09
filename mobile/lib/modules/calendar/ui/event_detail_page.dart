@@ -7,7 +7,7 @@ import '../../../core/calendar/calendar_store.dart';
 import '../../../core/calendar/reminder_defaults.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
-import '../data/events_repository.dart';
+import '../../../core/calendar/events_repository.dart';
 import 'calendar_format.dart';
 import 'event_edit_page.dart';
 import 'series_scope_dialog.dart';

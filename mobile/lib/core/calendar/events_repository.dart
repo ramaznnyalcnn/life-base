@@ -2,11 +2,11 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/calendar/calendar_event.dart';
-import '../../../core/providers.dart';
-import '../../../core/storage/app_database.dart';
-import '../../../core/sync/local_sync.dart';
-import '../../../core/sync/sync_controller.dart';
+import 'calendar_event.dart';
+import '../providers.dart';
+import '../storage/app_database.dart';
+import '../sync/local_sync.dart';
+import '../sync/sync_controller.dart';
 
 /// Which part of a repeating series an edit or delete applies to.
 enum SeriesScope { thisOne, thisAndFollowing, all }

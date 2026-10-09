@@ -28,7 +28,7 @@ final localSyncEngineProvider = Provider<LocalSyncEngine?>((ref) {
   return LocalSyncEngine(database: db, transport: ApiSyncTransport(api), collections: localSyncCollections(db));
 });
 
-/// Rows (events, medications, dose logs, wallet writes) not yet backed up to the server.
+/// Rows (events, medications, dose logs, notes, wallet writes) not yet backed up to the server.
 final localPendingCountProvider = StreamProvider<int>((ref) {
   final db = ref.watch(databaseProvider);
   return db
@@ -36,8 +36,10 @@ final localPendingCountProvider = StreamProvider<int>((ref) {
         'SELECT (SELECT COUNT(*) FROM local_events WHERE dirty = 1)'
         ' + (SELECT COUNT(*) FROM local_medications WHERE dirty = 1)'
         ' + (SELECT COUNT(*) FROM local_dose_logs WHERE dirty = 1)'
+        ' + (SELECT COUNT(*) FROM local_notes WHERE dirty = 1)'
+        ' + (SELECT COUNT(*) FROM local_note_items WHERE dirty = 1)'
         " + (SELECT COUNT(*) FROM wallet_outbox WHERE state != 'sent') AS c",
-        readsFrom: {db.localEvents, db.localMedications, db.localDoseLogs, db.walletOutbox},
+        readsFrom: {db.localEvents, db.localMedications, db.localDoseLogs, db.localNotes, db.localNoteItems, db.walletOutbox},
       )
       .watchSingle()
       .map((row) => row.read<int>('c'));

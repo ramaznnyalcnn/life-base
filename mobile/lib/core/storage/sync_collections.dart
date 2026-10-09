@@ -10,6 +10,8 @@ abstract final class SyncCollections {
   static const events = 'events';
   static const medications = 'medications';
   static const doseLogs = 'dose_logs';
+  static const notes = 'notes';
+  static const noteItems = 'note_items';
 }
 
 String? _iso(DateTime? value) => value?.toUtc().toIso8601String();
@@ -102,8 +104,54 @@ final doseLogCodec = SyncRowCodec<LocalDoseLog>(
   ),
 );
 
+final noteCodec = SyncRowCodec<LocalNote>(
+  meta: (r) => (id: r.id, updatedAtMs: r.updatedAtMs, deletedAtMs: r.deletedAtMs, dirty: r.dirty),
+  toBody: (r) => {
+    'title': r.title,
+    'body': r.body,
+    'kind': r.kind,
+    'pinned': r.pinned,
+    'color': r.color,
+    'event_id': r.eventId,
+    'archived': r.archived,
+  },
+  fromBody: (id, b, ms) => LocalNotesCompanion.insert(
+    id: id,
+    updatedAtMs: ms,
+    title: Value(b['title'] as String? ?? ''),
+    body: Value(b['body'] as String? ?? ''),
+    kind: Value(b['kind'] as String? ?? 'note'),
+    pinned: Value(b['pinned'] == true),
+    color: Value((b['color'] as num?)?.toInt()),
+    eventId: Value(b['event_id'] as String?),
+    archived: Value(b['archived'] == true),
+  ),
+);
+
+final noteItemCodec = SyncRowCodec<LocalNoteItem>(
+  meta: (r) => (id: r.id, updatedAtMs: r.updatedAtMs, deletedAtMs: r.deletedAtMs, dirty: r.dirty),
+  toBody: (r) => {
+    'note_id': r.noteId,
+    'content': r.content,
+    'done': r.done,
+    'position': r.position,
+    'done_by': r.doneBy,
+  },
+  fromBody: (id, b, ms) => LocalNoteItemsCompanion.insert(
+    id: id,
+    updatedAtMs: ms,
+    noteId: b['note_id'] as String? ?? '',
+    content: Value(b['content'] as String? ?? ''),
+    done: Value(b['done'] == true),
+    position: Value(_num(b['position']) ?? 0),
+    doneBy: Value((b['done_by'] as num?)?.toInt()),
+  ),
+);
+
 List<SyncCollection> localSyncCollections(AppDatabase db) => [
       DriftSyncCollection(db, db.localEvents, SyncCollections.events, eventCodec),
       DriftSyncCollection(db, db.localMedications, SyncCollections.medications, medicationCodec),
       DriftSyncCollection(db, db.localDoseLogs, SyncCollections.doseLogs, doseLogCodec),
+      DriftSyncCollection(db, db.localNotes, SyncCollections.notes, noteCodec),
+      DriftSyncCollection(db, db.localNoteItems, SyncCollections.noteItems, noteItemCodec),
     ];

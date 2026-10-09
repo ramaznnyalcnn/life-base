@@ -5,8 +5,11 @@ The Android client in `mobile/` is a Flutter 3.38 application for Android 8.0+
 
 ## Product flow
 
-- Four independent modules behind a floating glass navigation bar:
-  **Bugün**, **Cüzdan**, **Takvim**, **İlaç**. Account and settings open from
+- Five independent modules behind a floating "liquid glass" tab bar, in the
+  order **Cüzdan · Takvim · Bugün · İlaç · Notlar**. Bugün is home: the app
+  opens there and back returns there. Every tab shows its icon and label; a
+  lens springs behind the active one, and sliding a finger along the bar
+  switches tabs. Account and settings open from
   the profile button in each module's header.
 - Each module owns its add flow (floating add button → container transform
   into that module's own page). There is no shared "Ekle" wizard.
@@ -147,6 +150,26 @@ Sunucudaki" (on the movement and in "Kararını bekleyenler"); other refusals
 can be retried or dropped. Accepted writes leave the outbox only together with
 the pull that contains them, so nothing is counted twice. Pulls run with the
 rest of sync; joining or leaving a household replaces the mirror.
+
+## Notes
+
+Notes and checklists live on the device and are backed up like calendar
+events (`local_notes`, `local_note_items`; each checklist line is its own
+document). The editor saves as you type; an empty new note is never stored.
+
+- **Takvime ekle.** When a note mentions a date or time, a chip offers to add
+  it to the calendar (e.g. "Takvime ekle: Yarın 15:00"). Recognition is a fixed
+  set of Turkish rules (`core/notes/date_hint.dart`, no AI, offline): bugün,
+  yarın, öbür gün, "N gün sonra", haftaya, weekday names (with "haftaya" and
+  suffixes like "cuma'ya"), "12 ekim [2027]", "12/10[/2026]", "12.10.2026",
+  "15:00", "15.30", "saat 3'te" (afternoon), "sabah 9", "akşam 8", "gece 11",
+  "öğlen". "12.10" alone is read as a time. One tap makes the event (title
+  without the date words, the note's text as its notes, the default
+  reminders) and links it; later edits to the note update the event's text.
+  The note shows "Takvimde: …" with options to unlink or delete the event.
+- **Lists:** add, tick, drag to reorder, delete; ticked lines move below.
+  A note turns into a list (lines become items) and back.
+- Search, filters (Tümü / Listeler / Takvimde), pinning and colours.
 
 ## Android integration
 

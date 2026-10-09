@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lifebase_mobile/core/calendar/calendar_event.dart';
 import 'package:lifebase_mobile/core/calendar/calendar_store.dart';
 import 'package:lifebase_mobile/core/storage/app_database.dart';
-import 'package:lifebase_mobile/modules/calendar/data/events_repository.dart';
+import 'package:lifebase_mobile/core/calendar/events_repository.dart';
 
 void main() {
   late AppDatabase db;

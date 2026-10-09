@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/calendar/calendar_event.dart';
 import '../../../core/providers.dart';
-import 'events_repository.dart';
+import '../../../core/calendar/events_repository.dart';
 
 const _importKey = 'import.server_calendar';
 

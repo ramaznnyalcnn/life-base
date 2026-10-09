@@ -8,7 +8,7 @@ import '../../../core/calendar/reminder_picker.dart';
 import '../../../core/design_system/add_page_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
-import '../data/events_repository.dart';
+import '../../../core/calendar/events_repository.dart';
 import 'calendar_format.dart';
 import 'series_scope_dialog.dart';
 

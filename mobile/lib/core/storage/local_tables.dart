@@ -70,6 +70,36 @@ class LocalDoseLogs extends Table with SyncColumns {
   DateTimeColumn get snoozedUntil => dateTime().nullable()();
 }
 
+/// Notes and checklists. `space` is `me` (backed up to this account) or
+/// `household` (shared with the household).
+class LocalNotes extends Table with SyncColumns {
+  TextColumn get title => text().withDefault(const Constant(''))();
+  TextColumn get body => text().withDefault(const Constant(''))();
+
+  /// note, list
+  TextColumn get kind => text().withDefault(const Constant('note'))();
+  BoolColumn get pinned => boolean().withDefault(const Constant(false))();
+  IntColumn get color => integer().nullable()();
+
+  /// The calendar event made from this note, if any.
+  TextColumn get eventId => text().nullable()();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+  TextColumn get space => text().withDefault(const Constant('me'))();
+}
+
+/// Checklist lines, one document each, so two people can tick different
+/// lines of the same list at once.
+class LocalNoteItems extends Table with SyncColumns {
+  TextColumn get noteId => text()();
+  TextColumn get content => text().withDefault(const Constant(''))();
+  BoolColumn get done => boolean().withDefault(const Constant(false))();
+  RealColumn get position => real().withDefault(const Constant(0))();
+
+  /// User id that ticked it (shared lists).
+  IntColumn get doneBy => integer().nullable()();
+  TextColumn get space => text().withDefault(const Constant('me'))();
+}
+
 /// Small key/value store for sync bookkeeping (pull cursor, last run).
 class SyncStates extends Table {
   TextColumn get key => text()();
