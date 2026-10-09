@@ -107,6 +107,33 @@ class NotesRepository {
     _onChanged();
   }
 
+  /// Moves a note (with its lines) into the household's shared space or back.
+  /// Documents cannot change space, so it is copied under new ids and the
+  /// old copy is deleted.
+  Future<Note> setShared(Note note, {required bool shared}) async {
+    if (note.shared == shared) return note;
+    final moved = Note(
+      id: newId(),
+      title: note.title,
+      body: note.body,
+      kind: note.kind,
+      pinned: note.pinned,
+      color: note.color,
+      eventId: note.eventId,
+      shared: shared,
+    );
+    final items = await (_db.select(_db.localNoteItems)..where((t) => t.noteId.equals(note.id) & t.deletedAtMs.isNull())).get();
+    await save(moved);
+    for (final item in items) {
+      await saveItem(
+        NoteItem(id: newId(), noteId: moved.id, content: item.content, done: item.done, position: item.position, doneBy: item.doneBy),
+        shared: shared,
+      );
+    }
+    await delete(note.id);
+    return moved;
+  }
+
   // Calendar ----------------------------------------------------------------
 
   /// Turns the note into a calendar event at [hint] and links them.

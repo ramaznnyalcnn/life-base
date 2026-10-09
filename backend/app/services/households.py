@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Household, HouseholdInvite, HouseholdMember, User
+from app.models import Account, Household, HouseholdInvite, HouseholdMember, SharedCursor, SharedDocument, User
 from app.services.ledger import PERSONAL, SHARED, record_change, scope_for
 
 
@@ -107,7 +107,9 @@ def leave(session: Session, user_id: int) -> None:
     session.delete(member)
     session.flush()
     if session.scalar(select(HouseholdMember.id).where(HouseholdMember.household_id == household_id)) is None:
-        for invite in session.scalars(select(HouseholdInvite).where(HouseholdInvite.household_id == household_id)):
-            session.delete(invite)
+        # The last member left: the household and what it shared go.
+        for model in (HouseholdInvite, SharedDocument, SharedCursor):
+            for row in session.scalars(select(model).where(model.household_id == household_id)):
+                session.delete(row)
         session.flush()
         session.delete(session.get(Household, household_id))

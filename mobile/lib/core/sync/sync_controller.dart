@@ -28,6 +28,29 @@ final localSyncEngineProvider = Provider<LocalSyncEngine?>((ref) {
   return LocalSyncEngine(database: db, transport: ApiSyncTransport(api), collections: localSyncCollections(db));
 });
 
+const _sharedScopeKey = 'shared.scope';
+const _sharedCursorKey = 'shared.cursor';
+
+/// The household's shared notes and lists (only while in a household).
+final sharedSyncEngineProvider = Provider<LocalSyncEngine?>((ref) {
+  final api = ref.watch(apiClientProvider);
+  if (api == null) return null;
+  final db = ref.watch(databaseProvider);
+  return LocalSyncEngine(
+    database: db,
+    transport: ApiSharedTransport(
+      api,
+      readScope: () => db.syncState(_sharedScopeKey),
+      onReset: (scope) async {
+        await clearSharedSpace(db);
+        await db.setSyncState(_sharedScopeKey, scope);
+      },
+    ),
+    collections: sharedSyncCollections(db),
+    cursorKey: _sharedCursorKey,
+  );
+});
+
 /// Rows (events, medications, dose logs, notes, wallet writes) not yet backed up to the server.
 final localPendingCountProvider = StreamProvider<int>((ref) {
   final db = ref.watch(databaseProvider);
@@ -67,6 +90,20 @@ class SyncController extends Notifier<SyncStatus> {
     return const SyncStatus();
   }
 
+  /// Shared lists follow the household the wallet pull reported. Best effort:
+  /// a failure here is retried next time and does not mark sync as failed.
+  Future<void> _syncShared() async {
+    final db = ref.read(databaseProvider);
+    final inHousehold = (await db.syncState('wallet.scope'))?.startsWith('h:') ?? false;
+    if (inHousehold) {
+      await ref.read(sharedSyncEngineProvider)?.run();
+    } else if ((await db.syncState(_sharedScopeKey) ?? '').isNotEmpty) {
+      await clearSharedSpace(db);
+      await db.setSyncState(_sharedScopeKey, '');
+      await db.setSyncState(_sharedCursorKey, '0');
+    }
+  }
+
   /// Coalesces bursts of edits into one sync.
   void requestSync({Duration delay = const Duration(seconds: 2)}) {
     _debounce?.cancel();
@@ -88,6 +125,7 @@ class SyncController extends Notifier<SyncStatus> {
         WalletSyncResult.failed => const SyncOutcome(SyncOutcomeKind.failed),
       };
     }
+    if (outcome.kind == SyncOutcomeKind.synced) await _syncShared();
     if (!ref.mounted) return outcome;
     state = switch (outcome.kind) {
       SyncOutcomeKind.synced => SyncStatus(lastSyncedAt: DateTime.now()),

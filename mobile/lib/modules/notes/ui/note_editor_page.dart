@@ -191,6 +191,8 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     final open = items.where((i) => !i.done).toList();
     final done = items.where((i) => i.done).toList();
     final me = ref.watch(walletMeProvider);
+    final inHousehold = (ref.watch(walletScopeProvider).value ?? '').startsWith('h:');
+    final members = {for (final m in ref.watch(walletMembersProvider).value ?? const []) m.userId: m.initials};
     final event = _note.eventId == null
         ? null
         : ref.watch(localEventsProvider).value?.where((e) => e.id == _note.eventId).firstOrNull;
@@ -215,10 +217,18 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
           ),
           PopupMenuButton<String>(
             tooltip: 'Diğer',
-            onSelected: (value) {
-              if (value == 'delete') _delete();
+            onSelected: (value) async {
+              if (value == 'delete') return _delete();
+              _debounce?.cancel();
+              await _ensureStored();
+              final moved = await _repo.setShared(_current, shared: value == 'share');
+              if (mounted) setState(() => _note = moved);
             },
-            itemBuilder: (_) => const [PopupMenuItem(value: 'delete', child: Text('Sil'))],
+            itemBuilder: (_) => [
+              if (inHousehold && !_note.shared) const PopupMenuItem(value: 'share', child: Text('Haneyle paylaş')),
+              if (_note.shared) const PopupMenuItem(value: 'unshare', child: Text('Paylaşımı kaldır')),
+              const PopupMenuItem(value: 'delete', child: Text('Sil')),
+            ],
           ),
         ],
       ),
@@ -275,7 +285,15 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
               padding: const EdgeInsets.only(top: 12, bottom: 4),
               child: Text('${done.length} madde tamam', style: TextStyle(color: t.muted, fontWeight: FontWeight.w700)),
             ),
-            for (final item in done) _ItemRow(key: ValueKey(item.id), item: item, onToggle: () => _toggle(item, me), repo: _repo, shared: _note.shared),
+            for (final item in done)
+              _ItemRow(
+                key: ValueKey(item.id),
+                item: item,
+                onToggle: () => _toggle(item, me),
+                repo: _repo,
+                shared: _note.shared,
+                doneBy: _note.shared && members.length > 1 ? members[item.doneBy] : null,
+              ),
           ],
         ],
         const SizedBox(height: 16),
@@ -345,8 +363,11 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
 }
 
 class _ItemRow extends StatefulWidget {
-  const _ItemRow({super.key, required this.item, required this.onToggle, required this.repo, required this.shared, this.index});
+  const _ItemRow({super.key, required this.item, required this.onToggle, required this.repo, required this.shared, this.index, this.doneBy});
   final NoteItem item;
+
+  /// Initials of who ticked it (shared lists).
+  final String? doneBy;
   final int? index;
   final VoidCallback onToggle;
   final NotesRepository repo;
@@ -405,6 +426,15 @@ class _ItemRowState extends State<_ItemRow> {
           decoration: const InputDecoration(border: InputBorder.none, filled: false, isDense: true),
         ),
       ),
+      if (widget.doneBy != null)
+        Tooltip(
+          message: 'İşaretleyen',
+          child: CircleAvatar(
+            radius: 11,
+            backgroundColor: t.module(LbModule.notes).withValues(alpha: .2),
+            child: Text(widget.doneBy!, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: t.onBase)),
+          ),
+        ),
       IconButton(
         tooltip: 'Maddeyi sil',
         icon: Icon(Icons.close_rounded, size: 18, color: t.muted),

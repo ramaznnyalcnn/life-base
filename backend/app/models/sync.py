@@ -45,3 +45,40 @@ class SyncCursor(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
     last_seq: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class SharedDocument(Base):
+    """A document shared by a household (shared notes and checklist lines).
+
+    Same last-writer-wins rules as :class:`SyncDocument`, numbered per household.
+    """
+
+    __tablename__ = "shared_documents"
+    __table_args__ = (
+        UniqueConstraint("household_id", "collection", "doc_id", name="uq_shared_documents_household_collection_doc"),
+        Index("ix_shared_documents_household_seq", "household_id", "seq"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    household_id: Mapped[int] = mapped_column(ForeignKey("households.id"))
+    collection: Mapped[str] = mapped_column(String(40))
+    doc_id: Mapped[str] = mapped_column(String(64))
+    body: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    client_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    seq: Mapped[int] = mapped_column(BigInteger)
+    updated_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    server_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class SharedCursor(Base):
+    """Per-household change counter for shared documents."""
+
+    __tablename__ = "shared_cursors"
+
+    household_id: Mapped[int] = mapped_column(ForeignKey("households.id"), primary_key=True)
+    last_seq: Mapped[int] = mapped_column(BigInteger, default=0)

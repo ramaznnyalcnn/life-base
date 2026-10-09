@@ -13,6 +13,7 @@ from app.api.routes.recurring_events import router as recurring_events_router
 from app.api.routes.sync_v3 import router as sync_v3_router
 from app.api.routes.wallet_v3 import router as wallet_v3_router
 from app.api.routes.household_v3 import router as household_v3_router
+from app.api.routes.shared_v3 import router as shared_v3_router
 from app.api.routes.transfers import router as transfers_router
 from app.api.routes.transactions import router as transactions_router
 from app.api.routes.wallet import router as wallet_router
@@ -34,4 +35,5 @@ __all__ = [
     "sync_v3_router",
     "wallet_v3_router",
     "household_v3_router",
+    "shared_v3_router",
 ]

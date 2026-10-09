@@ -109,6 +109,12 @@ class ApiClient {
 
   Future<Map<String, Object?>> leaveHousehold() async => (await _dio.post<Map<String, Object?>>('/api/v3/household/leave')).data!;
 
+  Future<Map<String, Object?>> sharedPush(List<Map<String, Object?>> changes) async =>
+      (await _dio.post<Map<String, Object?>>('/api/v3/shared/push', data: {'changes': changes})).data!;
+
+  Future<Map<String, Object?>> sharedPull(int since, String? scope) async =>
+      (await _dio.get<Map<String, Object?>>('/api/v3/shared/pull', queryParameters: {'since': since, 'scope': ?scope})).data!;
+
   Future<Map<String, Object?>> syncPush(List<Map<String, Object?>> changes) async =>
       (await _dio.post<Map<String, Object?>>('/api/v3/sync/push', data: {'changes': changes})).data!;
 

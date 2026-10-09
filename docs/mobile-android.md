@@ -170,6 +170,12 @@ document). The editor saves as you type; an empty new note is never stored.
 - **Lists:** add, tick, drag to reorder, delete; ticked lines move below.
   A note turns into a list (lines become items) and back.
 - Search, filters (Tümü / Listeler / Takvimde), pinning and colours.
+- **Shared with the household** (menu → Haneyle paylaş): the note and its
+  lines move to the household's space (`/api/v3/shared`, members only) and
+  both phones see and tick them; ticked lines show who ticked them. Sharing
+  copies the note under new ids and deletes the personal copy (and back for
+  "Paylaşımı kaldır"). Leaving the household removes the shared notes from
+  the phone; the household keeps them for the others.
 
 ## Android integration
 

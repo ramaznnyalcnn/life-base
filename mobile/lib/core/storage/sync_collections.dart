@@ -104,7 +104,8 @@ final doseLogCodec = SyncRowCodec<LocalDoseLog>(
   ),
 );
 
-final noteCodec = SyncRowCodec<LocalNote>(
+/// Notes of one space: `me` (personal sync) or `household` (shared sync).
+SyncRowCodec<LocalNote> noteCodecFor(String space) => SyncRowCodec<LocalNote>(
   meta: (r) => (id: r.id, updatedAtMs: r.updatedAtMs, deletedAtMs: r.deletedAtMs, dirty: r.dirty),
   toBody: (r) => {
     'title': r.title,
@@ -125,10 +126,11 @@ final noteCodec = SyncRowCodec<LocalNote>(
     color: Value((b['color'] as num?)?.toInt()),
     eventId: Value(b['event_id'] as String?),
     archived: Value(b['archived'] == true),
+    space: Value(space),
   ),
 );
 
-final noteItemCodec = SyncRowCodec<LocalNoteItem>(
+SyncRowCodec<LocalNoteItem> noteItemCodecFor(String space) => SyncRowCodec<LocalNoteItem>(
   meta: (r) => (id: r.id, updatedAtMs: r.updatedAtMs, deletedAtMs: r.deletedAtMs, dirty: r.dirty),
   toBody: (r) => {
     'note_id': r.noteId,
@@ -145,6 +147,7 @@ final noteItemCodec = SyncRowCodec<LocalNoteItem>(
     done: Value(b['done'] == true),
     position: Value(_num(b['position']) ?? 0),
     doneBy: Value((b['done_by'] as num?)?.toInt()),
+    space: Value(space),
   ),
 );
 
@@ -152,6 +155,18 @@ List<SyncCollection> localSyncCollections(AppDatabase db) => [
       DriftSyncCollection(db, db.localEvents, SyncCollections.events, eventCodec),
       DriftSyncCollection(db, db.localMedications, SyncCollections.medications, medicationCodec),
       DriftSyncCollection(db, db.localDoseLogs, SyncCollections.doseLogs, doseLogCodec),
-      DriftSyncCollection(db, db.localNotes, SyncCollections.notes, noteCodec),
-      DriftSyncCollection(db, db.localNoteItems, SyncCollections.noteItems, noteItemCodec),
+      DriftSyncCollection(db, db.localNotes, SyncCollections.notes, noteCodecFor('me'), filter: (t) => t.space.equals('me')),
+      DriftSyncCollection(db, db.localNoteItems, SyncCollections.noteItems, noteItemCodecFor('me'), filter: (t) => t.space.equals('me')),
     ];
+
+/// What the household shares: its notes and checklist lines.
+List<SyncCollection> sharedSyncCollections(AppDatabase db) => [
+      DriftSyncCollection(db, db.localNotes, SyncCollections.notes, noteCodecFor('household'), filter: (t) => t.space.equals('household')),
+      DriftSyncCollection(db, db.localNoteItems, SyncCollections.noteItems, noteItemCodecFor('household'), filter: (t) => t.space.equals('household')),
+    ];
+
+/// Drops every shared note and line (left the household, or it changed).
+Future<void> clearSharedSpace(AppDatabase db) => db.transaction(() async {
+      await (db.delete(db.localNotes)..where((t) => t.space.equals('household'))).go();
+      await (db.delete(db.localNoteItems)..where((t) => t.space.equals('household'))).go();
+    });

@@ -64,6 +64,8 @@ def test_metadata_can_create_schema():
         "recurring_events",
         "reminders",
         "scheduled_payments",
+        "shared_cursors",
+        "shared_documents",
         "statement_marks",
         "sync_cursors",
         "sync_documents",

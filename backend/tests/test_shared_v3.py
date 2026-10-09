@@ -1,0 +1,88 @@
+"""Household-shared notes and checklists (/api/v3/shared)."""
+
+from sqlalchemy import select
+
+from app.models import Household, SharedDocument, User
+from app.services.auth import issue_access_token
+from tests.conftest import api_request
+
+T = "2026-10-09T12:00:00+00:00"
+
+
+def user(setup_database, email, name):
+    with setup_database() as session:
+        row = User(email=email, display_name=name)
+        session.add(row)
+        session.flush()
+        _, token = issue_access_token(session, row, label="test")
+        session.commit()
+        return row.id, {"Authorization": f"Bearer {token}"}
+
+
+def doc(doc_id, body, collection="note_items", at=T, deleted=False):
+    return {"collection": collection, "id": doc_id, "updated_at": at, "deleted": deleted, "body": None if deleted else body}
+
+
+def push(*changes, headers=None):
+    return api_request("POST", "/api/v3/shared/push", json={"changes": list(changes)}, headers=headers)
+
+
+def pull(since=0, scope=None, headers=None):
+    params = {"since": since, **({"scope": scope} if scope else {})}
+    return api_request("GET", "/api/v3/shared/pull", params=params, headers=headers)
+
+
+def household(setup_database):
+    partner_id, partner = user(setup_database, "partner@example.com", "Partner")
+    code = api_request("POST", "/api/v3/household/invites").json()["code"]
+    assert api_request("POST", "/api/v3/household/join", json={"code": code}, headers=partner).status_code == 200
+    return partner_id, partner
+
+
+def test_only_household_members_share(setup_database):
+    _, stranger = user(setup_database, "x@example.com", "X")
+    assert push(doc("i1", {"content": "Süt"}), headers=stranger).status_code == 403
+    assert pull(headers=stranger).status_code == 403
+
+
+def test_members_tick_different_lines_of_one_list_at_once(setup_database):
+    partner_id, partner = household(setup_database)
+    list_doc = doc("market", {"title": "Market", "kind": "list"}, collection="notes")
+    assert push(list_doc, doc("i1", {"note_id": "market", "content": "Süt"}), doc("i2", {"note_id": "market", "content": "Ekmek"})).status_code == 200
+
+    first = pull(headers=partner).json()
+    assert first["reset"] is True and first["scope"].startswith("h:")
+    assert {c["id"] for c in first["changes"]} == {"market", "i1", "i2"}
+
+    # Both tick a different line "at the same time" (from older copies).
+    later = "2026-10-09T12:05:00+00:00"
+    mine = push(doc("i1", {"note_id": "market", "content": "Süt", "done": True}, at=later))
+    theirs = push(doc("i2", {"note_id": "market", "content": "Ekmek", "done": True}, at=later), headers=partner)
+    assert mine.json()["applied"] == ["note_items/i1"]
+    assert theirs.json()["applied"] == ["note_items/i2"]
+
+    news = pull(first["cursor"], first["scope"], headers=partner).json()
+    assert news["reset"] is False
+    assert {c["id"]: c["body"]["done"] for c in news["changes"]} == {"i1": True, "i2": True}
+    with setup_database() as session:
+        authors = dict(session.execute(select(SharedDocument.doc_id, SharedDocument.updated_by_user_id)).all())
+    assert authors["i2"] == partner_id
+
+
+def test_only_notes_can_be_shared(setup_database):
+    _, partner = household(setup_database)
+    assert push(doc("e1", {"title": "x"}, collection="events"), headers=partner).status_code == 400
+
+
+def test_leaving_stops_access_and_the_last_one_out_clears_the_space(setup_database):
+    _, partner = household(setup_database)
+    push(doc("i1", {"note_id": "n", "content": "Süt"}))
+
+    api_request("POST", "/api/v3/household/leave", headers=partner)
+    assert pull(headers=partner).status_code == 403
+    assert len(pull().json()["changes"]) == 1
+
+    api_request("POST", "/api/v3/household/leave")
+    with setup_database() as session:
+        assert session.scalars(select(SharedDocument)).all() == []
+        assert session.scalars(select(Household)).all() == []

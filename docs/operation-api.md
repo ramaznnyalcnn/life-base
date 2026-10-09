@@ -103,6 +103,16 @@ Rules:
 The v1 `/accounts`, `/transactions`, `/transfers` routes (React web) use the
 same ledger and change feed until they are retired.
 
+## Shared notes (v3)
+
+`POST /api/v3/shared/push` and `GET /api/v3/shared/pull?since=&scope=` work
+like `/api/v3/sync` (last writer wins, deletions final) for documents a
+household shares — only the `notes` and `note_items` collections, only for
+members (403 otherwise). Changes are numbered per household; a pull whose
+`scope` is not the caller's current household returns everything with
+`reset: true`. When the last member leaves, the household's shared documents
+are deleted with it.
+
 ## Database upgrade
 
 Run `alembic -c alembic.ini upgrade head` from `backend/`. Revisions `0012`–
@@ -110,4 +120,5 @@ Run `alembic -c alembic.ini upgrade head` from `backend/`. Revisions `0012`–
 polymorphic reminder ownership, and optimistic entity versions. `0016` adds
 households, wallet client ids, statement marks and the wallet change feed; it
 converts card balances from "available credit" to "minus the debt" and derives
-each account's opening balance from its history.
+each account's opening balance from its history. `0017` adds the
+household-shared document store.

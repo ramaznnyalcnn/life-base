@@ -107,11 +107,14 @@ class SyncRowCodec<R> {
 }
 
 class DriftSyncCollection<T extends SyncColumns, R> implements SyncCollection {
-  DriftSyncCollection(this._db, this._table, this.name, this._codec);
+  DriftSyncCollection(this._db, this._table, this.name, this._codec, {Expression<bool> Function(T table)? filter}) : _filter = filter;
 
   final AppDatabase _db;
   final TableInfo<T, R> _table;
   final SyncRowCodec<R> _codec;
+
+  /// Limits the rows this collection pushes (e.g. one space of a table).
+  final Expression<bool> Function(T table)? _filter;
 
   @override
   final String name;
@@ -123,7 +126,7 @@ class DriftSyncCollection<T extends SyncColumns, R> implements SyncCollection {
 
   @override
   Future<List<SyncDocument>> dirty() async {
-    final rows = await (_db.select(_table)..where((t) => t.dirty.equals(true))).get();
+    final rows = await (_db.select(_table)..where((t) => _filter == null ? t.dirty.equals(true) : t.dirty.equals(true) & _filter(t))).get();
     return [
       for (final row in rows)
         () {

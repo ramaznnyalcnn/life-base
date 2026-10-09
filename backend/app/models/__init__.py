@@ -10,7 +10,7 @@ from app.models.operation_execution import AgendaRevision, OperationExecution
 from app.models.planning import ActivityTemplate, ActivityTemplateKind, Task
 from app.models.recurring_event import RecurringEvent
 from app.models.scheduled_payment import ScheduledPayment
-from app.models.sync import SyncCursor, SyncDocument
+from app.models.sync import SharedCursor, SharedDocument, SyncCursor, SyncDocument
 from app.models.transfer import Transfer
 from app.models.transaction import Transaction, TransactionType
 from app.models.wallet_sync import StatementMark, WalletChange, WalletCursor
@@ -42,6 +42,8 @@ __all__ = [
     "AgendaRevision",
     "SyncDocument",
     "SyncCursor",
+    "SharedDocument",
+    "SharedCursor",
     "Household",
     "HouseholdMember",
     "HouseholdInvite",
