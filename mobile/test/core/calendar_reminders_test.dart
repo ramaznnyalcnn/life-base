@@ -17,6 +17,9 @@ class FakePort implements NotificationPort {
       ];
 
   @override
+  Future<List<({int id, String? payload})>> shown() async => const [];
+
+  @override
   Future<void> schedule(PlannedNotification n) async {
     scheduleCalls++;
     scheduled[n.id] = n;

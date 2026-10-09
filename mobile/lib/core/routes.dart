@@ -7,4 +7,7 @@ abstract final class AppRoutes {
   static const calendar = '/calendar';
   static const meds = '/meds';
   static const account = '/account';
+
+  /// Full-screen dose alarm: `/alarm/<doseId>`.
+  static const alarm = '/alarm';
 }

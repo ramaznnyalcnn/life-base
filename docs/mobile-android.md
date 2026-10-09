@@ -78,6 +78,36 @@ decision; other 4xx: mark failed).
   grant (settings) Android may deliver them a few minutes late.
 - Server-side events and routines are imported on-device once.
 
+## Medications
+
+- Today's doses in time order (pending, taken, snoozed, skipped, missed after
+  two hours), as-needed medicines with a "Şimdi aldım" button, a seven-day
+  adherence strip, and the medicine list with stock and a low-stock warning.
+- Each medicine: form, dose amount and unit, schedule (N times a day, chosen
+  weekdays, every N days, every N hours, or as needed — no alarm), course
+  start/end, meal relation, notes, stock with an alert threshold, and alarm
+  settings (full screen, snooze length, repeat interval and count).
+- Detail page: refill stock, finish a course (it ends yesterday, so nothing
+  after counts as missed) or restart it from today, and the last 14 days of
+  doses; tapping one corrects it (take, skip, or undo back to unanswered).
+- Taking a dose uses stock; undoing returns it. Dose logs are keyed
+  `<medicationId>@<UTC time>`, so two devices answering the same dose merge.
+
+**Alarms.** Doses ring on the `meds_alarm` channel with the alarm sound and
+alarm volume, keep ringing until answered (up to three minutes), and repeat
+every few minutes while unanswered. The notification has Aldım / Ertele / Atla
+buttons; the full-screen intent opens `/alarm/<doseId>` above the lock screen.
+Only that page may show over the lock screen: the activity turns
+`showWhenLocked` off as soon as it closes or a button answers. Answering a
+dose anywhere (alarm, list, another device after sync) cancels its remaining
+rings and silences one already on screen. Alarms are planned for the next
+three days (max 150) and re-planned on every change and on resume.
+
+Settings show the notification, exact-alarm and full-screen (Android 14+)
+grants with shortcuts to the system screens; the İlaç screen shows a banner
+when one that its medicines need is off. When the exact-alarm grant changes,
+every reminder is scheduled again in the new mode.
+
 ## Android integration
 
 **Google calendar, both ways, own account only.** Settings connect the

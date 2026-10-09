@@ -40,6 +40,14 @@ class PlatformBridge {
     return (account: raw['account'] as String?, permission: raw['permission'] == true);
   }
 
+  /// False when Android 14+ has withheld full-screen (alarm-style) alerts.
+  Future<bool> canUseFullScreenIntent() async =>
+      await _channel.invokeMethod<bool>('canUseFullScreenIntent') ?? true;
+
+  /// Lets the dose alarm page show above the lock screen (off afterwards).
+  Future<void> setShowOverLockScreen(bool enabled) =>
+      _channel.invokeMethod<void>('setShowOverLockScreen', {'enabled': enabled});
+
   /// Writes the app's local events into the connected Google calendar.
   Future<void> projectLocalEvents(String itemsJson) =>
       _channel.invokeMethod<void>('projectLocalEvents', {'items': itemsJson});

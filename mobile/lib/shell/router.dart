@@ -7,6 +7,7 @@ import '../core/routes.dart';
 import '../modules/account/data/session_controller.dart';
 import '../modules/account/ui/account_screen.dart';
 import '../modules/calendar/ui/calendar_screen.dart';
+import '../modules/meds/ui/dose_alarm_page.dart';
 import '../modules/meds/ui/meds_screen.dart';
 import '../modules/today/ui/today_screen.dart';
 import '../modules/wallet/ui/wallet_screen.dart';
@@ -38,6 +39,11 @@ GoRouter buildRouter({String initialLocation = AppRoutes.today}) {
         path: AppRoutes.account,
         parentNavigatorKey: rootKey,
         builder: (context, state) => const AccountScreen(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.alarm}/:doseId',
+        parentNavigatorKey: rootKey,
+        builder: (context, state) => DoseAlarmPage(doseId: state.pathParameters['doseId']!),
       ),
     ],
   );

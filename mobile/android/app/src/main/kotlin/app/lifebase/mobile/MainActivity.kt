@@ -1,8 +1,11 @@
 package app.lifebase.mobile
 
 import android.Manifest
+import android.app.NotificationManager
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -17,6 +20,31 @@ import java.util.concurrent.TimeUnit
 class MainActivity : FlutterActivity() {
     private val channelName = "app.lifebase.mobile/platform"
     private val calendarRequestCode = 4201
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        showOverLockScreenForDoseAlarm(intent)
+        super.onCreate(savedInstanceState)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        showOverLockScreenForDoseAlarm(intent)
+        super.onNewIntent(intent)
+    }
+
+    /**
+     * Only a dose alarm may appear above the lock screen; the rest of the app
+     * (wallet, cards) stays behind it. Dart turns this off when the alarm closes.
+     */
+    private fun showOverLockScreenForDoseAlarm(intent: Intent?) {
+        if (intent?.getStringExtra("payload")?.startsWith("med|") == true) setShowOverLockScreen(true)
+    }
+
+    private fun setShowOverLockScreen(enabled: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(enabled)
+            setTurnScreenOn(enabled)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -39,6 +67,11 @@ class MainActivity : FlutterActivity() {
                         SessionCleaner.clear(this)
                         result.success(true)
                     }
+                    "setShowOverLockScreen" -> {
+                        setShowOverLockScreen(call.argument<Boolean>("enabled") == true)
+                        result.success(true)
+                    }
+                    "canUseFullScreenIntent" -> result.success(canUseFullScreenIntent())
                     "googleAccounts" -> result.success(CalendarSyncer(this).googleAccounts())
                     "googleStatus" -> result.success(CalendarSyncer(this).googleStatus())
                     "connectGoogle" -> {
@@ -78,6 +111,11 @@ class MainActivity : FlutterActivity() {
                 }
             }
     }
+
+    /** Android 14+ lets the user withhold alarm-style full-screen alerts. */
+    private fun canUseFullScreenIntent(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+            getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
 
     private fun hasCalendarAccess(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&

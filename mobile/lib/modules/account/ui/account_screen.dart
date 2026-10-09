@@ -35,7 +35,7 @@ class AccountScreen extends ConsumerWidget {
         const _AppearanceCard(),
         const SizedBox(height: 24),
         const _SectionLabel('Bildirimler'),
-        const Card(child: Column(children: [_DefaultRemindersTile(), Divider(height: 1), _ExactAlarmTile()])),
+        const Card(child: Column(children: [_DefaultRemindersTile(), Divider(height: 1), _AlarmPermissionTiles()])),
         const SizedBox(height: 24),
         const _SectionLabel('Eşitleme'),
         Card(child: Column(children: [
@@ -419,29 +419,39 @@ class _DefaultRemindersSheet extends ConsumerWidget {
       );
 }
 
-/// Without the exact-alarm grant Android may deliver reminders late.
-class _ExactAlarmTile extends ConsumerWidget {
-  const _ExactAlarmTile();
+/// Notification, exact-alarm and full-screen grants, each with a shortcut to
+/// the system setting. Refreshes when the user comes back.
+class _AlarmPermissionTiles extends ConsumerWidget {
+  const _AlarmPermissionTiles();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final port = ref.watch(notificationPortProvider).value;
-    if (port == null) return const SizedBox.shrink();
-    final exact = port.exactAlarms;
-    return ListTile(
-      minTileHeight: 64,
-      leading: Icon(exact ? Icons.alarm_on_rounded : Icons.alarm_rounded),
-      title: const Text('Tam zamanlı hatırlatma'),
-      subtitle: Text(exact ? 'Açık · hatırlatmalar dakikasında gelir' : 'Kapalı · birkaç dakika gecikebilir'),
-      trailing: exact ? const Icon(Icons.check_circle_rounded) : const Icon(Icons.chevron_right),
-      onTap: exact
-          ? null
-          : () async {
-              await port.requestExactAlarms();
-              // Re-read the grant and re-plan reminders with the new mode.
-              ref.invalidate(notificationPortProvider);
-              ref.invalidate(calendarReminderSyncProvider);
-            },
-    );
+    final perms = ref.watch(alarmPermissionsProvider).value;
+    if (port == null || perms == null) return const SizedBox.shrink();
+    Widget tile(IconData icon, String title, bool granted, String on, String off, Future<void> Function() request) => ListTile(
+          minTileHeight: 64,
+          leading: Icon(icon),
+          title: Text(title),
+          subtitle: Text(granted ? on : off),
+          trailing: granted ? const Icon(Icons.check_circle_rounded) : const Icon(Icons.chevron_right),
+          onTap: granted
+              ? null
+              : () async {
+                  await request();
+                  ref.invalidate(alarmPermissionsProvider);
+                },
+        );
+
+    return Column(children: [
+      tile(Icons.notifications_active_rounded, 'Bildirim izni', perms.notifications, 'Açık',
+          'Kapalı · hatırlatma ve alarm gösterilemez', port.requestNotifications),
+      const Divider(height: 1),
+      tile(Icons.alarm_on_rounded, 'Tam zamanlı hatırlatma', perms.exact, 'Açık · hatırlatmalar dakikasında gelir',
+          'Kapalı · birkaç dakika gecikebilir', port.requestExactAlarms),
+      const Divider(height: 1),
+      tile(Icons.fullscreen_rounded, 'Tam ekran ilaç alarmı', perms.fullScreen, 'Açık · kilit ekranında alarm gibi açılır',
+          'Kapalı · alarm yalnızca bildirim olarak gelir', port.requestFullScreen),
+    ]);
   }
 }

@@ -6,13 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/calendar/google_projection.dart';
 import 'core/design_system/app_theme.dart';
 import 'core/design_system/appearance.dart';
-import 'core/calendar/calendar_reminders.dart';
 import 'core/notifications/reminder_sync.dart';
-import 'core/routes.dart';
 import 'core/sync/sync_controller.dart';
 import 'modules/account/data/session_controller.dart';
 import 'modules/calendar/data/server_import.dart';
 import 'modules/account/ui/onboarding_screen.dart';
+import 'shell/notification_handler.dart';
 import 'shell/router.dart';
 
 /// Turkish pickers, dialogs and number formats everywhere.
@@ -47,8 +46,9 @@ class LifeBaseApp extends ConsumerWidget {
       ref.listen(calendarReminderSyncProvider, (_, _) {});
       ref.listen(googleProjectionProvider, (_, _) {});
       ref.listen(serverCalendarImportProvider, (_, _) {});
-      ref.listen(notificationTapProvider, (_, payload) {
-        if (payload?.startsWith('$calendarNotificationGroup|') ?? false) ref.read(routerProvider).go(AppRoutes.calendar);
+      ref.listen(medReminderSyncProvider, (_, _) {});
+      ref.listen(notificationTapProvider, (_, tap) {
+        if (tap != null) handleNotificationTap(ref, tap);
       });
       return MaterialApp.router(
         title: 'LifeBase',
