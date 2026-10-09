@@ -31,8 +31,10 @@ class Transfer(EntityVersionMixin, TimestampMixin, Base):
         default=lambda: datetime.now(timezone.utc),
         index=True,
     )
+    client_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
-    user = relationship("User", back_populates="transfers")
+    user = relationship("User", back_populates="transfers", foreign_keys=[user_id])
     source_account = relationship(
         "Account",
         foreign_keys=[source_account_id],

@@ -1,5 +1,7 @@
 """Bootstrap and seed helpers."""
 
+from uuid import uuid4
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -57,6 +59,7 @@ def ensure_default_cash_account(session: Session, user_id: int | None = None) ->
 
     account = Account(
         user_id=owner_id,
+        client_id=str(uuid4()),
         name="Nakit",
         type=AccountType.CASH,
         currency="TRY",

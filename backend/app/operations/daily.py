@@ -9,17 +9,14 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 
 from app.models import (
-    Account, AccountType, Category, CategoryType, Event, Medication, MedicationDoseLog,
-    RecurringEvent, ScheduledPayment, Task, Transaction, TransactionType, Transfer,
+    Account, Category, CategoryType, Event, Medication, MedicationDoseLog,
+    RecurringEvent, ScheduledPayment, Task,
 )
 from app.operations.base import HandlerResult, OperationContext, OperationHandler
 from app.operations.definitions import definition, field
 from app.operations.executor import EntityVersionConflictError
 from app.schemas import EntityRef, OperationFieldKind
 from app.schemas.operation_inputs import (
-    AccountCreateInput,
-    AccountToggleInput,
-    AccountUpdateInput,
     CategoryCreateInput,
     CategoryToggleInput,
     CategoryUpdateInput,
@@ -40,10 +37,6 @@ from app.schemas.operation_inputs import (
     TaskDeleteInput,
     TaskReopenInput,
     TaskUpdateInput,
-    TransactionDeleteInput,
-    TransactionUpdateInput,
-    TransferDeleteInput,
-    TransferUpdateDailyInput,
     VersionedOperationInput,
 )
 from app.services.medications import _parse_times, _parse_weekdays, _serialize_times, _serialize_weekdays
@@ -129,50 +122,6 @@ class VersionedDailyOperation(DailyOperation):
     input_model = VersionedOperationInput
 
 
-class AccountCreateOperation(DailyOperation):
-    key = "finance.account.create"
-    input_model = AccountCreateInput
-    definition = definition(key, "finance", "Hesap olustur", [
-        field("name", "Hesap adi", OperationFieldKind.SHORT_TEXT, max_length=120),
-        field("type", "Hesap turu", OperationFieldKind.CHOICE, source="account.types"),
-        field("currency", "Para birimi", OperationFieldKind.CHOICE, source="currencies"),
-    ])
-
-    def execute(self, context, payload):
-        account = Account(user_id=context.user_id, name=payload.name.strip(), type=AccountType(payload.type), currency=payload.currency, balance=Decimal("0"))
-        context.session.add(account); context.session.flush()
-        return HandlerResult([EntityRef(kind="account", id=account.id)])
-
-
-class AccountUpdateOperation(VersionedDailyOperation):
-    key = "finance.account.update"
-    input_model = AccountUpdateInput
-    versioned_model = Account
-    versioned_id_field = "account_id"
-    definition = definition(key, "finance", "Hesabi duzenle", [
-        field("account_id", "Hesap", OperationFieldKind.CHOICE, source="accounts"),
-        field("name", "Hesap adi", OperationFieldKind.SHORT_TEXT, required=False, max_length=120),
-        field("currency", "Para birimi", OperationFieldKind.CHOICE, required=False, source="currencies"),
-        field("expected_version", "Surum", OperationFieldKind.DURATION),
-    ])
-    def execute(self, context, payload):
-        entity = _owned(context, Account, payload.account_id); _check(entity, payload)
-        if getattr(payload, "name", None): entity.name = payload.name.strip()
-        if getattr(payload, "currency", None): entity.currency = payload.currency
-        _bump(entity); return HandlerResult([EntityRef(kind="account", id=entity.id)])
-
-
-class AccountToggleOperation(VersionedDailyOperation):
-    key = "finance.account.toggle"
-    input_model = AccountToggleInput
-    versioned_model = Account
-    versioned_id_field = "account_id"
-    definition = definition(key, "finance", "Hesabi ac veya kapat", [field("account_id", "Hesap", OperationFieldKind.CHOICE, source="accounts.all"), field("expected_version", "Surum", OperationFieldKind.DURATION)])
-    def execute(self, context, payload):
-        entity = _owned(context, Account, payload.account_id); _check(entity, payload); entity.is_active = not entity.is_active; _bump(entity)
-        return HandlerResult([EntityRef(kind="account", id=entity.id)])
-
-
 class CategoryCreateOperation(DailyOperation):
     key = "finance.category.create"
     input_model = CategoryCreateInput
@@ -204,77 +153,6 @@ class CategoryToggleOperation(VersionedDailyOperation):
         entity = _owned(context, Category, payload.category_id); _check(entity, payload)
         if entity.is_system: raise ValueError("Sistem kategorisi kapatilamaz.")
         entity.is_active = not entity.is_active; _bump(entity); return HandlerResult([EntityRef(kind="category", id=entity.id)])
-
-
-def _transaction_sign(kind: TransactionType) -> int:
-    return 1 if kind == TransactionType.INCOME else -1
-
-
-class TransactionUpdateOperation(VersionedDailyOperation):
-    key = "finance.transaction.update"
-    input_model = TransactionUpdateInput
-    versioned_model = Transaction
-    versioned_id_field = "transaction_id"
-    definition = definition(key, "finance", "Islemi duzenle", [field("transaction_id", "Islem", OperationFieldKind.CHOICE, source="transactions.recent"), field("account_id", "Hesap", OperationFieldKind.CHOICE, required=False, source="accounts"), field("category_id", "Kategori", OperationFieldKind.CHOICE, required=False, source="categories.all"), field("amount", "Tutar", OperationFieldKind.MONEY, required=False), field("occurred_at", "Zaman", OperationFieldKind.DATETIME, required=False), field("expected_version", "Surum", OperationFieldKind.DURATION)])
-    def execute(self, context, payload):
-        entity = _owned(context, Transaction, payload.transaction_id); _check(entity, payload)
-        old_account = _owned(context, Account, entity.account_id); old_account.balance -= entity.amount * _transaction_sign(entity.type)
-        if payload.account_id is not None:
-            entity.account_id = _owned(context, Account, payload.account_id).id
-        if payload.category_id is not None:
-            if entity.type == TransactionType.PAYMENT:
-                raise ValueError("Odeme islemi kategoriye atanamaz.")
-            category = _owned_category(context, payload.category_id, CategoryType(entity.type.value))
-            entity.category_id = category.id
-            entity.description = category.name
-        if getattr(payload, "amount", None): entity.amount = _amount(payload.amount)
-        if getattr(payload, "occurred_at", None): entity.occurred_at = _datetime(payload.occurred_at)
-        new_account = _owned(context, Account, entity.account_id); new_account.balance += entity.amount * _transaction_sign(entity.type)
-        _bump(entity); return HandlerResult([EntityRef(kind="transaction", id=entity.id)])
-
-
-class TransactionDeleteOperation(VersionedDailyOperation):
-    key = "finance.transaction.delete"
-    input_model = TransactionDeleteInput
-    versioned_model = Transaction
-    versioned_id_field = "transaction_id"
-    definition = definition(key, "finance", "Islemi sil", [field("transaction_id", "Islem", OperationFieldKind.CHOICE, source="transactions.recent"), field("expected_version", "Surum", OperationFieldKind.DURATION)])
-    def execute(self, context, payload):
-        entity = _owned(context, Transaction, payload.transaction_id); _check(entity, payload)
-        account = _owned(context, Account, entity.account_id); account.balance -= entity.amount * _transaction_sign(entity.type)
-        entity_id = entity.id; context.session.delete(entity); return HandlerResult([EntityRef(kind="transaction", id=entity_id)])
-
-
-class TransferUpdateOperation(VersionedDailyOperation):
-    key = "finance.transfer.update"
-    input_model = TransferUpdateDailyInput
-    versioned_model = Transfer
-    versioned_id_field = "transfer_id"
-    definition = definition(key, "finance", "Transferi duzenle", [field("transfer_id", "Transfer", OperationFieldKind.CHOICE, source="transfers.recent"), field("source_account_id", "Kaynak hesap", OperationFieldKind.CHOICE, required=False, source="accounts"), field("destination_account_id", "Hedef hesap", OperationFieldKind.CHOICE, required=False, source="accounts"), field("amount", "Tutar", OperationFieldKind.MONEY, required=False), field("occurred_at", "Zaman", OperationFieldKind.DATETIME, required=False), field("expected_version", "Surum", OperationFieldKind.DURATION)])
-    def execute(self, context, payload):
-        entity = _owned(context, Transfer, payload.transfer_id); _check(entity, payload)
-        _owned(context, Account, entity.source_account_id).balance += entity.amount
-        _owned(context, Account, entity.destination_account_id).balance -= entity.amount
-        if getattr(payload, "source_account_id", None): entity.source_account_id = payload.source_account_id
-        if getattr(payload, "destination_account_id", None): entity.destination_account_id = payload.destination_account_id
-        if entity.source_account_id == entity.destination_account_id: raise ValueError("Hesaplar ayni olamaz.")
-        if getattr(payload, "amount", None): entity.amount = _amount(payload.amount)
-        if getattr(payload, "occurred_at", None): entity.occurred_at = _datetime(payload.occurred_at)
-        _owned(context, Account, entity.source_account_id).balance -= entity.amount
-        _owned(context, Account, entity.destination_account_id).balance += entity.amount
-        _bump(entity); return HandlerResult([EntityRef(kind="transfer", id=entity.id)])
-
-
-class TransferDeleteOperation(VersionedDailyOperation):
-    key = "finance.transfer.delete"
-    input_model = TransferDeleteInput
-    versioned_model = Transfer
-    versioned_id_field = "transfer_id"
-    definition = definition(key, "finance", "Transferi sil", [field("transfer_id", "Transfer", OperationFieldKind.CHOICE, source="transfers.recent"), field("expected_version", "Surum", OperationFieldKind.DURATION)])
-    def execute(self, context, payload):
-        entity = _owned(context, Transfer, payload.transfer_id); _check(entity, payload)
-        _owned(context, Account, entity.source_account_id).balance += entity.amount; _owned(context, Account, entity.destination_account_id).balance -= entity.amount
-        entity_id = entity.id; context.session.delete(entity); return HandlerResult([EntityRef(kind="transfer", id=entity_id)])
 
 
 class PaymentUpdateOperation(VersionedDailyOperation):
@@ -543,9 +421,7 @@ class MedicationUndoTakeOperation(DailyOperation):
 
 
 DAILY_OPERATIONS = [
-    AccountCreateOperation, AccountUpdateOperation, AccountToggleOperation,
     CategoryCreateOperation, CategoryUpdateOperation, CategoryToggleOperation,
-    TransactionUpdateOperation, TransactionDeleteOperation, TransferUpdateOperation, TransferDeleteOperation,
     PaymentUpdateOperation, PaymentCancelOperation, TaskUpdateOperation, TaskReopenOperation, TaskDeleteOperation,
     EventUpdateOperation, EventCompleteOperation, EventReopenOperation, EventDeleteOperation,
     RoutineUpdateOperation, RoutineToggleOperation, RoutineDeleteOperation,

@@ -20,30 +20,6 @@ class VersionedOperationInput(OperationInput):
     expected_version: int = Field(ge=1)
 
 
-class ExpenseRecordInput(OperationInput):
-    operation_key: Literal["finance.expense.record"] = "finance.expense.record"
-    account_id: int
-    category_id: int
-    amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
-    occurred_at: datetime | None = None
-
-
-class IncomeRecordInput(OperationInput):
-    operation_key: Literal["finance.income.record"] = "finance.income.record"
-    account_id: int
-    category_id: int
-    amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
-    occurred_at: datetime | None = None
-
-
-class TransferRecordInput(OperationInput):
-    operation_key: Literal["finance.transfer.record"] = "finance.transfer.record"
-    source_account_id: int
-    destination_account_id: int
-    amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
-    occurred_at: datetime | None = None
-
-
 class PaymentScheduleInput(OperationInput):
     operation_key: Literal["finance.payment.schedule"] = "finance.payment.schedule"
     source_account_id: int
@@ -151,25 +127,6 @@ class MedicationSnoozeInput(OperationInput):
     snooze_minutes: int = Field(default=10, ge=5, le=120)
 
 
-class AccountCreateInput(OperationInput):
-    operation_key: Literal["finance.account.create"] = "finance.account.create"
-    name: str = Field(min_length=1, max_length=120)
-    type: Literal["cash", "bank", "credit_card"]
-    currency: Literal["TRY", "USD", "EUR"]
-
-
-class AccountUpdateInput(VersionedOperationInput):
-    operation_key: Literal["finance.account.update"] = "finance.account.update"
-    account_id: int
-    name: str | None = Field(default=None, min_length=1, max_length=120)
-    currency: Literal["TRY", "USD", "EUR"] | None = None
-
-
-class AccountToggleInput(VersionedOperationInput):
-    operation_key: Literal["finance.account.toggle"] = "finance.account.toggle"
-    account_id: int
-
-
 class CategoryCreateInput(OperationInput):
     operation_key: Literal["finance.category.create"] = "finance.category.create"
     name: str = Field(min_length=1, max_length=80)
@@ -185,34 +142,6 @@ class CategoryUpdateInput(VersionedOperationInput):
 class CategoryToggleInput(VersionedOperationInput):
     operation_key: Literal["finance.category.toggle"] = "finance.category.toggle"
     category_id: int
-
-
-class TransactionUpdateInput(VersionedOperationInput):
-    operation_key: Literal["finance.transaction.update"] = "finance.transaction.update"
-    transaction_id: int
-    account_id: int | None = None
-    category_id: int | None = None
-    amount: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
-    occurred_at: datetime | None = None
-
-
-class TransactionDeleteInput(VersionedOperationInput):
-    operation_key: Literal["finance.transaction.delete"] = "finance.transaction.delete"
-    transaction_id: int
-
-
-class TransferUpdateDailyInput(VersionedOperationInput):
-    operation_key: Literal["finance.transfer.update"] = "finance.transfer.update"
-    transfer_id: int
-    source_account_id: int | None = None
-    destination_account_id: int | None = None
-    amount: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
-    occurred_at: datetime | None = None
-
-
-class TransferDeleteInput(VersionedOperationInput):
-    operation_key: Literal["finance.transfer.delete"] = "finance.transfer.delete"
-    transfer_id: int
 
 
 class PaymentUpdateInput(VersionedOperationInput):

@@ -44,8 +44,14 @@ class Transaction(EntityVersionMixin, TimestampMixin, Base):
         index=True,
     )
     statement_month: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    client_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Installment parts share a group (the first part's client id), 1-based.
+    installment_group: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    installment_index: Mapped[int | None] = mapped_column(nullable=True)
+    installment_count: Mapped[int | None] = mapped_column(nullable=True)
 
-    user = relationship("User", back_populates="transactions")
+    user = relationship("User", back_populates="transactions", foreign_keys=[user_id])
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")
 

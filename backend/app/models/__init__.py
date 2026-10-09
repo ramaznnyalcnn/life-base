@@ -3,6 +3,7 @@
 from app.models.account import Account, AccountType, Category, CategoryType
 from app.models.auth import AccessToken, User
 from app.models.event import Event, Reminder, ReminderChannel
+from app.models.household import Household, HouseholdInvite, HouseholdMember
 from app.models.medication import Medication, MedicationDoseLog, MedicationDoseStatus, MedicationPushDelivery
 from app.models.notification import PushSubscription
 from app.models.operation_execution import AgendaRevision, OperationExecution
@@ -12,6 +13,7 @@ from app.models.scheduled_payment import ScheduledPayment
 from app.models.sync import SyncCursor, SyncDocument
 from app.models.transfer import Transfer
 from app.models.transaction import Transaction, TransactionType
+from app.models.wallet_sync import StatementMark, WalletChange, WalletCursor
 
 __all__ = [
     "User",
@@ -40,4 +42,10 @@ __all__ = [
     "AgendaRevision",
     "SyncDocument",
     "SyncCursor",
+    "Household",
+    "HouseholdMember",
+    "HouseholdInvite",
+    "WalletChange",
+    "WalletCursor",
+    "StatementMark",
 ]

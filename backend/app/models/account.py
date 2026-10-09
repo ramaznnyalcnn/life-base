@@ -47,6 +47,17 @@ class Account(EntityVersionMixin, TimestampMixin, Base):
     issuer: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # Wallet v3. Card balances are minus the debt (0 = nothing owed), so
+    # available credit is credit_limit + balance.
+    client_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    household_id: Mapped[int | None] = mapped_column(ForeignKey("households.id"), nullable=True, index=True)
+    visibility: Mapped[str] = mapped_column(String(10), default="personal")
+    opening_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
+    last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    network: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    iban: Mapped[str | None] = mapped_column(String(34), nullable=True)
+
     user = relationship("User", back_populates="accounts")
     transactions = relationship("Transaction", back_populates="account")
     outgoing_transfers = relationship(

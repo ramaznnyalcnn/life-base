@@ -55,5 +55,7 @@ def execute_operation(
         raise HTTPException(status_code=409, detail={"message": str(exc), "current": exc.current}) from exc
     except OperationConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

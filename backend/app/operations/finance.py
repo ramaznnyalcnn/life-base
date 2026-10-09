@@ -1,32 +1,17 @@
 """Class-based finance operations."""
 
 from datetime import timedelta, timezone
+from uuid import uuid4
 
 from sqlalchemy import select
 
-from app.models import (
-    Account,
-    AccountType,
-    Category,
-    CategoryType,
-    Reminder,
-    ScheduledPayment,
-    Transaction,
-    TransactionType,
-    Transfer,
-)
+from app.models import Account, Reminder, ScheduledPayment, Transfer
 from app.operations.base import HandlerResult, OperationContext, OperationHandler
 from app.operations.definitions import definition, field
 from app.operations.executor import EntityVersionConflictError
 from app.schemas import EntityRef, OperationFieldKind
-from app.schemas.operation_inputs import (
-    ExpenseRecordInput,
-    IncomeRecordInput,
-    PaymentCompleteInput,
-    PaymentScheduleInput,
-    TransferRecordInput,
-)
-from app.services.finance import calculate_statement_month
+from app.schemas.operation_inputs import PaymentCompleteInput, PaymentScheduleInput
+from app.services.ledger import apply_balance_deltas, lock_accounts, owner_scope, record_change
 
 
 def _owned_account(context: OperationContext, account_id: int) -> Account:
@@ -36,97 +21,6 @@ def _owned_account(context: OperationContext, account_id: int) -> Account:
     if account is None:
         raise ValueError("Hesap bulunamadi.")
     return account
-
-
-def _transaction_fields(category_source: str):
-    return [
-        field("account_id", "Hesap", OperationFieldKind.CHOICE, source="accounts"),
-        field("category_id", "Kategori", OperationFieldKind.CHOICE, source=category_source),
-        field("amount", "Tutar", OperationFieldKind.MONEY),
-        field("occurred_at", "Zaman", OperationFieldKind.DATE, required=False),
-    ]
-
-
-class _TransactionOperation(OperationHandler):
-    transaction_type: TransactionType
-    category_type: CategoryType
-
-    def execute(self, context: OperationContext, payload) -> HandlerResult:
-        account = _owned_account(context, payload.account_id)
-        category = context.session.scalar(
-            select(Category).where(
-                Category.id == payload.category_id,
-                Category.type == self.category_type,
-                (Category.user_id == context.user_id) | (Category.user_id.is_(None)),
-            )
-        )
-        if category is None:
-            raise ValueError("Kategori bulunamadi.")
-        occurred_at = payload.occurred_at or context.now
-        transaction = Transaction(
-            user_id=context.user_id,
-            account_id=account.id,
-            category_id=category.id,
-            type=self.transaction_type,
-            amount=payload.amount,
-            description=category.name,
-            occurred_at=occurred_at,
-            statement_month=(
-                calculate_statement_month(occurred_at, account.statement_day)
-                if account.type == AccountType.CREDIT_CARD
-                else None
-            ),
-        )
-        account.balance += payload.amount if self.transaction_type == TransactionType.INCOME else -payload.amount
-        context.session.add(transaction)
-        context.session.flush()
-        return HandlerResult(entities=[EntityRef(kind="transaction", id=transaction.id)])
-
-
-class ExpenseRecordOperation(_TransactionOperation):
-    key = "finance.expense.record"
-    input_model = ExpenseRecordInput
-    transaction_type = TransactionType.EXPENSE
-    category_type = CategoryType.EXPENSE
-    definition = definition(key, "finance", "Harcama kaydet", _transaction_fields("categories.expense"))
-
-
-class IncomeRecordOperation(_TransactionOperation):
-    key = "finance.income.record"
-    input_model = IncomeRecordInput
-    transaction_type = TransactionType.INCOME
-    category_type = CategoryType.INCOME
-    definition = definition(key, "finance", "Gelir kaydet", _transaction_fields("categories.income"))
-
-
-class TransferRecordOperation(OperationHandler[TransferRecordInput]):
-    key = "finance.transfer.record"
-    input_model = TransferRecordInput
-    definition = definition(key, "finance", "Transfer", [
-        field("source_account_id", "Kaynak hesap", OperationFieldKind.CHOICE, source="accounts"),
-        field("destination_account_id", "Hedef hesap", OperationFieldKind.CHOICE, source="accounts"),
-        field("amount", "Tutar", OperationFieldKind.MONEY),
-        field("occurred_at", "Zaman", OperationFieldKind.DATE, required=False),
-    ])
-
-    def execute(self, context: OperationContext, payload: TransferRecordInput) -> HandlerResult:
-        source = _owned_account(context, payload.source_account_id)
-        destination = _owned_account(context, payload.destination_account_id)
-        if source.id == destination.id:
-            raise ValueError("Kaynak ve hedef hesap ayni olamaz.")
-        transfer = Transfer(
-            user_id=context.user_id,
-            source_account_id=source.id,
-            destination_account_id=destination.id,
-            amount=payload.amount,
-            description="Hesap transferi",
-            occurred_at=payload.occurred_at or context.now,
-        )
-        source.balance -= payload.amount
-        destination.balance += payload.amount
-        context.session.add(transfer)
-        context.session.flush()
-        return HandlerResult(entities=[EntityRef(kind="transfer", id=transfer.id)])
 
 
 class PaymentScheduleOperation(OperationHandler[PaymentScheduleInput]):
@@ -188,21 +82,27 @@ class PaymentCompleteOperation(OperationHandler[PaymentCompleteInput]):
             raise ValueError("Planli odeme zaten tamamlandi.")
         source = _owned_account(context, payment.source_account_id)
         destination = _owned_account(context, payment.destination_account_id)
+        accounts = lock_accounts(context.session, [source.id, destination.id])
         transfer = Transfer(
             user_id=context.user_id,
+            client_id=str(uuid4()),
+            created_by_user_id=context.user_id,
             source_account_id=source.id,
             destination_account_id=destination.id,
             amount=payment.amount,
             description="Planli odeme",
             occurred_at=context.now.astimezone(timezone.utc),
         )
-        source.balance -= payment.amount
-        destination.balance += payment.amount
         payment.is_completed = True
         payment.completed_at = context.now
         payment.completed_transfer = transfer
         context.session.add(transfer)
         context.session.flush()
+        apply_balance_deltas(context.session, {source.id: -payment.amount, destination.id: payment.amount})
+        scope = owner_scope(context.session, source)
+        record_change(context.session, scope, "transfer", transfer.client_id)
+        for account in accounts.values():
+            record_change(context.session, scope, "account", account.client_id)
         return HandlerResult(
             entities=[EntityRef(kind="scheduled_payment", id=payment.id), EntityRef(kind="transfer", id=transfer.id)],
             affects_agenda=True,

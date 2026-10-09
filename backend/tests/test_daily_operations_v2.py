@@ -41,8 +41,8 @@ def test_catalog_describes_wizard_surface_and_daily_crud_operations():
     assert response.status_code == 200
     catalog = {item["key"]: item for item in response.json()}
     assert {
-        "finance.account.create",
-        "finance.transaction.update",
+        "wallet.account.save",
+        "wallet.transaction.save",
         "planning.task.reopen",
         "planning.event.delete",
         "planning.routine.toggle",
@@ -56,7 +56,7 @@ def test_catalog_describes_wizard_surface_and_daily_crud_operations():
 
 
 def test_daily_operation_payloads_validate_required_fields():
-    response = execute("finance.account.create", type="bank", currency="TRY")
+    response = execute("wallet.account.save", account={"id": "a1", "type": "bank"})
 
     assert response.status_code == 400
     assert "name" in response.json()["detail"]
@@ -142,17 +142,15 @@ def test_legacy_updates_also_advance_entity_version(setup_database):
 def test_executor_turns_atomic_stale_write_into_version_conflict(setup_database, monkeypatch):
     with setup_database() as session:
         owner = ensure_default_user(session)
-        account = Account(user_id=owner.id, name="Banka", type="bank", currency="TRY", balance=0)
+        account = Account(user_id=owner.id, client_id="acc-1", name="Banka", type="bank", currency="TRY", balance=0)
         session.add(account)
         session.commit()
-        account_id = account.id
 
     session = setup_database()
     payload = OperationInput.model_validate({
         "request_id": str(uuid4()),
-        "operation_key": "finance.account.update",
-        "account_id": account_id,
-        "name": "Yeni ad",
+        "operation_key": "wallet.account.save",
+        "account": {"id": "acc-1", "name": "Yeni ad", "type": "bank"},
         "expected_version": 1,
     })
     monkeypatch.setattr(session, "commit", lambda: (_ for _ in ()).throw(StaleDataError("stale")))
@@ -160,8 +158,9 @@ def test_executor_turns_atomic_stale_write_into_version_conflict(setup_database,
     with pytest.raises(EntityVersionConflictError) as conflict:
         OperationExecutor(build_operation_registry()).execute(session, payload, user_id=owner.id)
 
-    assert conflict.value.current["id"] == account_id
-    assert conflict.value.current["entity_version"] == 1
+    assert conflict.value.current["id"] == "acc-1"
+    assert conflict.value.current["name"] == "Banka"
+    assert conflict.value.current["version"] == 1
     session.close()
 
 
@@ -178,8 +177,11 @@ def test_transaction_and_payment_updates_reject_other_users_references(setup_dat
         other_category = Category(user_id=other.id, name="Other expense", type=CategoryType.EXPENSE)
         session.add_all([other_account, other_category])
         session.flush()
+        own_account.client_id = "own"
+        other_account.client_id = "other"
         transaction = Transaction(
             user_id=owner.id,
+            client_id="t1",
             account_id=own_account.id,
             category_id=own_category.id,
             type=TransactionType.EXPENSE,
@@ -196,23 +198,14 @@ def test_transaction_and_payment_updates_reject_other_users_references(setup_dat
         )
         session.add_all([transaction, payment])
         session.commit()
-        transaction_id = transaction.id
         payment_id = payment.id
         other_account_id = other_account.id
         other_category_id = other_category.id
+        own_category_id = own_category.id
 
-    wrong_account = execute(
-        "finance.transaction.update",
-        transaction_id=transaction_id,
-        account_id=other_account_id,
-        expected_version=1,
-    )
-    wrong_category = execute(
-        "finance.transaction.update",
-        transaction_id=transaction_id,
-        category_id=other_category_id,
-        expected_version=1,
-    )
+    edit = {"id": "t1", "kind": "expense", "amount": "10", "occurred_at": "2026-10-09T10:00:00+03:00", "expected_version": 1}
+    wrong_account = execute("wallet.transaction.save", account_id="other", category_id=own_category_id, **edit)
+    wrong_category = execute("wallet.transaction.save", account_id="own", category_id=other_category_id, **edit)
     wrong_payment_account = execute(
         "finance.payment.update",
         scheduled_payment_id=payment_id,
@@ -220,7 +213,7 @@ def test_transaction_and_payment_updates_reject_other_users_references(setup_dat
         expected_version=1,
     )
 
-    assert wrong_account.status_code == 400
+    assert wrong_account.status_code == 403
     assert wrong_category.status_code == 400
     assert wrong_payment_account.status_code == 400
 

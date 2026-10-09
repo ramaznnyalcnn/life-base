@@ -26,10 +26,10 @@ def test_catalog_and_context_expose_selection_driven_mobile_contract():
     context = api_request("GET", "/api/v2/operations/context")
 
     assert catalog.status_code == 200
-    assert len(catalog.json()) >= 38
+    assert len(catalog.json()) >= 35
     assert {item["key"] for item in catalog.json()} >= {
         "planning.task.create",
-        "finance.expense.record",
+        "wallet.transaction.save",
         "health.medication.take",
     }
     assert context.status_code == 200
@@ -66,7 +66,7 @@ def test_execute_creates_task_and_replays_same_request(setup_database):
 def test_execute_records_decimal_expense_from_selected_account_and_category(setup_database):
     with setup_database() as session:
         owner = ensure_default_user(session)
-        account = Account(user_id=owner.id, name="Banka", type=AccountType.BANK, balance=Decimal("1000.00"))
+        account = Account(user_id=owner.id, client_id="bank", name="Banka", type=AccountType.BANK, balance=Decimal("1000.00"))
         category = Category(user_id=owner.id, name="Market", type=CategoryType.EXPENSE)
         session.add_all([account, category])
         session.commit()
@@ -74,10 +74,13 @@ def test_execute_records_decimal_expense_from_selected_account_and_category(setu
 
     response = api_request("POST", "/api/v2/operations/execute", json={
         "request_id": str(uuid4()),
-        "operation_key": "finance.expense.record",
-        "account_id": account_id,
+        "operation_key": "wallet.transaction.save",
+        "id": "t-1",
+        "account_id": "bank",
+        "kind": "expense",
         "category_id": category_id,
         "amount": "125.45",
+        "occurred_at": "2026-10-09T12:00:00+03:00",
     })
 
     assert response.status_code == 200

@@ -76,8 +76,9 @@ def _to_card_summary(account: Account) -> WalletAccountCard:
             utilization_ratio=None,
         )
 
-    available_credit = max(account.balance, ZERO)
-    used_credit = max(account.credit_limit - available_credit, ZERO)
+    # Card balances are minus the debt.
+    used_credit = max(-account.balance, ZERO)
+    available_credit = max(account.credit_limit - used_credit, ZERO)
     utilization_ratio = (
         (used_credit / account.credit_limit).quantize(Decimal("0.0001"))
         if account.credit_limit > ZERO

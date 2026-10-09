@@ -3,23 +3,20 @@ from app.schemas import OperationFieldKind
 
 
 EXPECTED_KEYS = {
-    "finance.account.create",
-    "finance.account.update",
-    "finance.account.toggle",
     "finance.category.create",
     "finance.category.update",
     "finance.category.toggle",
-    "finance.expense.record",
-    "finance.income.record",
-    "finance.transfer.record",
     "finance.payment.schedule",
     "finance.payment.complete",
     "finance.payment.update",
     "finance.payment.cancel",
-    "finance.transaction.update",
-    "finance.transaction.delete",
-    "finance.transfer.update",
-    "finance.transfer.delete",
+    "wallet.account.save",
+    "wallet.account.archive",
+    "wallet.transaction.save",
+    "wallet.transaction.delete",
+    "wallet.transfer.save",
+    "wallet.transfer.delete",
+    "wallet.statement.mark",
     "planning.task.create",
     "planning.task.complete",
     "planning.task.update",
@@ -59,6 +56,6 @@ def test_catalog_is_selection_first_and_money_is_numeric():
     assert task_fields["template_id"].option_source == "activity_templates.task"
     assert task_fields["custom_title"].max_length == 160
 
-    expense_fields = {field.key: field for field in definitions["finance.expense.record"].fields}
-    assert expense_fields["account_id"].kind == OperationFieldKind.CHOICE
-    assert expense_fields["amount"].kind == OperationFieldKind.MONEY
+    payment_fields = {field.key: field for field in definitions["finance.payment.schedule"].fields}
+    assert payment_fields["source_account_id"].kind == OperationFieldKind.CHOICE
+    assert payment_fields["amount"].kind == OperationFieldKind.MONEY

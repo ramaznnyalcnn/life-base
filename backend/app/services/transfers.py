@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Account, AccountType, Transfer
 from app.schemas import TransferCreate, TransferUpdate
 from app.services.auth import ensure_default_user
+from app.services.ledger import apply_balance_deltas, lock_accounts, owner_scope, record_change
 
 
 ZERO = Decimal("0.00")
@@ -27,14 +29,13 @@ def _get_owned_account(session: Session, account_id: int, owner_id: int) -> Acco
     return account
 
 
-def _apply_transfer(source_account: Account, destination_account: Account, amount: Decimal) -> None:
-    source_account.balance -= amount
-    destination_account.balance += amount
+def _move(session: Session, transfer: Transfer, source: Account, destination: Account, *, sign: int = 1) -> None:
+    """Apply (sign=1) or undo (sign=-1) a transfer and note it for the change feed."""
 
-
-def _revert_transfer(source_account: Account, destination_account: Account, amount: Decimal) -> None:
-    source_account.balance += amount
-    destination_account.balance -= amount
+    apply_balance_deltas(session, {source.id: -sign * transfer.amount, destination.id: sign * transfer.amount})
+    scope = owner_scope(session, source)
+    for account in (source, destination):
+        record_change(session, scope, "account", account.client_id)
 
 
 def _transfer_query(owner_id: int):
@@ -79,6 +80,8 @@ def create_transfer(session: Session, payload: TransferCreate, *, user_id: int |
     occurred_at = payload.occurred_at or datetime.now(timezone.utc)
     transfer = Transfer(
         user_id=owner_id,
+        client_id=str(uuid4()),
+        created_by_user_id=owner_id,
         source_account_id=source_account.id,
         destination_account_id=destination_account.id,
         amount=payload.amount,
@@ -87,8 +90,10 @@ def create_transfer(session: Session, payload: TransferCreate, *, user_id: int |
         occurred_at=occurred_at,
     )
 
-    _apply_transfer(source_account, destination_account, payload.amount)
     session.add(transfer)
+    session.flush()
+    _move(session, transfer, source_account, destination_account)
+    record_change(session, owner_scope(session, source_account), "transfer", transfer.client_id)
     session.commit()
     session.refresh(transfer)
     return session.scalar(_transfer_query(owner_id).where(Transfer.id == transfer.id))
@@ -110,7 +115,8 @@ def update_transfer(
 
     original_source = _get_owned_account(session, transfer.source_account_id, owner_id)
     original_destination = _get_owned_account(session, transfer.destination_account_id, owner_id)
-    _revert_transfer(original_source, original_destination, transfer.amount)
+    lock_accounts(session, [original_source.id, original_destination.id])
+    _move(session, transfer, original_source, original_destination, sign=-1)
 
     updates = payload.model_dump(exclude_unset=True)
     next_source = _get_owned_account(session, updates.get("source_account_id", transfer.source_account_id), owner_id)
@@ -129,7 +135,9 @@ def update_transfer(
     transfer.note = updates.get("note", transfer.note)
     transfer.occurred_at = updates.get("occurred_at", transfer.occurred_at)
 
-    _apply_transfer(next_source, next_destination, transfer.amount)
+    session.flush()
+    _move(session, transfer, next_source, next_destination)
+    record_change(session, owner_scope(session, next_source), "transfer", transfer.client_id)
     session.commit()
     return session.scalar(_transfer_query(owner_id).where(Transfer.id == transfer.id))
 
@@ -144,7 +152,8 @@ def delete_transfer(session: Session, transfer_id: int, *, user_id: int | None =
 
     source_account = _get_owned_account(session, transfer.source_account_id, owner_id)
     destination_account = _get_owned_account(session, transfer.destination_account_id, owner_id)
-    _revert_transfer(source_account, destination_account, transfer.amount)
+    _move(session, transfer, source_account, destination_account, sign=-1)
+    record_change(session, owner_scope(session, source_account), "transfer", transfer.client_id, deleted=True)
     session.delete(transfer)
     session.commit()
 

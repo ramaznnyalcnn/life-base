@@ -53,6 +53,9 @@ def test_metadata_can_create_schema():
         "agenda_revisions",
         "categories",
         "events",
+        "household_invites",
+        "household_members",
+        "households",
         "medication_dose_logs",
         "medication_push_deliveries",
         "medications",
@@ -61,12 +64,15 @@ def test_metadata_can_create_schema():
         "recurring_events",
         "reminders",
         "scheduled_payments",
+        "statement_marks",
         "sync_cursors",
         "sync_documents",
         "tasks",
         "transfers",
         "transactions",
         "users",
+        "wallet_changes",
+        "wallet_cursors",
     }
 
 

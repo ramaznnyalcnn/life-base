@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -11,6 +13,14 @@ from sqlalchemy.orm import Session
 from app.models import Account, AccountType, Category, CategoryType, Transaction, TransactionType
 from app.schemas import SummaryPeriod, TransactionCreate, TransactionSummary, TransactionUpdate
 from app.services.auth import ensure_default_user
+from app.services.ledger import (
+    apply_balance_delta,
+    apply_balance_deltas,
+    lock_accounts,
+    owner_scope,
+    record_change,
+    transaction_effect,
+)
 from app.services.transfers import sum_card_payment_transfers
 
 
@@ -122,32 +132,10 @@ def resolve_account(
     return None
 
 
-def apply_transaction_to_account(account: Account, payload: TransactionCreate) -> None:
-    """Apply transaction impact to account balance."""
-
-    if payload.type == TransactionType.INCOME:
-        account.balance += payload.amount
-        return
-
-    if payload.type == TransactionType.PAYMENT:
-        account.balance += payload.amount
-        return
-
-    account.balance -= payload.amount
-
-
-def revert_transaction_from_account(account: Account, transaction: Transaction) -> None:
-    """Revert transaction impact from account balance."""
-
-    if transaction.type == TransactionType.INCOME:
-        account.balance -= transaction.amount
-        return
-
-    if transaction.type == TransactionType.PAYMENT:
-        account.balance -= transaction.amount
-        return
-
-    account.balance += transaction.amount
+def _note_transaction(session: Session, account: Account, transaction: Transaction, *, deleted: bool = False) -> None:
+    scope = owner_scope(session, account)
+    record_change(session, scope, "transaction", transaction.client_id, deleted=deleted)
+    record_change(session, scope, "account", account.client_id)
 
 
 def create_transaction(session: Session, payload: TransactionCreate, *, user_id: int | None = None) -> Transaction:
@@ -163,6 +151,8 @@ def create_transaction(session: Session, payload: TransactionCreate, *, user_id:
 
     transaction = Transaction(
         user_id=owner_id,
+        client_id=str(uuid4()),
+        created_by_user_id=owner_id,
         account_id=account.id,
         category_id=category.id if category else None,
         type=payload.type,
@@ -177,9 +167,10 @@ def create_transaction(session: Session, payload: TransactionCreate, *, user_id:
         ),
     )
 
-    apply_transaction_to_account(account, payload)
-
     session.add(transaction)
+    session.flush()
+    apply_balance_delta(session, account.id, transaction_effect(payload.type, payload.amount))
+    _note_transaction(session, account, transaction)
     session.commit()
     session.refresh(transaction)
     session.refresh(account)
@@ -208,7 +199,7 @@ def update_transaction(
     if original_account is None:
         raise ValueError("Orijinal hesap bulunamadi.")
 
-    revert_transaction_from_account(original_account, transaction)
+    old_account_id, old_effect = original_account.id, transaction_effect(transaction.type, transaction.amount)
 
     updates = payload.model_dump(exclude_unset=True)
     next_account_id = updates.get("account_id", transaction.account_id)
@@ -245,18 +236,15 @@ def update_transaction(
         else None
     )
 
-    apply_transaction_to_account(
-        next_account,
-        TransactionCreate(
-            account_id=next_account.id,
-            category_id=transaction.category_id,
-            type=transaction.type,
-            amount=transaction.amount,
-            description=transaction.description,
-            note=transaction.note,
-            occurred_at=transaction.occurred_at,
-        ),
-    )
+    lock_accounts(session, [old_account_id, next_account.id])
+    deltas = defaultdict(Decimal)
+    deltas[old_account_id] -= old_effect
+    deltas[next_account.id] += transaction_effect(transaction.type, transaction.amount)
+    session.flush()
+    apply_balance_deltas(session, deltas)
+    _note_transaction(session, next_account, transaction)
+    if old_account_id != next_account.id:
+        _note_transaction(session, original_account, transaction)
 
     session.commit()
     session.refresh(transaction)
@@ -277,7 +265,8 @@ def delete_transaction(session: Session, transaction_id: int, *, user_id: int | 
     if account is None:
         raise ValueError("Hesap bulunamadi.")
 
-    revert_transaction_from_account(account, transaction)
+    apply_balance_delta(session, account.id, -transaction_effect(transaction.type, transaction.amount))
+    _note_transaction(session, account, transaction, deleted=True)
     session.delete(transaction)
     session.commit()
 

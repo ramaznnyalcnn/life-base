@@ -28,7 +28,7 @@ def seed_wallet_state(db_session):
             name="Akbank Platinum",
             type=AccountType.CREDIT_CARD,
             currency="TRY",
-            balance=Decimal("18000.00"),
+            balance=Decimal("-22000.00"),  # card: minus the debt
             credit_limit=Decimal("40000.00"),
             statement_day=25,
             due_day=5,

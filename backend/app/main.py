@@ -21,6 +21,8 @@ from app.api.routes import (
     operations_v2_router,
     recurring_events_router,
     sync_v3_router,
+    wallet_v3_router,
+    household_v3_router,
     transfers_router,
     transactions_router,
     wallet_router,
@@ -84,6 +86,8 @@ app.include_router(agenda_v2_router, prefix="/api/v2")
 app.include_router(activity_templates_v2_router, prefix="/api/v2")
 app.include_router(daily_v2_router, prefix="/api/v2")
 app.include_router(sync_v3_router, prefix="/api/v3")
+app.include_router(wallet_v3_router, prefix="/api/v3")
+app.include_router(household_v3_router, prefix="/api/v3")
 
 
 @app.exception_handler(ProgrammingError)

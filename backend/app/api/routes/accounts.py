@@ -1,5 +1,7 @@
 """Account endpoints."""
 
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,6 +11,7 @@ from app.db import get_db
 from app.models import Account, AccountType, User
 from app.schemas import AccountCreate, AccountRead, AccountUpdate
 from app.services.bootstrap import ensure_default_cash_account
+from app.services.ledger import apply_balance_delta, lock_accounts, owner_scope, record_change
 
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -45,6 +48,8 @@ def create_account(
 
     account = Account(
         user_id=current_user.id,
+        client_id=str(uuid4()),
+        opening_balance=payload.balance,
         name=payload.name,
         type=payload.type,
         currency=payload.currency,
@@ -60,6 +65,8 @@ def create_account(
         is_active=payload.is_active,
     )
     db.add(account)
+    db.flush()
+    record_change(db, owner_scope(db, account), "account", account.client_id)
     db.commit()
     db.refresh(account)
     return account
@@ -78,6 +85,15 @@ def update_account(
         raise HTTPException(status_code=404, detail="Hesap bulunamadi.")
 
     updates = payload.model_dump(exclude_unset=True)
+    # A typed-in balance is a correction of the opening balance, applied
+    # atomically. Lock first: locking reloads the row.
+    new_balance = updates.pop("balance", None)
+    if new_balance is not None:
+        account = lock_accounts(db, [account.id])[account.id]
+        delta = new_balance - account.balance
+        account.opening_balance += delta
+        db.flush()
+        apply_balance_delta(db, account.id, delta)
     for field, value in updates.items():
         setattr(account, field, value)
 
@@ -86,6 +102,7 @@ def update_account(
         account.statement_day = None
         account.due_day = None
 
+    record_change(db, owner_scope(db, account), "account", account.client_id)
     db.commit()
     db.refresh(account)
     return account

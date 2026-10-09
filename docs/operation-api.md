@@ -57,8 +57,57 @@ created idempotently. User templates can be managed through:
 Deleting a user template deactivates it so existing tasks and events retain the
 selected template reference and their saved title snapshot.
 
+## Wallet (v3)
+
+The wallet is server-authoritative and can be shared by a household. Writes are
+operations (above) that name records by **client-generated ids**, so a phone can
+create an account offline and add expenses to it before either reaches the
+server:
+
+| Operation | Does |
+|---|---|
+| `wallet.account.save` | Create or edit an account/card (owner only). Fields: name, type (cash/bank/credit_card), bank, visibility (personal/shared), opening balance, limit, statement/due day, last4, network, colour, IBAN. Type cannot change. |
+| `wallet.account.archive` | Hide or restore an account. |
+| `wallet.transaction.save` | Create or edit an expense/income with category and `note` ("neden"). `installments` > 1 (card expenses) splits the amount into equal parts in kuruş (remainder on the first) on successive statements, ids `<id>`, `<id>~2`, … |
+| `wallet.transaction.delete` | Delete; any installment deletes the whole purchase. |
+| `wallet.transfer.save` / `.delete` | Money between two accounts; into a card it is a card payment. |
+| `wallet.statement.mark` | Manual "paid" for one card statement; `paid: null` returns it to automatic. |
+
+Rules:
+
+- **Balances.** Card balances are minus the debt (available = limit + balance).
+  `balance = opening_balance + Σ effects` (income and payments raise it).
+  Every change goes through one atomic `UPDATE … SET balance = balance + δ`
+  per account in id order; edits and deletions lock the accounts
+  (`FOR UPDATE`, id order) before undoing the old effect. Two people spending
+  on the same shared card at once both land.
+- **Conflicts.** Edits carry `expected_version`; an outdated one returns 409
+  with `current` in the pull format.
+- **Access.** An account is usable by its owner, and by household members when
+  it is shared. Anything else is 403. Only the owner edits or archives it.
+- **Households.** `GET /api/v3/household`, `POST /invites` (creates the
+  household on first use; 6-character code, 48 h, single use), `POST /join`,
+  `POST /leave`. A user is in at most one household; a leaver keeps their
+  shared accounts as personal ones.
+- **Pull.** `GET /api/v3/wallet/pull?since=<cursor>&scope=<scope>` returns the
+  current state of every record changed since the cursor (`accounts`,
+  `transactions`, `transfers`, `statement_marks`, `deleted` tombstones,
+  `members`, `categories`). Changes are numbered per scope (`h:<household>` or
+  `u:<user>`) by a counter locked until commit, so numbers follow commit order.
+  When the client is new or its scope changed (joined/left), `reset: true` and
+  a full snapshot is returned.
+- **Reconciliation.** `python -m app.cli.reconcile_balances [--fix]` reports
+  (or corrects) balances that differ from opening balance + history; exit 1 on
+  unfixed drift.
+
+The v1 `/accounts`, `/transactions`, `/transfers` routes (React web) use the
+same ledger and change feed until they are retired.
+
 ## Database upgrade
 
 Run `alembic -c alembic.ini upgrade head` from `backend/`. Revisions `0012`–
 `0014` add the operation core, task/payment models, agenda versioning,
-polymorphic reminder ownership, and optimistic entity versions.
+polymorphic reminder ownership, and optimistic entity versions. `0016` adds
+households, wallet client ids, statement marks and the wallet change feed; it
+converts card balances from "available credit" to "minus the debt" and derives
+each account's opening balance from its history.
