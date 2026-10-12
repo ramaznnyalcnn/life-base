@@ -76,7 +76,7 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
     _limit = TextEditingController(text: a?.limit == null ? '' : _plain(a!.limit!));
     _last4 = TextEditingController(text: a?.last4 ?? '');
     _iban = TextEditingController(text: a?.iban == null ? '' : formatIban(a!.iban!));
-    _color = a?.color ?? 'gece';
+    _color = a?.color ?? 'aurora';
     _network = a?.network;
     _statementDay = a?.statementDay;
     _dueDay = a?.dueDay;

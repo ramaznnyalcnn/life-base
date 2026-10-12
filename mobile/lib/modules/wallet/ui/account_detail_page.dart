@@ -43,7 +43,7 @@ class AccountDetailPage extends ConsumerWidget {
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
         if (account.isCard) ...[
-          SecureCard(card: account, wallet: wallet, now: now),
+          SecureCard(card: account, wallet: wallet, now: now, onEdit: () => open(AccountEditPage(initial: account))),
           const SizedBox(height: 16),
           Row(children: [
             Expanded(

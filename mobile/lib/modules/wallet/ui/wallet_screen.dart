@@ -14,11 +14,11 @@ import '../../../core/wallet/wallet_store.dart';
 import '../data/wallet_repository.dart';
 import 'account_detail_page.dart';
 import 'account_edit_page.dart';
-import 'card_face.dart';
 import 'entry_detail_page.dart';
 import 'entry_page.dart';
 import 'outbox_issues_page.dart';
 import 'payment_edit_page.dart';
+import 'secure_card.dart';
 import 'wallet_format.dart';
 
 enum WalletFilter { all, personal, shared }
@@ -311,12 +311,25 @@ class _CardsState extends State<_Cards> {
             final card = widget.cards[index];
             return Padding(
               padding: const EdgeInsets.only(right: 12, bottom: 16),
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountDetailPage(accountId: card.id))),
-                child: CardFace(card: card, wallet: widget.wallet, now: widget.now),
+              // Tap turns the card over; the pencil edits it.
+              child: SecureCard(
+                card: card,
+                wallet: widget.wallet,
+                now: widget.now,
+                onEdit: () => _openAccountEditor(context, card),
               ),
             );
           },
+        ),
+      ),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          icon: const Icon(Icons.receipt_long_rounded, size: 18),
+          label: Text('${widget.cards[_page.clamp(0, widget.cards.length - 1)].name} · ekstre ve hareketler'),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => AccountDetailPage(accountId: widget.cards[_page.clamp(0, widget.cards.length - 1)].id),
+          )),
         ),
       ),
       if (widget.cards.length > 1)

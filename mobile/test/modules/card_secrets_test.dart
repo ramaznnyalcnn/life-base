@@ -147,13 +147,13 @@ void main() {
     await pump(tester, const AccountDetailPage(accountId: 'card'));
 
     unlocker.answer = 'Vazgeçildi.';
-    await tester.tap(find.text('•••• 9012'));
+    await tester.tap(find.text('••••  9012'));
     await tester.pumpAndSettle();
     expect(find.text('Vazgeçildi.'), findsOneWidget);
     expect(find.text('4543 1234 5678 9012'), findsNothing);
 
     unlocker.answer = null;
-    await tester.tap(find.text('•••• 9012'));
+    await tester.tap(find.text('••••  9012'));
     await tester.pumpAndSettle();
     expect(find.text('4543 1234 5678 9012'), findsOneWidget);
     expect(find.text('987'), findsOneWidget);
@@ -162,17 +162,19 @@ void main() {
     await tester.pump(const Duration(seconds: 31));
     await tester.pumpAndSettle();
     expect(find.text('4543 1234 5678 9012'), findsNothing);
-    expect(find.text('•••• 9012'), findsOneWidget);
+    expect(find.text('••••  9012'), findsOneWidget);
     expect(secureCalls, [true, false]);
     await unmount(tester);
   });
 
   testWidgets('a card without details on this device says so instead of asking to unlock', (tester) async {
     await pump(tester, const AccountDetailPage(accountId: 'card'));
-    await tester.tap(find.text('•••• 9012'));
+    await tester.tap(find.text('••••  9012'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('bu cihazda kayıtlı değil'), findsOneWidget);
+    expect(find.textContaining('bu telefonda kayıtlı değil'), findsOneWidget, reason: 'it turns over to an offer to add them');
+    expect(find.text('Ekle'), findsOneWidget);
     expect(unlocker.asked, 0);
+    expect(secureCalls, isEmpty, reason: 'nothing secret is on screen');
     await unmount(tester);
   });
 }

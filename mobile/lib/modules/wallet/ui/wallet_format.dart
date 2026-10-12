@@ -31,8 +31,10 @@ IconData categoryIcon(String? name, TxKind kind) {
   return kind == TxKind.income ? Icons.south_west_rounded : Icons.north_east_rounded;
 }
 
-/// Card colour schemes: (label, gradient, text colour).
+/// Card colour schemes: (label, gradient, text colour). The card face lays
+/// soft colour glows over the gradient (see [cardGlows]).
 const cardSchemes = <String, (String, List<Color>, Color)>{
+  'aurora': ('Aurora', [Color(0xFFC6ECFF), Color(0xFFF7A8D8), Color(0xFFFFF1C9)], Color(0xFF1B1530)),
   'gece': ('Gece', [Color(0xFF1F2937), Color(0xFF111827)], Colors.white),
   'okyanus': ('Okyanus', [Color(0xFF1E5BA8), Color(0xFF0E3366)], Colors.white),
   'zumrut': ('Zümrüt', [Color(0xFF1F7A5A), Color(0xFF0E4A36)], Colors.white),
@@ -42,6 +44,24 @@ const cardSchemes = <String, (String, List<Color>, Color)>{
   'gumus': ('Gümüş', [Color(0xFFE3E6EA), Color(0xFFAEB4BC)], Color(0xFF1F2328)),
   'turuncu': ('Turuncu', [Color(0xFFF08A3C), Color(0xFFB4501A)], Colors.white),
 };
+
+/// Glows painted over each scheme's gradient: (colour, centre). Aurora is the
+/// pastel, holographic look; the others get a lighter and a deeper glow of
+/// their own colour.
+List<(Color, Alignment)> cardGlows(String? key) => switch (key) {
+      'aurora' => const [
+          (Color(0xFFE040FB), Alignment(.1, -.75)),
+          (Color(0xFF9C6BFF), Alignment(1.1, -1.1)),
+          (Color(0xFFFF8FA3), Alignment(1.1, .7)),
+          (Color(0xFFB9E6FF), Alignment(-1.1, -1.1)),
+          (Color(0xFFFFF6B8), Alignment(-.9, 1.2)),
+        ],
+      _ => [
+          (Color.lerp(schemeOf(key).$1.first, Colors.white, .45)!, const Alignment(-.9, -1.1)),
+          (Color.lerp(schemeOf(key).$1.first, const Color(0xFFE040FB), .35)!, const Alignment(1.0, -.6)),
+          (Color.lerp(schemeOf(key).$1.last, Colors.black, .25)!, const Alignment(.8, 1.2)),
+        ],
+    };
 
 (List<Color>, Color) schemeOf(String? key) {
   final scheme = cardSchemes[key] ?? cardSchemes['gece']!;
