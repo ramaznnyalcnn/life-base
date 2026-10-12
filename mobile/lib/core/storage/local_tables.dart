@@ -195,6 +195,30 @@ class WalletStatementMarks extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+/// A planned payment: an expense from [accountId], or with [toAccountId] a
+/// transfer such as a card payment. Paying a monthly one moves [dueAt] on.
+@DataClassName('WalletPaymentRow')
+class WalletScheduledPayments extends Table {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+
+  /// expense, transfer
+  TextColumn get kind => text()();
+  TextColumn get accountId => text()();
+  TextColumn get toAccountId => text().nullable()();
+  IntColumn get categoryId => integer().nullable()();
+  IntColumn get amountCents => integer()();
+  DateTimeColumn get dueAt => dateTime()();
+  BoolColumn get repeatMonthly => boolean().withDefault(const Constant(false))();
+  BoolColumn get completed => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get lastPaidAt => dateTime().nullable()();
+  IntColumn get createdBy => integer()();
+  IntColumn get version => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 /// Wallet writes waiting for the server, oldest first. Each names the
 /// accounts it touches: a write waits for earlier writes on the same account,
 /// and a conflict or failure holds only those accounts.

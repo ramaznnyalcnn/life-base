@@ -315,8 +315,9 @@ def dispatch_due_reminders(
             body = "Yaklasan gorev hatirlatmasi."
         else:
             payment = reminder.scheduled_payment
-            title = f"{payment.amount:.2f} {payment.source_account.currency} odeme"
-            body = f"{payment.destination_account.name} odeme zamani yaklasiyor."
+            title = payment.title or f"{payment.amount:.2f} {payment.source_account.currency} odeme"
+            target = payment.destination_account or payment.source_account
+            body = f"{target.name} odeme zamani yaklasiyor."
         for subscription in reminder_subscriptions:
             try:
                 gateway.send(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
@@ -10,12 +11,14 @@ import '../../../core/sync/sync_controller.dart';
 import '../../../core/wallet/wallet_models.dart';
 import '../../../core/wallet/wallet_outbox.dart';
 import '../../../core/wallet/wallet_store.dart';
+import '../data/wallet_repository.dart';
 import 'account_detail_page.dart';
 import 'account_edit_page.dart';
 import 'card_face.dart';
 import 'entry_detail_page.dart';
 import 'entry_page.dart';
 import 'outbox_issues_page.dart';
+import 'payment_edit_page.dart';
 import 'wallet_format.dart';
 
 enum WalletFilter { all, personal, shared }
@@ -109,6 +112,14 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   const SizedBox(height: 20),
                   _Cards(cards: cards, wallet: wallet, now: now),
                 ],
+                _Payments(
+                  payments: wallet.payments.values
+                      .where((p) => !p.completed && accounts.any((a) => a.id == p.accountId))
+                      .toList()
+                    ..sort((a, b) => a.dueAt.compareTo(b.dueAt)),
+                  wallet: wallet,
+                  now: now,
+                ),
                 _SectionHeader(
                   title: 'Hesaplar',
                   action: IconButton(
@@ -490,6 +501,87 @@ class EntryTile extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// Planned payments still to pay, soonest (or most overdue) first.
+class _Payments extends ConsumerWidget {
+  const _Payments({required this.payments, required this.wallet, required this.now});
+  final List<ScheduledPayment> payments;
+  final WalletData wallet;
+  final DateTime now;
+
+  void _open(BuildContext context, [ScheduledPayment? payment]) =>
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PaymentEditPage(initial: payment)));
+
+  Future<void> _pay(BuildContext context, WidgetRef ref, ScheduledPayment payment) async {
+    final from = wallet.accounts[payment.accountId]?.name ?? 'hesap';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('${payment.title} ödendi mi?'),
+        content: Text(
+          '${formatMoney(payment.amount)} $from hesabından ${payment.isTransfer ? 'karta ödeme' : 'gider'} olarak kaydedilir.'
+          '${payment.repeatMonthly ? ' Sonraki ödeme ${DateFormat('d MMMM', 'tr_TR').format(addMonths(payment.dueAt, 1))}.' : ''}',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Vazgeç')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Ödendi')),
+        ],
+      ),
+    );
+    if (confirmed == true) await ref.read(walletRepositoryProvider).completePayment(payment);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = LbTokens.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _SectionHeader(
+        title: 'Ödemeler',
+        action: IconButton(tooltip: 'Planlı ödeme ekle', onPressed: () => _open(context), icon: const Icon(Icons.event_repeat_rounded)),
+      ),
+      if (payments.isEmpty)
+        Text('Kira, fatura gibi düzenli ödemeleri ekle; zamanı gelince hatırlatırım.', style: TextStyle(color: t.muted)),
+      for (final payment in payments)
+        Opacity(
+          opacity: payment.sync == SyncMark.pending ? .6 : 1,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(LbTokens.radiusSmall),
+            onTap: () => _open(context, payment),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(color: t.module(LbModule.wallet).withValues(alpha: .14), shape: BoxShape.circle),
+                  child: Icon(payment.isTransfer ? Icons.credit_score_rounded : Icons.event_repeat_rounded, color: t.module(LbModule.wallet), size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(payment.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, color: t.onBase)),
+                    Text(
+                      [dueLabel(payment.dueAt, now), formatMoney(payment.amount), if (payment.repeatMonthly) 'her ay'].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: payment.dueAt.isBefore(DateUtils.dateOnly(now)) ? t.expense : t.muted,
+                        fontSize: 12,
+                        fontWeight: payment.dueAt.isBefore(DateUtils.dateOnly(now)) ? FontWeight.w700 : null,
+                      ),
+                    ),
+                  ]),
+                ),
+                syncBadge(context, payment.sync),
+                const SizedBox(width: 4),
+                FilledButton.tonal(onPressed: () => _pay(context, ref, payment), child: const Text('Ödendi')),
+              ]),
+            ),
+          ),
+        ),
+    ]);
   }
 }
 

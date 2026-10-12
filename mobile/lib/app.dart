@@ -47,6 +47,7 @@ class LifeBaseApp extends ConsumerWidget {
       ref.listen(googleProjectionProvider, (_, _) {});
       ref.listen(serverCalendarImportProvider, (_, _) {});
       ref.listen(medReminderSyncProvider, (_, _) {});
+      ref.listen(paymentReminderSyncProvider, (_, _) {});
       ref.listen(notificationTapProvider, (_, tap) {
         if (tap != null) handleNotificationTap(ref, tap);
       });

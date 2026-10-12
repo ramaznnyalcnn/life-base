@@ -33,6 +33,7 @@ void main() {
     expect(await db.select(db.walletOutbox).get(), isEmpty);
     expect(await db.select(db.walletAccounts).get(), isEmpty);
     expect(await db.select(db.localNotes).get(), isEmpty);
+    expect(await db.select(db.walletScheduledPayments).get(), isEmpty);
     await db.setSyncState('sync.cursor', '7');
     expect(await db.syncState('sync.cursor'), '7');
   });

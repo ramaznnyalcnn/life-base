@@ -30,7 +30,7 @@ class User(TimestampMixin, Base):
     events = relationship("Event", back_populates="user")
     activity_templates = relationship("ActivityTemplate", back_populates="user")
     tasks = relationship("Task", back_populates="user")
-    scheduled_payments = relationship("ScheduledPayment", back_populates="user")
+    scheduled_payments = relationship("ScheduledPayment", back_populates="user", foreign_keys="ScheduledPayment.user_id")
     operation_executions = relationship("OperationExecution", back_populates="user")
     agenda_revision = relationship(
         "AgendaRevision", back_populates="user", uselist=False, cascade="all, delete-orphan"

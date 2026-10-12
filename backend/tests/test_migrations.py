@@ -23,6 +23,7 @@ def test_alembic_files_exist():
     assert (base / "versions" / "20261009_0015_sync_documents.py").exists()
     assert (base / "versions" / "20261010_0016_household_wallet.py").exists()
     assert (base / "versions" / "20261010_0017_shared_documents.py").exists()
+    assert (base / "versions" / "20261012_0018_scheduled_payments_v3.py").exists()
 
 
 def test_migration_constraint_names_fit_postgres_identifier_limit():

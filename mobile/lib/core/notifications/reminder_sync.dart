@@ -9,6 +9,8 @@ import '../calendar/calendar_store.dart';
 import '../meds/med_reminders.dart';
 import '../meds/meds_store.dart';
 import '../providers.dart';
+import '../wallet/payment_reminders.dart';
+import '../wallet/wallet_store.dart';
 import 'notifications.dart';
 
 /// The last notification (or notification button) the user tapped, or a
@@ -42,6 +44,32 @@ final calendarReminderSyncProvider = Provider<void>((ref) {
   }
 
   ref.listen(localEventsProvider, (_, next) {
+    if (next.hasValue) schedule();
+  }, fireImmediately: true);
+  final lifecycle = AppLifecycleListener(onResume: schedule);
+  ref.onDispose(() {
+    debounce?.cancel();
+    lifecycle.dispose();
+  });
+});
+
+/// Keeps payment reminders in step with the wallet (queued writes included,
+/// so paying a payment offline moves its reminders at once).
+final paymentReminderSyncProvider = Provider<void>((ref) {
+  Timer? debounce;
+  Future<void> run() async {
+    final port = await ref.read(notificationPortProvider.future);
+    final wallet = ref.read(walletProvider).value;
+    if (port == null || wallet == null) return;
+    await reconcileNotifications(port, paymentNotificationGroup, planPaymentReminders(wallet.payments.values, DateTime.now()));
+  }
+
+  void schedule() {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 400), run);
+  }
+
+  ref.listen(walletProvider, (_, next) {
     if (next.hasValue) schedule();
   }, fireImmediately: true);
   final lifecycle = AppLifecycleListener(onResume: schedule);
@@ -116,6 +144,7 @@ final alarmPermissionsProvider = FutureProvider<AlarmPermissions?>((ref) async {
     await port.cancelAllPending();
     ref.invalidate(calendarReminderSyncProvider);
     ref.invalidate(medReminderSyncProvider);
+    ref.invalidate(paymentReminderSyncProvider);
   }
   return (
     notifications: await port.notificationsEnabled(),

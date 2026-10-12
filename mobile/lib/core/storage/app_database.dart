@@ -42,6 +42,7 @@ class QueuedOperations extends Table {
   WalletTransactions,
   WalletTransfers,
   WalletStatementMarks,
+  WalletScheduledPayments,
   WalletOutbox,
   LocalNotes,
   LocalNoteItems,
@@ -51,7 +52,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? driftDatabase(name: 'lifebase'));
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -76,6 +77,10 @@ class AppDatabase extends _$AppDatabase {
             await migrator.createTable(localNotes);
             await migrator.createTable(localNoteItems);
           }
+          if (from < 5) {
+            // Planned wallet payments.
+            await migrator.createTable(walletScheduledPayments);
+          }
         },
       );
 
@@ -95,6 +100,7 @@ class AppDatabase extends _$AppDatabase {
         await delete(walletTransactions).go();
         await delete(walletTransfers).go();
         await delete(walletStatementMarks).go();
+        await delete(walletScheduledPayments).go();
         await delete(walletOutbox).go();
         await delete(localNotes).go();
         await delete(localNoteItems).go();

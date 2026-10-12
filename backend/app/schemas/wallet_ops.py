@@ -102,3 +102,44 @@ class StatementMarkInput(OperationInput):
     month: date
     # None returns the statement to the automatic rule.
     paid: bool | None
+
+
+class PaymentSaveInput(OperationInput):
+    """A planned payment: an expense from ``account_id`` or, with ``to_account_id``,
+    a transfer such as a card payment."""
+
+    operation_key: Literal["wallet.payment.save"] = "wallet.payment.save"
+    id: str = ClientId
+    title: str = Field(min_length=1, max_length=120)
+    kind: Literal["expense", "transfer"]
+    account_id: str = ClientId
+    to_account_id: str | None = Field(default=None, min_length=1, max_length=64)
+    category_id: int | None = None
+    amount: Decimal = Money
+    due_at: datetime
+    repeat_monthly: bool = False
+    expected_version: int | None = Field(default=None, ge=1)
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Odeme adi gerekli.")
+        return value.strip()
+
+
+class PaymentDeleteInput(OperationInput):
+    operation_key: Literal["wallet.payment.delete"] = "wallet.payment.delete"
+    id: str = ClientId
+    expected_version: int | None = Field(default=None, ge=1)
+
+
+class PaymentCompleteInput(OperationInput):
+    """"Ödendi": records the expense or transfer under ``entry_id`` and moves a
+    monthly payment to its next due date."""
+
+    operation_key: Literal["wallet.payment.complete"] = "wallet.payment.complete"
+    id: str = ClientId
+    entry_id: str = ClientId
+    paid_at: datetime
+    expected_version: int | None = Field(default=None, ge=1)

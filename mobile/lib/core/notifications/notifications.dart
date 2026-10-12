@@ -9,7 +9,8 @@ enum NotificationChannel {
   calendarHigh('calendar_high', 'Önemli takvim hatırlatmaları', Importance.high),
 
   /// Rings with the alarm sound and alarm volume, like a clock alarm.
-  medsAlarm('meds_alarm', 'İlaç alarmları', Importance.max);
+  medsAlarm('meds_alarm', 'İlaç alarmları', Importance.max),
+  wallet('wallet', 'Ödeme hatırlatmaları', Importance.high);
 
   const NotificationChannel(this.id, this.label, this.importance);
   final String id;
@@ -198,7 +199,7 @@ class PluginNotificationPort implements NotificationPort {
         n.channel.id,
         n.channel.label,
         importance: n.channel.importance,
-        priority: n.channel == NotificationChannel.calendarHigh ? Priority.high : Priority.defaultPriority,
+        priority: n.channel.importance == Importance.high ? Priority.high : Priority.defaultPriority,
         category: AndroidNotificationCategory.reminder,
         styleInformation: BigTextStyleInformation(n.body),
       );

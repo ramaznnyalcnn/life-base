@@ -74,10 +74,11 @@ final confirmedWalletProvider = StreamProvider<WalletData>((ref) {
   var transactions = <String, WalletTransaction>{};
   var transfers = <String, WalletTransfer>{};
   var marks = <String, StatementMark>{};
+  var payments = <String, ScheduledPayment>{};
   var ready = 0;
   void emit() {
-    if (ready == 0xF) {
-      controller.add(WalletData(accounts: accounts, transactions: transactions, transfers: transfers, marks: marks));
+    if (ready == 0x1F) {
+      controller.add(WalletData(accounts: accounts, transactions: transactions, transfers: transfers, marks: marks, payments: payments));
     }
   }
 
@@ -100,6 +101,11 @@ final confirmedWalletProvider = StreamProvider<WalletData>((ref) {
     db.select(db.walletStatementMarks).watch().listen((rows) {
       marks = {for (final r in rows) r.id: StatementMark.fromRow(r)};
       ready |= 8;
+      emit();
+    }),
+    db.select(db.walletScheduledPayments).watch().listen((rows) {
+      payments = {for (final r in rows) r.id: ScheduledPayment.fromRow(r)};
+      ready |= 16;
       emit();
     }),
   ];

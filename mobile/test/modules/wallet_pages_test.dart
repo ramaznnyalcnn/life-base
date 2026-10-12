@@ -111,4 +111,45 @@ void main() {
     expect(op.accountKeys, ['bank']);
     await unmount(tester);
   });
+
+  testWidgets('a monthly payment is planned from the wallet and paid with one tap', (tester) async {
+    await pump(tester, const SizedBox());
+    await db.into(db.walletAccounts).insert(WalletAccountsCompanion.insert(
+          id: 'bank', ownerId: 1, name: 'Maaş hesabı', type: 'bank', balanceCents: 2000000));
+    await tester.pumpWidget(ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(db)],
+      child: MaterialApp(theme: AppTheme.build(LbPalette.kum, Brightness.light), home: const WalletScreen()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('düzenli ödemeleri ekle'), findsOneWidget);
+    await tester.tap(find.byTooltip('Planlı ödeme ekle'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Ne ödenecek?'), 'Kira');
+    await tester.enterText(find.widgetWithText(TextField, 'Tutar'), '15.000');
+    await tester.tap(find.text('Market'));
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+
+    final [saved] = await outbox();
+    expect(saved.key, 'wallet.payment.save');
+    expect((saved.values['title'], saved.values['amount'], saved.values['kind']), ('Kira', '15000.00', 'expense'));
+    expect((saved.values['account_id'], saved.values['category_id'], saved.values['repeat_monthly']), ('bank', 3, true));
+    expect(find.text('Kira'), findsOneWidget);
+    expect(find.textContaining('Yarın · ₺15.000,00 · her ay'), findsOneWidget);
+
+    await tester.tap(find.text('Ödendi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kira ödendi mi?'), findsOneWidget);
+    await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(FilledButton, 'Ödendi')));
+    await tester.pumpAndSettle();
+
+    final ops = await outbox();
+    expect(ops.last.key, 'wallet.payment.complete');
+    expect(ops.last.values['id'], saved.values['id']);
+    // The expense shows at once and the payment moves to next month.
+    expect(find.text('₺5.000,00'), findsWidgets);
+    expect(find.textContaining('Yarın'), findsNothing);
+    await unmount(tester);
+  });
 }

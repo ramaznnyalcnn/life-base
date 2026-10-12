@@ -328,10 +328,10 @@ class _EntryPageState extends ConsumerState<EntryPage> {
             ),
           ),
           label(_isTransfer ? 'Nereden' : 'Hesap / kart'),
-          _AccountChips(accounts: sources, selected: _accountId, onSelected: (id) => setState(() => _accountId = id)),
+          AccountChips(accounts: sources, selected: _accountId, onSelected: (id) => setState(() => _accountId = id)),
           if (_isTransfer) ...[
             label(_type == EntryType.cardPayment ? 'Hangi kart' : 'Nereye'),
-            _AccountChips(accounts: targets, selected: _toAccountId, onSelected: (id) => setState(() => _toAccountId = id)),
+            AccountChips(accounts: targets, selected: _toAccountId, onSelected: (id) => setState(() => _toAccountId = id)),
             if (_type == EntryType.cardPayment && _toAccountId != null) _paymentSuggestions(wallet),
           ],
           if (!_isTransfer) ...[
@@ -448,8 +448,8 @@ class _EntryPageState extends ConsumerState<EntryPage> {
   }
 }
 
-class _AccountChips extends StatelessWidget {
-  const _AccountChips({required this.accounts, required this.selected, required this.onSelected});
+class AccountChips extends StatelessWidget {
+  const AccountChips({super.key, required this.accounts, required this.selected, required this.onSelected});
   final List<WalletAccount> accounts;
   final String? selected;
   final ValueChanged<String> onSelected;

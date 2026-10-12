@@ -10,8 +10,13 @@ typedef Cents = int;
 Cents? parseCents(String text) {
   var value = text.trim().replaceAll(' ', '').replaceAll('₺', '');
   if (value.isEmpty) return null;
-  // Turkish input: "." groups thousands, "," is the decimal point.
-  if (value.contains(',')) value = value.replaceAll('.', '').replaceAll(',', '.');
+  // Turkish input: "." groups thousands, "," is the decimal point. Without a
+  // comma, "15.000" is grouped thousands while "1234.5" is a decimal.
+  if (value.contains(',')) {
+    value = value.replaceAll('.', '').replaceAll(',', '.');
+  } else if (RegExp(r'^-?\d{1,3}(\.\d{3})+$').hasMatch(value)) {
+    value = value.replaceAll('.', '');
+  }
   final number = num.tryParse(value);
   return number == null ? null : (number * 100).round();
 }
@@ -338,6 +343,85 @@ class StatementMark {
   final SyncMark sync;
 
   String get id => markId(accountId, month);
+}
+
+/// A planned payment. Nothing moves until it is paid ("Ödendi"): then an
+/// expense (or, with [toAccountId], a transfer such as a card payment) is
+/// recorded and a monthly payment moves a month on.
+@immutable
+class ScheduledPayment {
+  const ScheduledPayment({
+    required this.id,
+    required this.title,
+    required this.accountId,
+    required this.amount,
+    required this.dueAt,
+    required this.createdBy,
+    this.toAccountId,
+    this.categoryId,
+    this.repeatMonthly = false,
+    this.completed = false,
+    this.lastPaidAt,
+    this.version = 1,
+    this.sync = SyncMark.confirmed,
+  });
+
+  factory ScheduledPayment.fromRow(WalletPaymentRow row) => ScheduledPayment(
+        id: row.id,
+        title: row.title,
+        accountId: row.accountId,
+        toAccountId: row.toAccountId,
+        categoryId: row.categoryId,
+        amount: row.amountCents,
+        dueAt: row.dueAt.toLocal(),
+        repeatMonthly: row.repeatMonthly,
+        completed: row.completed,
+        lastPaidAt: row.lastPaidAt?.toLocal(),
+        createdBy: row.createdBy,
+        version: row.version,
+      );
+
+  final String id;
+  final String title;
+  final String accountId;
+
+  /// Set for a transfer / card payment; null for an expense.
+  final String? toAccountId;
+  final int? categoryId;
+  final Cents amount;
+  final DateTime dueAt;
+  final bool repeatMonthly;
+  final bool completed;
+  final DateTime? lastPaidAt;
+  final int createdBy;
+  final int version;
+  final SyncMark sync;
+
+  bool get isTransfer => toAccountId != null;
+  String get kind => isTransfer ? 'transfer' : 'expense';
+
+  /// Paid: a monthly payment moves a month on, a one-off is done.
+  ScheduledPayment paid(DateTime at) => copyWith(
+        dueAt: repeatMonthly ? addMonths(dueAt, 1) : dueAt,
+        completed: !repeatMonthly,
+        lastPaidAt: at,
+      );
+
+  ScheduledPayment copyWith({DateTime? dueAt, bool? completed, DateTime? lastPaidAt, SyncMark? sync}) => ScheduledPayment(
+        id: id,
+        title: title,
+        accountId: accountId,
+        toAccountId: toAccountId,
+        categoryId: categoryId,
+        amount: amount,
+        dueAt: dueAt ?? this.dueAt,
+        repeatMonthly: repeatMonthly,
+        completed: completed ?? this.completed,
+        lastPaidAt: lastPaidAt ?? this.lastPaidAt,
+        createdBy: createdBy,
+        version: version,
+        sync: sync ?? this.sync,
+      );
 }
 
 String markId(String accountId, DateTime month) => '$accountId:${DateFormat('yyyy-MM').format(month)}';

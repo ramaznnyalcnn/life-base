@@ -6025,6 +6025,781 @@ class WalletStatementMarksCompanion extends UpdateCompanion<WalletMarkRow> {
   }
 }
 
+class $WalletScheduledPaymentsTable extends WalletScheduledPayments
+    with TableInfo<$WalletScheduledPaymentsTable, WalletPaymentRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WalletScheduledPaymentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _accountIdMeta = const VerificationMeta(
+    'accountId',
+  );
+  @override
+  late final GeneratedColumn<String> accountId = GeneratedColumn<String>(
+    'account_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _toAccountIdMeta = const VerificationMeta(
+    'toAccountId',
+  );
+  @override
+  late final GeneratedColumn<String> toAccountId = GeneratedColumn<String>(
+    'to_account_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  @override
+  late final GeneratedColumn<int> categoryId = GeneratedColumn<int>(
+    'category_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _amountCentsMeta = const VerificationMeta(
+    'amountCents',
+  );
+  @override
+  late final GeneratedColumn<int> amountCents = GeneratedColumn<int>(
+    'amount_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dueAtMeta = const VerificationMeta('dueAt');
+  @override
+  late final GeneratedColumn<DateTime> dueAt = GeneratedColumn<DateTime>(
+    'due_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _repeatMonthlyMeta = const VerificationMeta(
+    'repeatMonthly',
+  );
+  @override
+  late final GeneratedColumn<bool> repeatMonthly = GeneratedColumn<bool>(
+    'repeat_monthly',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("repeat_monthly" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _completedMeta = const VerificationMeta(
+    'completed',
+  );
+  @override
+  late final GeneratedColumn<bool> completed = GeneratedColumn<bool>(
+    'completed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("completed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _lastPaidAtMeta = const VerificationMeta(
+    'lastPaidAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastPaidAt = GeneratedColumn<DateTime>(
+    'last_paid_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdByMeta = const VerificationMeta(
+    'createdBy',
+  );
+  @override
+  late final GeneratedColumn<int> createdBy = GeneratedColumn<int>(
+    'created_by',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    kind,
+    accountId,
+    toAccountId,
+    categoryId,
+    amountCents,
+    dueAt,
+    repeatMonthly,
+    completed,
+    lastPaidAt,
+    createdBy,
+    version,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'wallet_scheduled_payments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<WalletPaymentRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('account_id')) {
+      context.handle(
+        _accountIdMeta,
+        accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_accountIdMeta);
+    }
+    if (data.containsKey('to_account_id')) {
+      context.handle(
+        _toAccountIdMeta,
+        toAccountId.isAcceptableOrUnknown(
+          data['to_account_id']!,
+          _toAccountIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['category_id']!, _categoryIdMeta),
+      );
+    }
+    if (data.containsKey('amount_cents')) {
+      context.handle(
+        _amountCentsMeta,
+        amountCents.isAcceptableOrUnknown(
+          data['amount_cents']!,
+          _amountCentsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_amountCentsMeta);
+    }
+    if (data.containsKey('due_at')) {
+      context.handle(
+        _dueAtMeta,
+        dueAt.isAcceptableOrUnknown(data['due_at']!, _dueAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dueAtMeta);
+    }
+    if (data.containsKey('repeat_monthly')) {
+      context.handle(
+        _repeatMonthlyMeta,
+        repeatMonthly.isAcceptableOrUnknown(
+          data['repeat_monthly']!,
+          _repeatMonthlyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('completed')) {
+      context.handle(
+        _completedMeta,
+        completed.isAcceptableOrUnknown(data['completed']!, _completedMeta),
+      );
+    }
+    if (data.containsKey('last_paid_at')) {
+      context.handle(
+        _lastPaidAtMeta,
+        lastPaidAt.isAcceptableOrUnknown(
+          data['last_paid_at']!,
+          _lastPaidAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_by')) {
+      context.handle(
+        _createdByMeta,
+        createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdByMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  WalletPaymentRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return WalletPaymentRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      accountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}account_id'],
+      )!,
+      toAccountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}to_account_id'],
+      ),
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}category_id'],
+      ),
+      amountCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount_cents'],
+      )!,
+      dueAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}due_at'],
+      )!,
+      repeatMonthly: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}repeat_monthly'],
+      )!,
+      completed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}completed'],
+      )!,
+      lastPaidAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_paid_at'],
+      ),
+      createdBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_by'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+    );
+  }
+
+  @override
+  $WalletScheduledPaymentsTable createAlias(String alias) {
+    return $WalletScheduledPaymentsTable(attachedDatabase, alias);
+  }
+}
+
+class WalletPaymentRow extends DataClass
+    implements Insertable<WalletPaymentRow> {
+  final String id;
+  final String title;
+
+  /// expense, transfer
+  final String kind;
+  final String accountId;
+  final String? toAccountId;
+  final int? categoryId;
+  final int amountCents;
+  final DateTime dueAt;
+  final bool repeatMonthly;
+  final bool completed;
+  final DateTime? lastPaidAt;
+  final int createdBy;
+  final int version;
+  const WalletPaymentRow({
+    required this.id,
+    required this.title,
+    required this.kind,
+    required this.accountId,
+    this.toAccountId,
+    this.categoryId,
+    required this.amountCents,
+    required this.dueAt,
+    required this.repeatMonthly,
+    required this.completed,
+    this.lastPaidAt,
+    required this.createdBy,
+    required this.version,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    map['kind'] = Variable<String>(kind);
+    map['account_id'] = Variable<String>(accountId);
+    if (!nullToAbsent || toAccountId != null) {
+      map['to_account_id'] = Variable<String>(toAccountId);
+    }
+    if (!nullToAbsent || categoryId != null) {
+      map['category_id'] = Variable<int>(categoryId);
+    }
+    map['amount_cents'] = Variable<int>(amountCents);
+    map['due_at'] = Variable<DateTime>(dueAt);
+    map['repeat_monthly'] = Variable<bool>(repeatMonthly);
+    map['completed'] = Variable<bool>(completed);
+    if (!nullToAbsent || lastPaidAt != null) {
+      map['last_paid_at'] = Variable<DateTime>(lastPaidAt);
+    }
+    map['created_by'] = Variable<int>(createdBy);
+    map['version'] = Variable<int>(version);
+    return map;
+  }
+
+  WalletScheduledPaymentsCompanion toCompanion(bool nullToAbsent) {
+    return WalletScheduledPaymentsCompanion(
+      id: Value(id),
+      title: Value(title),
+      kind: Value(kind),
+      accountId: Value(accountId),
+      toAccountId: toAccountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(toAccountId),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
+      amountCents: Value(amountCents),
+      dueAt: Value(dueAt),
+      repeatMonthly: Value(repeatMonthly),
+      completed: Value(completed),
+      lastPaidAt: lastPaidAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastPaidAt),
+      createdBy: Value(createdBy),
+      version: Value(version),
+    );
+  }
+
+  factory WalletPaymentRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return WalletPaymentRow(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      kind: serializer.fromJson<String>(json['kind']),
+      accountId: serializer.fromJson<String>(json['accountId']),
+      toAccountId: serializer.fromJson<String?>(json['toAccountId']),
+      categoryId: serializer.fromJson<int?>(json['categoryId']),
+      amountCents: serializer.fromJson<int>(json['amountCents']),
+      dueAt: serializer.fromJson<DateTime>(json['dueAt']),
+      repeatMonthly: serializer.fromJson<bool>(json['repeatMonthly']),
+      completed: serializer.fromJson<bool>(json['completed']),
+      lastPaidAt: serializer.fromJson<DateTime?>(json['lastPaidAt']),
+      createdBy: serializer.fromJson<int>(json['createdBy']),
+      version: serializer.fromJson<int>(json['version']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'kind': serializer.toJson<String>(kind),
+      'accountId': serializer.toJson<String>(accountId),
+      'toAccountId': serializer.toJson<String?>(toAccountId),
+      'categoryId': serializer.toJson<int?>(categoryId),
+      'amountCents': serializer.toJson<int>(amountCents),
+      'dueAt': serializer.toJson<DateTime>(dueAt),
+      'repeatMonthly': serializer.toJson<bool>(repeatMonthly),
+      'completed': serializer.toJson<bool>(completed),
+      'lastPaidAt': serializer.toJson<DateTime?>(lastPaidAt),
+      'createdBy': serializer.toJson<int>(createdBy),
+      'version': serializer.toJson<int>(version),
+    };
+  }
+
+  WalletPaymentRow copyWith({
+    String? id,
+    String? title,
+    String? kind,
+    String? accountId,
+    Value<String?> toAccountId = const Value.absent(),
+    Value<int?> categoryId = const Value.absent(),
+    int? amountCents,
+    DateTime? dueAt,
+    bool? repeatMonthly,
+    bool? completed,
+    Value<DateTime?> lastPaidAt = const Value.absent(),
+    int? createdBy,
+    int? version,
+  }) => WalletPaymentRow(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    kind: kind ?? this.kind,
+    accountId: accountId ?? this.accountId,
+    toAccountId: toAccountId.present ? toAccountId.value : this.toAccountId,
+    categoryId: categoryId.present ? categoryId.value : this.categoryId,
+    amountCents: amountCents ?? this.amountCents,
+    dueAt: dueAt ?? this.dueAt,
+    repeatMonthly: repeatMonthly ?? this.repeatMonthly,
+    completed: completed ?? this.completed,
+    lastPaidAt: lastPaidAt.present ? lastPaidAt.value : this.lastPaidAt,
+    createdBy: createdBy ?? this.createdBy,
+    version: version ?? this.version,
+  );
+  WalletPaymentRow copyWithCompanion(WalletScheduledPaymentsCompanion data) {
+    return WalletPaymentRow(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      toAccountId: data.toAccountId.present
+          ? data.toAccountId.value
+          : this.toAccountId,
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
+      amountCents: data.amountCents.present
+          ? data.amountCents.value
+          : this.amountCents,
+      dueAt: data.dueAt.present ? data.dueAt.value : this.dueAt,
+      repeatMonthly: data.repeatMonthly.present
+          ? data.repeatMonthly.value
+          : this.repeatMonthly,
+      completed: data.completed.present ? data.completed.value : this.completed,
+      lastPaidAt: data.lastPaidAt.present
+          ? data.lastPaidAt.value
+          : this.lastPaidAt,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
+      version: data.version.present ? data.version.value : this.version,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WalletPaymentRow(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('kind: $kind, ')
+          ..write('accountId: $accountId, ')
+          ..write('toAccountId: $toAccountId, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('dueAt: $dueAt, ')
+          ..write('repeatMonthly: $repeatMonthly, ')
+          ..write('completed: $completed, ')
+          ..write('lastPaidAt: $lastPaidAt, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('version: $version')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    title,
+    kind,
+    accountId,
+    toAccountId,
+    categoryId,
+    amountCents,
+    dueAt,
+    repeatMonthly,
+    completed,
+    lastPaidAt,
+    createdBy,
+    version,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is WalletPaymentRow &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.kind == this.kind &&
+          other.accountId == this.accountId &&
+          other.toAccountId == this.toAccountId &&
+          other.categoryId == this.categoryId &&
+          other.amountCents == this.amountCents &&
+          other.dueAt == this.dueAt &&
+          other.repeatMonthly == this.repeatMonthly &&
+          other.completed == this.completed &&
+          other.lastPaidAt == this.lastPaidAt &&
+          other.createdBy == this.createdBy &&
+          other.version == this.version);
+}
+
+class WalletScheduledPaymentsCompanion
+    extends UpdateCompanion<WalletPaymentRow> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<String> kind;
+  final Value<String> accountId;
+  final Value<String?> toAccountId;
+  final Value<int?> categoryId;
+  final Value<int> amountCents;
+  final Value<DateTime> dueAt;
+  final Value<bool> repeatMonthly;
+  final Value<bool> completed;
+  final Value<DateTime?> lastPaidAt;
+  final Value<int> createdBy;
+  final Value<int> version;
+  final Value<int> rowid;
+  const WalletScheduledPaymentsCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.accountId = const Value.absent(),
+    this.toAccountId = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.amountCents = const Value.absent(),
+    this.dueAt = const Value.absent(),
+    this.repeatMonthly = const Value.absent(),
+    this.completed = const Value.absent(),
+    this.lastPaidAt = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.version = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  WalletScheduledPaymentsCompanion.insert({
+    required String id,
+    required String title,
+    required String kind,
+    required String accountId,
+    this.toAccountId = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    required int amountCents,
+    required DateTime dueAt,
+    this.repeatMonthly = const Value.absent(),
+    this.completed = const Value.absent(),
+    this.lastPaidAt = const Value.absent(),
+    required int createdBy,
+    this.version = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       kind = Value(kind),
+       accountId = Value(accountId),
+       amountCents = Value(amountCents),
+       dueAt = Value(dueAt),
+       createdBy = Value(createdBy);
+  static Insertable<WalletPaymentRow> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? kind,
+    Expression<String>? accountId,
+    Expression<String>? toAccountId,
+    Expression<int>? categoryId,
+    Expression<int>? amountCents,
+    Expression<DateTime>? dueAt,
+    Expression<bool>? repeatMonthly,
+    Expression<bool>? completed,
+    Expression<DateTime>? lastPaidAt,
+    Expression<int>? createdBy,
+    Expression<int>? version,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (kind != null) 'kind': kind,
+      if (accountId != null) 'account_id': accountId,
+      if (toAccountId != null) 'to_account_id': toAccountId,
+      if (categoryId != null) 'category_id': categoryId,
+      if (amountCents != null) 'amount_cents': amountCents,
+      if (dueAt != null) 'due_at': dueAt,
+      if (repeatMonthly != null) 'repeat_monthly': repeatMonthly,
+      if (completed != null) 'completed': completed,
+      if (lastPaidAt != null) 'last_paid_at': lastPaidAt,
+      if (createdBy != null) 'created_by': createdBy,
+      if (version != null) 'version': version,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  WalletScheduledPaymentsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? title,
+    Value<String>? kind,
+    Value<String>? accountId,
+    Value<String?>? toAccountId,
+    Value<int?>? categoryId,
+    Value<int>? amountCents,
+    Value<DateTime>? dueAt,
+    Value<bool>? repeatMonthly,
+    Value<bool>? completed,
+    Value<DateTime?>? lastPaidAt,
+    Value<int>? createdBy,
+    Value<int>? version,
+    Value<int>? rowid,
+  }) {
+    return WalletScheduledPaymentsCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      kind: kind ?? this.kind,
+      accountId: accountId ?? this.accountId,
+      toAccountId: toAccountId ?? this.toAccountId,
+      categoryId: categoryId ?? this.categoryId,
+      amountCents: amountCents ?? this.amountCents,
+      dueAt: dueAt ?? this.dueAt,
+      repeatMonthly: repeatMonthly ?? this.repeatMonthly,
+      completed: completed ?? this.completed,
+      lastPaidAt: lastPaidAt ?? this.lastPaidAt,
+      createdBy: createdBy ?? this.createdBy,
+      version: version ?? this.version,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (accountId.present) {
+      map['account_id'] = Variable<String>(accountId.value);
+    }
+    if (toAccountId.present) {
+      map['to_account_id'] = Variable<String>(toAccountId.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<int>(categoryId.value);
+    }
+    if (amountCents.present) {
+      map['amount_cents'] = Variable<int>(amountCents.value);
+    }
+    if (dueAt.present) {
+      map['due_at'] = Variable<DateTime>(dueAt.value);
+    }
+    if (repeatMonthly.present) {
+      map['repeat_monthly'] = Variable<bool>(repeatMonthly.value);
+    }
+    if (completed.present) {
+      map['completed'] = Variable<bool>(completed.value);
+    }
+    if (lastPaidAt.present) {
+      map['last_paid_at'] = Variable<DateTime>(lastPaidAt.value);
+    }
+    if (createdBy.present) {
+      map['created_by'] = Variable<int>(createdBy.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WalletScheduledPaymentsCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('kind: $kind, ')
+          ..write('accountId: $accountId, ')
+          ..write('toAccountId: $toAccountId, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('dueAt: $dueAt, ')
+          ..write('repeatMonthly: $repeatMonthly, ')
+          ..write('completed: $completed, ')
+          ..write('lastPaidAt: $lastPaidAt, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('version: $version, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $WalletOutboxTable extends WalletOutbox
     with TableInfo<$WalletOutboxTable, WalletOutboxRow> {
   @override
@@ -7992,6 +8767,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $WalletStatementMarksTable walletStatementMarks =
       $WalletStatementMarksTable(this);
+  late final $WalletScheduledPaymentsTable walletScheduledPayments =
+      $WalletScheduledPaymentsTable(this);
   late final $WalletOutboxTable walletOutbox = $WalletOutboxTable(this);
   late final $LocalNotesTable localNotes = $LocalNotesTable(this);
   late final $LocalNoteItemsTable localNoteItems = $LocalNoteItemsTable(this);
@@ -8010,6 +8787,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     walletTransactions,
     walletTransfers,
     walletStatementMarks,
+    walletScheduledPayments,
     walletOutbox,
     localNotes,
     localNoteItems,
@@ -11023,6 +11801,387 @@ typedef $$WalletStatementMarksTableProcessedTableManager =
       WalletMarkRow,
       PrefetchHooks Function()
     >;
+typedef $$WalletScheduledPaymentsTableCreateCompanionBuilder =
+    WalletScheduledPaymentsCompanion Function({
+      required String id,
+      required String title,
+      required String kind,
+      required String accountId,
+      Value<String?> toAccountId,
+      Value<int?> categoryId,
+      required int amountCents,
+      required DateTime dueAt,
+      Value<bool> repeatMonthly,
+      Value<bool> completed,
+      Value<DateTime?> lastPaidAt,
+      required int createdBy,
+      Value<int> version,
+      Value<int> rowid,
+    });
+typedef $$WalletScheduledPaymentsTableUpdateCompanionBuilder =
+    WalletScheduledPaymentsCompanion Function({
+      Value<String> id,
+      Value<String> title,
+      Value<String> kind,
+      Value<String> accountId,
+      Value<String?> toAccountId,
+      Value<int?> categoryId,
+      Value<int> amountCents,
+      Value<DateTime> dueAt,
+      Value<bool> repeatMonthly,
+      Value<bool> completed,
+      Value<DateTime?> lastPaidAt,
+      Value<int> createdBy,
+      Value<int> version,
+      Value<int> rowid,
+    });
+
+class $$WalletScheduledPaymentsTableFilterComposer
+    extends Composer<_$AppDatabase, $WalletScheduledPaymentsTable> {
+  $$WalletScheduledPaymentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get accountId => $composableBuilder(
+    column: $table.accountId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get toAccountId => $composableBuilder(
+    column: $table.toAccountId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get dueAt => $composableBuilder(
+    column: $table.dueAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get repeatMonthly => $composableBuilder(
+    column: $table.repeatMonthly,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get completed => $composableBuilder(
+    column: $table.completed,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastPaidAt => $composableBuilder(
+    column: $table.lastPaidAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$WalletScheduledPaymentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $WalletScheduledPaymentsTable> {
+  $$WalletScheduledPaymentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get accountId => $composableBuilder(
+    column: $table.accountId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get toAccountId => $composableBuilder(
+    column: $table.toAccountId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get dueAt => $composableBuilder(
+    column: $table.dueAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get repeatMonthly => $composableBuilder(
+    column: $table.repeatMonthly,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get completed => $composableBuilder(
+    column: $table.completed,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastPaidAt => $composableBuilder(
+    column: $table.lastPaidAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$WalletScheduledPaymentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $WalletScheduledPaymentsTable> {
+  $$WalletScheduledPaymentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get accountId =>
+      $composableBuilder(column: $table.accountId, builder: (column) => column);
+
+  GeneratedColumn<String> get toAccountId => $composableBuilder(
+    column: $table.toAccountId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get dueAt =>
+      $composableBuilder(column: $table.dueAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get repeatMonthly => $composableBuilder(
+    column: $table.repeatMonthly,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get completed =>
+      $composableBuilder(column: $table.completed, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastPaidAt => $composableBuilder(
+    column: $table.lastPaidAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+}
+
+class $$WalletScheduledPaymentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $WalletScheduledPaymentsTable,
+          WalletPaymentRow,
+          $$WalletScheduledPaymentsTableFilterComposer,
+          $$WalletScheduledPaymentsTableOrderingComposer,
+          $$WalletScheduledPaymentsTableAnnotationComposer,
+          $$WalletScheduledPaymentsTableCreateCompanionBuilder,
+          $$WalletScheduledPaymentsTableUpdateCompanionBuilder,
+          (
+            WalletPaymentRow,
+            BaseReferences<
+              _$AppDatabase,
+              $WalletScheduledPaymentsTable,
+              WalletPaymentRow
+            >,
+          ),
+          WalletPaymentRow,
+          PrefetchHooks Function()
+        > {
+  $$WalletScheduledPaymentsTableTableManager(
+    _$AppDatabase db,
+    $WalletScheduledPaymentsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WalletScheduledPaymentsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$WalletScheduledPaymentsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$WalletScheduledPaymentsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> accountId = const Value.absent(),
+                Value<String?> toAccountId = const Value.absent(),
+                Value<int?> categoryId = const Value.absent(),
+                Value<int> amountCents = const Value.absent(),
+                Value<DateTime> dueAt = const Value.absent(),
+                Value<bool> repeatMonthly = const Value.absent(),
+                Value<bool> completed = const Value.absent(),
+                Value<DateTime?> lastPaidAt = const Value.absent(),
+                Value<int> createdBy = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => WalletScheduledPaymentsCompanion(
+                id: id,
+                title: title,
+                kind: kind,
+                accountId: accountId,
+                toAccountId: toAccountId,
+                categoryId: categoryId,
+                amountCents: amountCents,
+                dueAt: dueAt,
+                repeatMonthly: repeatMonthly,
+                completed: completed,
+                lastPaidAt: lastPaidAt,
+                createdBy: createdBy,
+                version: version,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String title,
+                required String kind,
+                required String accountId,
+                Value<String?> toAccountId = const Value.absent(),
+                Value<int?> categoryId = const Value.absent(),
+                required int amountCents,
+                required DateTime dueAt,
+                Value<bool> repeatMonthly = const Value.absent(),
+                Value<bool> completed = const Value.absent(),
+                Value<DateTime?> lastPaidAt = const Value.absent(),
+                required int createdBy,
+                Value<int> version = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => WalletScheduledPaymentsCompanion.insert(
+                id: id,
+                title: title,
+                kind: kind,
+                accountId: accountId,
+                toAccountId: toAccountId,
+                categoryId: categoryId,
+                amountCents: amountCents,
+                dueAt: dueAt,
+                repeatMonthly: repeatMonthly,
+                completed: completed,
+                lastPaidAt: lastPaidAt,
+                createdBy: createdBy,
+                version: version,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$WalletScheduledPaymentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $WalletScheduledPaymentsTable,
+      WalletPaymentRow,
+      $$WalletScheduledPaymentsTableFilterComposer,
+      $$WalletScheduledPaymentsTableOrderingComposer,
+      $$WalletScheduledPaymentsTableAnnotationComposer,
+      $$WalletScheduledPaymentsTableCreateCompanionBuilder,
+      $$WalletScheduledPaymentsTableUpdateCompanionBuilder,
+      (
+        WalletPaymentRow,
+        BaseReferences<
+          _$AppDatabase,
+          $WalletScheduledPaymentsTable,
+          WalletPaymentRow
+        >,
+      ),
+      WalletPaymentRow,
+      PrefetchHooks Function()
+    >;
 typedef $$WalletOutboxTableCreateCompanionBuilder =
     WalletOutboxCompanion Function({
       required String requestId,
@@ -11983,6 +13142,11 @@ class $AppDatabaseManager {
       $$WalletTransfersTableTableManager(_db, _db.walletTransfers);
   $$WalletStatementMarksTableTableManager get walletStatementMarks =>
       $$WalletStatementMarksTableTableManager(_db, _db.walletStatementMarks);
+  $$WalletScheduledPaymentsTableTableManager get walletScheduledPayments =>
+      $$WalletScheduledPaymentsTableTableManager(
+        _db,
+        _db.walletScheduledPayments,
+      );
   $$WalletOutboxTableTableManager get walletOutbox =>
       $$WalletOutboxTableTableManager(_db, _db.walletOutbox);
   $$LocalNotesTableTableManager get localNotes =>

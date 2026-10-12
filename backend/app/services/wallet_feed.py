@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Category, StatementMark, Transaction, Transfer, User, WalletChange
+from app.models import Account, Category, ScheduledPayment, StatementMark, Transaction, Transfer, User, WalletChange
 from app.services.bootstrap import ensure_default_categories
 from app.services.households import describe
 from app.services.ledger import SHARED, Viewer, current_cursor
@@ -88,6 +88,24 @@ def mark_json(mark: StatementMark, account: Account) -> dict[str, object]:
     }
 
 
+def payment_json(payment: ScheduledPayment, source: Account, destination: Account | None) -> dict[str, object]:
+    return {
+        "id": payment.client_id,
+        "title": payment.title,
+        "kind": payment.kind,
+        "account_id": source.client_id,
+        "to_account_id": destination.client_id if destination is not None else None,
+        "category_id": payment.category_id,
+        "amount": str(payment.amount),
+        "due_at": _utc(payment.due_at).isoformat(),
+        "repeat_monthly": payment.repeat_monthly,
+        "completed": payment.is_completed,
+        "last_paid_at": _utc(payment.last_paid_at).isoformat() if payment.last_paid_at else None,
+        "created_by": payment.created_by_user_id or payment.user_id,
+        "version": payment.entity_version,
+    }
+
+
 def _visible_accounts_query(viewer: Viewer):
     condition = Account.user_id == viewer.user_id
     if viewer.household_id is not None:
@@ -105,11 +123,12 @@ def _categories(session: Session, viewer: Viewer) -> list[dict[str, object]]:
 
 
 def _empty() -> dict[str, list]:
-    return {"accounts": [], "transactions": [], "transfers": [], "statement_marks": [], "deleted": []}
+    return {"accounts": [], "transactions": [], "transfers": [], "statement_marks": [], "scheduled_payments": [], "deleted": []}
 
 
 def _fill(session: Session, viewer: Viewer, out: dict[str, list], accounts: Iterable[Account],
-          transactions: Iterable[Transaction], transfers: Iterable[Transfer], marks: Iterable[StatementMark]) -> None:
+          transactions: Iterable[Transaction], transfers: Iterable[Transfer], marks: Iterable[StatementMark],
+          payments: Iterable[ScheduledPayment] = ()) -> None:
     by_id: dict[int, Account] = {}
 
     def account(account_id: int) -> Account | None:
@@ -140,6 +159,14 @@ def _fill(session: Session, viewer: Viewer, out: dict[str, list], accounts: Iter
         owner = account(row.account_id)
         if owner is not None and viewer.can_use(owner):
             out["statement_marks"].append(mark_json(row, owner))
+    for row in payments:
+        # A payment belongs with the account it is paid from.
+        source = account(row.source_account_id)
+        destination = account(row.destination_account_id) if row.destination_account_id is not None else None
+        if source is not None and viewer.can_use(source):
+            out["scheduled_payments"].append(payment_json(row, source, destination))
+        else:
+            out["deleted"].append({"kind": "scheduled_payment", "id": row.client_id})
 
 
 def snapshot(session: Session, viewer: Viewer) -> dict[str, list]:
@@ -155,11 +182,16 @@ def snapshot(session: Session, viewer: Viewer) -> dict[str, list]:
         .order_by(Transfer.id)
     ).all() if ids else []
     marks = session.scalars(select(StatementMark).where(StatementMark.account_id.in_(ids))).all() if ids else []
-    _fill(session, viewer, out, accounts, transactions, transfers, marks)
+    payments = session.scalars(
+        select(ScheduledPayment)
+        .where(ScheduledPayment.source_account_id.in_(ids), ScheduledPayment.client_id.is_not(None))
+        .order_by(ScheduledPayment.id)
+    ).all() if ids else []
+    _fill(session, viewer, out, accounts, transactions, transfers, marks, payments)
     return out
 
 
-_MODELS = {"account": Account, "transaction": Transaction, "transfer": Transfer}
+_MODELS = {"account": Account, "transaction": Transaction, "transfer": Transfer, "scheduled_payment": ScheduledPayment}
 
 
 def changes_since(session: Session, viewer: Viewer, since: int, limit: int) -> tuple[dict[str, list], int, bool]:
@@ -175,7 +207,7 @@ def changes_since(session: Session, viewer: Viewer, since: int, limit: int) -> t
     for row in page:
         latest[(row.kind, row.client_id)] = row
     out = _empty()
-    found: dict[str, list] = {"account": [], "transaction": [], "transfer": [], "statement_mark": []}
+    found: dict[str, list] = {"account": [], "transaction": [], "transfer": [], "statement_mark": [], "scheduled_payment": []}
     for (kind, client_id), row in latest.items():
         if kind == "statement_mark":
             account_client_id, month = client_id.rsplit(":", 1)
@@ -195,7 +227,8 @@ def changes_since(session: Session, viewer: Viewer, since: int, limit: int) -> t
             out["deleted"].append({"kind": kind, "id": client_id})
         else:
             found[kind].append(entity)
-    _fill(session, viewer, out, found["account"], found["transaction"], found["transfer"], found["statement_mark"])
+    _fill(session, viewer, out, found["account"], found["transaction"], found["transfer"], found["statement_mark"],
+          found["scheduled_payment"])
     cursor = page[-1].seq if has_more else max(current_cursor(session, viewer.scope), since)
     return out, cursor, has_more
 

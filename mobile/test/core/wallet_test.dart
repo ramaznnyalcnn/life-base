@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -63,6 +64,9 @@ void main() {
     test('parses Turkish and plain input into kuruş', () {
       expect(parseCents('1.234,50'), 123450);
       expect(parseCents('1234.5'), 123450);
+      expect(parseCents('15.000'), 1500000);
+      expect(parseCents('1.234.567'), 123456700);
+      expect(centsOf('15000.00'), 1500000);
       expect(parseCents('₺ 12'), 1200);
       expect(parseCents('-0,05'), -5);
       expect(parseCents('abc'), isNull);
@@ -132,6 +136,101 @@ void main() {
       expect(view.accounts['card']!.balance, 25000);
       expect(view.transfers['p']!.sync, SyncMark.conflict);
       expect(view.accounts['card']!.sync, SyncMark.conflict);
+    });
+  });
+
+  group('planned payments', () {
+    WalletOp op(String key, Map<String, Object?> values) =>
+        WalletOp(requestId: '$key$values', key: key, values: values, accountKeys: const [], createdAt: DateTime(2026));
+
+    final confirmed = WalletData(accounts: {
+      'bank': const WalletAccount(id: 'bank', ownerId: 1, name: 'Banka', type: AccountType.bank, balance: 2000000),
+      'card': const WalletAccount(id: 'card', ownerId: 1, name: 'Kart', type: AccountType.creditCard, balance: -80000, statementDay: 15),
+    });
+    final rent = op('wallet.payment.save', {
+      'id': 'rent', 'title': 'Kira', 'kind': 'expense', 'account_id': 'bank', 'category_id': 3,
+      'amount': '15000.00', 'due_at': '2026-10-31T09:00:00+03:00', 'repeat_monthly': true,
+    });
+
+    test('a saved payment shows at once and moves no money', () {
+      final view = applyOutbox(confirmed, [rent], me: 1);
+      final payment = view.payments['rent']!;
+      expect((payment.title, payment.isTransfer, payment.sync), ('Kira', false, SyncMark.pending));
+      expect(payment.dueAt, DateTime.parse('2026-10-31T09:00:00+03:00').toLocal());
+      expect(view.accounts['bank']!.balance, 2000000);
+    });
+
+    test('paying records the expense and moves a monthly payment a month on', () {
+      final view = applyOutbox(confirmed, [
+        rent,
+        op('wallet.payment.complete', {'id': 'rent', 'entry_id': 'e1', 'paid_at': '2026-10-30T20:00:00+03:00'}),
+      ], me: 1, categoryNames: {3: 'Kira'});
+
+      expect(view.accounts['bank']!.balance, 500000);
+      final tx = view.transactions['e1']!;
+      expect((tx.kind, tx.amount, tx.note, tx.category), (TxKind.expense, 1500000, 'Kira', 'Kira'));
+      expect(view.payments['rent']!.dueAt, DateTime.parse('2026-11-30T09:00:00+03:00').toLocal());
+      expect(view.payments['rent']!.completed, isFalse);
+    });
+
+    test('a one-off card payment becomes a transfer and closes', () {
+      final view = applyOutbox(confirmed, [
+        op('wallet.payment.save', {
+          'id': 'bonus', 'title': 'Bonus', 'kind': 'transfer', 'account_id': 'bank', 'to_account_id': 'card',
+          'amount': '800.00', 'due_at': '2026-10-25T09:00:00+03:00', 'repeat_monthly': false,
+        }),
+        op('wallet.payment.complete', {'id': 'bonus', 'entry_id': 'e2', 'paid_at': '2026-10-20T12:00:00+03:00'}),
+        op('wallet.payment.complete', {'id': 'bonus', 'entry_id': 'e3', 'paid_at': '2026-10-20T12:00:00+03:00'}),
+      ], me: 1);
+
+      expect(view.accounts['card']!.balance, 0);
+      expect(view.accounts['bank']!.balance, 1920000, reason: 'a closed payment cannot be paid twice');
+      expect(view.transfers.keys, ['e2']);
+      expect(view.payments['bonus']!.completed, isTrue);
+    });
+
+    test('pulled payments are stored, and deleted ones dropped', () async {
+      final db = AppDatabase(executor: NativeDatabase.memory());
+      addTearDown(db.close);
+      final server = FakeServer()
+        ..pages.add({
+          'scope': 'u:1', 'cursor': 2, 'reset': true, 'has_more': false,
+          'accounts': [account('bank')],
+          'scheduled_payments': [
+            {'id': 'rent', 'title': 'Kira', 'kind': 'expense', 'account_id': 'bank', 'to_account_id': null, 'category_id': 3,
+             'amount': '15000.00', 'due_at': '2026-10-31T06:00:00+00:00', 'repeat_monthly': true, 'completed': false,
+             'last_paid_at': null, 'created_by': 1, 'version': 2},
+          ],
+        })
+        ..pages.add({'scope': 'u:1', 'cursor': 3, 'reset': false, 'has_more': false, 'deleted': [{'kind': 'scheduled_payment', 'id': 'rent'}]});
+      final engine = WalletSyncEngine(database: db, transport: server);
+
+      await engine.pull();
+      final row = await db.select(db.walletScheduledPayments).getSingle();
+      expect((row.title, row.amountCents, row.repeatMonthly, row.version), ('Kira', 1500000, true, 2));
+      expect(ScheduledPayment.fromRow(row).dueAt, DateTime.utc(2026, 10, 31, 6).toLocal());
+
+      await engine.pull();
+      expect(await db.select(db.walletScheduledPayments).get(), isEmpty);
+    });
+
+    test('the repository queues payments against the accounts they touch', () async {
+      final db = AppDatabase(executor: NativeDatabase.memory());
+      addTearDown(db.close);
+      final repo = WalletRepository(db);
+      await repo.savePayment(id: 'p', title: ' Bonus ', accountId: 'bank', toAccountId: 'card', categoryId: 3, amount: 80000, dueAt: DateTime(2026, 10, 25, 9));
+      final payment = ScheduledPayment(id: 'p', title: 'Bonus', accountId: 'bank', toAccountId: 'card', amount: 80000, dueAt: DateTime(2026, 10, 25, 9), createdBy: 1, version: 2);
+      await repo.completePayment(payment, at: DateTime(2026, 10, 20, 12));
+
+      final ops = [for (final r in await (db.select(db.walletOutbox)..orderBy([(t) => OrderingTerm.asc(t.seq)])).get()) WalletOp.fromRow(r)];
+      expect(ops.first.values['title'], 'Bonus');
+      expect(ops.first.values['kind'], 'transfer');
+      expect(ops.first.values['category_id'], isNull);
+      expect(ops.first.accountKeys, ['bank', 'card']);
+      expect(ops.last.key, 'wallet.payment.complete');
+      expect(ops.last.entityId, 'p');
+      expect(ops.last.values['expected_version'], 2);
+      expect(ops.last.values['entry_id'], isA<String>());
     });
   });
 

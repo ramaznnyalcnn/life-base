@@ -80,6 +80,8 @@ class PaymentCompleteOperation(OperationHandler[PaymentCompleteInput]):
             raise EntityVersionConflictError(self.current_snapshot(context, payload))
         if payment.is_completed:
             raise ValueError("Planli odeme zaten tamamlandi.")
+        if payment.destination_account_id is None:
+            raise ValueError("Bu planli odeme bir gider; mobil cuzdandan tamamlanir.")
         source = _owned_account(context, payment.source_account_id)
         destination = _owned_account(context, payment.destination_account_id)
         accounts = lock_accounts(context.session, [source.id, destination.id])

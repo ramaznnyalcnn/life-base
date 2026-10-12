@@ -185,6 +185,57 @@ class WalletRepository {
         [accountId],
       );
 
+  // Scheduled payments ------------------------------------------------------
+
+  /// Create ([previous] null) or edit a planned payment: an expense from
+  /// [accountId], or with [toAccountId] a transfer such as a card payment.
+  Future<void> savePayment({
+    required String id,
+    required String title,
+    required String accountId,
+    required Cents amount,
+    required DateTime dueAt,
+    String? toAccountId,
+    int? categoryId,
+    bool repeatMonthly = false,
+    ScheduledPayment? previous,
+  }) =>
+      _enqueue(
+        'wallet.payment.save',
+        {
+          'id': id,
+          'title': title.trim(),
+          'kind': toAccountId == null ? 'expense' : 'transfer',
+          'account_id': accountId,
+          'to_account_id': toAccountId,
+          'category_id': toAccountId == null ? categoryId : null,
+          'amount': decimalOf(amount),
+          'due_at': _time(dueAt),
+          'repeat_monthly': repeatMonthly,
+          'expected_version': previous?.version,
+        },
+        [accountId, toAccountId, previous?.accountId, previous?.toAccountId],
+      );
+
+  Future<void> deletePayment(ScheduledPayment payment) => _enqueue(
+        'wallet.payment.delete',
+        {'id': payment.id, 'expected_version': payment.version},
+        [payment.accountId, payment.toAccountId],
+      );
+
+  /// "Ödendi": records the expense or transfer (named here, so it shows at
+  /// once) and moves a monthly payment a month on.
+  Future<void> completePayment(ScheduledPayment payment, {DateTime? at}) => _enqueue(
+        'wallet.payment.complete',
+        {
+          'id': payment.id,
+          'entry_id': newId(),
+          'paid_at': _time(at ?? DateTime.now()),
+          'expected_version': payment.version,
+        },
+        [payment.accountId, payment.toAccountId],
+      );
+
   // Conflicts ---------------------------------------------------------------
 
   /// "Sunucudaki": drop this device's write.

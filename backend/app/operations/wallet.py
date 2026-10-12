@@ -16,7 +16,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.models import Account, AccountType, Category, StatementMark, Transaction, TransactionType, Transfer
+from app.models import Account, AccountType, Category, ScheduledPayment, StatementMark, Transaction, TransactionType, Transfer
 from app.operations.base import HandlerResult, OperationContext, OperationHandler
 from app.operations.definitions import definition, field
 from app.operations.executor import EntityVersionConflictError
@@ -24,6 +24,9 @@ from app.schemas import EntityRef, OperationFieldKind
 from app.schemas.wallet_ops import (
     AccountArchiveInput,
     AccountSaveInput,
+    PaymentCompleteInput,
+    PaymentDeleteInput,
+    PaymentSaveInput,
     StatementMarkInput,
     TransactionDeleteInput,
     TransactionSaveInput,
@@ -42,7 +45,7 @@ from app.services.ledger import (
     record_change,
     transaction_effect,
 )
-from app.services.wallet_feed import account_json, mark_id, transaction_json, transfer_json
+from app.services.wallet_feed import account_json, mark_id, payment_json, transaction_json, transfer_json
 
 
 CENT = Decimal("0.01")
@@ -431,6 +434,176 @@ class StatementMarkOperation(_WalletOperation):
         return HandlerResult([EntityRef(kind="statement_mark", id=key)])
 
 
+# Scheduled payments -----------------------------------------------------
+
+
+def _payment_snapshot(context: OperationContext, client_id: str) -> dict[str, object]:
+    row = context.session.scalar(select(ScheduledPayment).where(ScheduledPayment.client_id == client_id))
+    if row is None:
+        return {}
+    destination = context.session.get(Account, row.destination_account_id) if row.destination_account_id else None
+    return payment_json(row, context.session.get(Account, row.source_account_id), destination)
+
+
+def _expense_category(context: OperationContext, viewer: Viewer, category_id: int | None, unchanged: bool) -> Category | None:
+    if category_id is None:
+        return None
+    category = context.session.get(Category, category_id)
+    if category is None or category.type != TransactionType.EXPENSE or (
+        category.user_id not in (None, viewer.user_id) and not unchanged
+    ):
+        raise ValueError("Kategori bulunamadi.")
+    return category
+
+
+class PaymentSaveOperation(_WalletOperation):
+    """Create or edit a planned payment; nothing moves until it is paid."""
+
+    key = "wallet.payment.save"
+    input_model = PaymentSaveInput
+    definition = definition(key, "wallet", "Planli odeme kaydet", [
+        field("title", "Baslik", OperationFieldKind.SHORT_TEXT),
+        field("amount", "Tutar", OperationFieldKind.MONEY),
+    ])
+
+    def current_snapshot(self, context, payload):
+        return _payment_snapshot(context, payload.id)
+
+    def execute(self, context: OperationContext, payload: PaymentSaveInput) -> HandlerResult:
+        session, viewer = context.session, self.viewer(context)
+        payment = session.scalar(select(ScheduledPayment).where(ScheduledPayment.client_id == payload.id))
+        if payment is not None:
+            _usable(context, viewer, payment.source_account_id)
+            _check_version(payment, payload.expected_version, _payment_snapshot(context, payload.id))
+        source = account_by_client_id(session, viewer, payload.account_id)
+        destination = None
+        if payload.kind == "transfer":
+            if payload.to_account_id is None:
+                raise ValueError("Odenecek hesabi sec.")
+            destination = account_by_client_id(session, viewer, payload.to_account_id)
+            if destination.id == source.id:
+                raise ValueError("Kaynak ve hedef hesap ayni olamaz.")
+        unchanged = payment is not None and payment.category_id == payload.category_id
+        category = _expense_category(context, viewer, payload.category_id, unchanged) if payload.kind == "expense" else None
+        if payment is None:
+            payment = ScheduledPayment(client_id=payload.id, created_by_user_id=viewer.user_id, is_completed=False)
+            session.add(payment)
+        payment.user_id = source.user_id
+        payment.title = payload.title
+        payment.kind = payload.kind
+        payment.source_account_id = source.id
+        payment.destination_account_id = destination.id if destination is not None else None
+        payment.category_id = category.id if category else None
+        payment.amount = payload.amount
+        payment.due_at = payload.due_at
+        payment.repeat_monthly = payload.repeat_monthly
+        session.flush()
+        record_change(session, owner_scope(session, source), "scheduled_payment", payment.client_id)
+        return HandlerResult([EntityRef(kind="scheduled_payment", id=payment.client_id, version=payment.entity_version)])
+
+
+class PaymentDeleteOperation(_WalletOperation):
+    key = "wallet.payment.delete"
+    input_model = PaymentDeleteInput
+    definition = definition(key, "wallet", "Planli odemeyi sil", [field("id", "Odeme", OperationFieldKind.SHORT_TEXT)])
+
+    def current_snapshot(self, context, payload):
+        return _payment_snapshot(context, payload.id)
+
+    def execute(self, context: OperationContext, payload: PaymentDeleteInput) -> HandlerResult:
+        session, viewer = context.session, self.viewer(context)
+        payment = session.scalar(select(ScheduledPayment).where(ScheduledPayment.client_id == payload.id))
+        if payment is None:
+            return HandlerResult([])
+        source = _usable(context, viewer, payment.source_account_id)
+        _check_version(payment, payload.expected_version, _payment_snapshot(context, payload.id))
+        record_change(session, owner_scope(session, source), "scheduled_payment", payment.client_id, deleted=True)
+        session.delete(payment)
+        session.flush()
+        return HandlerResult([EntityRef(kind="scheduled_payment", id=payload.id)])
+
+
+class PaymentCompleteOperation(_WalletOperation):
+    """"Ödendi": records the expense or transfer, then moves a monthly payment a
+    month ahead (keeping its day, clamped to short months) or closes a one-off."""
+
+    key = "wallet.payment.complete"
+    input_model = PaymentCompleteInput
+    definition = definition(key, "wallet", "Odendi", [field("id", "Odeme", OperationFieldKind.SHORT_TEXT)])
+
+    def current_snapshot(self, context, payload):
+        return _payment_snapshot(context, payload.id)
+
+    def execute(self, context: OperationContext, payload: PaymentCompleteInput) -> HandlerResult:
+        session, viewer = context.session, self.viewer(context)
+        payment = session.scalar(select(ScheduledPayment).where(ScheduledPayment.client_id == payload.id))
+        if payment is None:
+            raise ValueError("Planli odeme bulunamadi.")
+        _usable(context, viewer, payment.source_account_id)
+        if payment.destination_account_id is not None:
+            _usable(context, viewer, payment.destination_account_id)
+        _check_version(payment, payload.expected_version, _payment_snapshot(context, payload.id))
+        if payment.is_completed:
+            raise ValueError("Planli odeme zaten tamamlandi.")
+        ids = {payment.source_account_id} | ({payment.destination_account_id} if payment.destination_account_id else set())
+        accounts = lock_accounts(session, ids)
+        source = accounts[payment.source_account_id]
+        scope = owner_scope(session, source)
+        deltas: dict[int, Decimal] = defaultdict(Decimal)
+        if payment.destination_account_id is None:
+            category = session.get(Category, payment.category_id) if payment.category_id else None
+            entry = Transaction(
+                client_id=payload.entry_id,
+                created_by_user_id=viewer.user_id,
+                user_id=source.user_id,
+                account_id=source.id,
+                category_id=payment.category_id,
+                type=TransactionType.EXPENSE,
+                amount=payment.amount,
+                description=category.name if category else "Gider",
+                note=payment.title,
+                occurred_at=payload.paid_at,
+                statement_month=(
+                    calculate_statement_month(payload.paid_at, source.statement_day)
+                    if source.type == AccountType.CREDIT_CARD else None
+                ),
+            )
+            deltas[source.id] += transaction_effect(TransactionType.EXPENSE, payment.amount)
+            kind = "transaction"
+        else:
+            destination = accounts[payment.destination_account_id]
+            entry = Transfer(
+                client_id=payload.entry_id,
+                created_by_user_id=viewer.user_id,
+                user_id=source.user_id,
+                source_account_id=source.id,
+                destination_account_id=destination.id,
+                amount=payment.amount,
+                description="Kart odemesi" if destination.type == AccountType.CREDIT_CARD else "Transfer",
+                note=payment.title,
+                occurred_at=payload.paid_at,
+            )
+            deltas[source.id] -= payment.amount
+            deltas[destination.id] += payment.amount
+            kind = "transfer"
+        session.add(entry)
+        payment.last_paid_at = payload.paid_at
+        if payment.repeat_monthly:
+            payment.due_at = add_months(payment.due_at, 1)
+        else:
+            payment.is_completed = True
+            payment.completed_at = payload.paid_at
+        session.flush()
+        apply_balance_deltas(session, deltas)
+        record_change(session, scope, kind, entry.client_id)
+        record_change(session, scope, "scheduled_payment", payment.client_id)
+        _note_accounts(context, accounts, deltas)
+        return HandlerResult([
+            EntityRef(kind="scheduled_payment", id=payment.client_id, version=payment.entity_version),
+            EntityRef(kind=kind, id=entry.client_id, version=entry.entity_version),
+        ])
+
+
 WALLET_OPERATIONS = (
     AccountSaveOperation,
     AccountArchiveOperation,
@@ -439,4 +612,7 @@ WALLET_OPERATIONS = (
     TransferSaveOperation,
     TransferDeleteOperation,
     StatementMarkOperation,
+    PaymentSaveOperation,
+    PaymentDeleteOperation,
+    PaymentCompleteOperation,
 )

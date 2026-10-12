@@ -253,3 +253,98 @@ def test_manual_version_bump_does_not_double_count(setup_database):
         account.entity_version += 1  # what daily.py's _bump does
         session.commit()
         assert account.entity_version == 2
+
+
+# Scheduled payments -------------------------------------------------------
+
+
+def payment(payment_id, account_id, amount, *, headers=None, due="2026-10-31T09:00:00+03:00", kind="expense", **extra):
+    return op("wallet.payment.save", headers=headers, id=payment_id, title=extra.pop("title", "Kira"), kind=kind,
+              account_id=account_id, amount=amount, due_at=due, **extra)
+
+
+def pay(payment_id, entry_id, *, headers=None, at="2026-10-30T20:00:00+03:00", request_id=None, **extra):
+    return op("wallet.payment.complete", headers=headers, request_id=request_id, id=payment_id, entry_id=entry_id,
+              paid_at=at, **extra)
+
+
+def test_a_monthly_expense_is_paid_once_and_moves_to_the_next_month(setup_database):
+    save_account("bank", opening_balance="20000")
+    category_id = market_id(setup_database)
+    assert payment("rent", "bank", "15000", repeat_monthly=True, category_id=category_id).status_code == 200
+    before = pull()
+    [planned] = before["scheduled_payments"]
+    assert planned["kind"] == "expense" and planned["to_account_id"] is None and planned["completed"] is False
+    assert balances(before)["bank"] == Decimal("20000.00")  # Nothing moves until it is paid.
+
+    request_id = str(uuid4())
+    first = pay("rent", "rent-oct", request_id=request_id, expected_version=1)
+    replay = pay("rent", "rent-oct", request_id=request_id, expected_version=1)
+    assert first.status_code == 200 and replay.json()["replayed"] is True
+    assert {"kind": "transaction", "id": "rent-oct", "version": 1} in first.json()["entities"]
+
+    news = pull(before["cursor"], before["scope"])
+    assert balances(news)["bank"] == Decimal("5000.00")
+    [tx] = news["transactions"]
+    assert tx["id"] == "rent-oct" and tx["note"] == "Kira" and tx["category"] == "Market"
+    [moved] = news["scheduled_payments"]
+    assert moved["due_at"].startswith("2026-11-30") and moved["completed"] is False
+    assert moved["last_paid_at"].startswith("2026-10-30")
+
+
+def test_monthly_due_dates_keep_their_day_within_short_months(setup_database):
+    save_account("bank", opening_balance="1000")
+    payment("phone", "bank", "100", repeat_monthly=True, due="2027-01-31T09:00:00+00:00")
+    pay("phone", "p1", expected_version=1)
+    [moved] = pull()["scheduled_payments"]
+    assert moved["due_at"].startswith("2027-02-28")
+
+
+def test_a_one_off_card_payment_is_a_transfer_and_closes_the_payment(setup_database):
+    save_account("bank", opening_balance="5000")
+    save_account("card", type="credit_card", credit_limit="10000", statement_day=15, due_day=25)
+    expense("buy", "card", "800")
+    missing_target = payment("bonus", "bank", "800", kind="transfer", title="Bonus")
+    assert missing_target.status_code == 400
+    assert payment("bonus", "bank", "800", kind="transfer", to_account_id="card", title="Bonus").status_code == 200
+
+    assert pay("bonus", "bonus-paid").status_code == 200
+    data = pull()
+    [transfer] = data["transfers"]
+    assert (transfer["from_account_id"], transfer["to_account_id"], transfer["note"]) == ("bank", "card", "Bonus")
+    assert balances(data) == {"bank": Decimal("4200.00"), "card": Decimal("0.00")}
+    assert data["scheduled_payments"][0]["completed"] is True
+    assert pay("bonus", "again").status_code == 400
+
+
+def test_payments_edit_with_versions_and_delete_to_a_tombstone(setup_database):
+    save_account("bank", opening_balance="1000")
+    payment("gym", "bank", "500")
+    before = pull()
+
+    assert payment("gym", "bank", "550", expected_version=1).status_code == 200
+    stale = payment("gym", "bank", "600", expected_version=1)
+    assert stale.status_code == 409 and stale.json()["detail"]["current"]["amount"] == "550.00"
+    assert op("wallet.payment.delete", id="gym", expected_version=2).status_code == 200
+
+    news = pull(before["cursor"], before["scope"])
+    assert news["scheduled_payments"] == []
+    assert {"kind": "scheduled_payment", "id": "gym"} in news["deleted"]
+
+
+def test_only_household_members_can_see_and_pay_a_shared_payment(setup_database):
+    partner_id, partner = second_user(setup_database)
+    _, outsider = second_user(setup_database, "out@example.com", "Out")
+    code = api_request("POST", "/api/v3/household/invites").json()["code"]
+    api_request("POST", "/api/v3/household/join", json={"code": code}, headers=partner)
+    save_account("joint", name="Ortak", visibility="shared", opening_balance="3000")
+    save_account("own", opening_balance="100")
+    payment("bills", "joint", "1200", title="Elektrik")
+    payment("mine", "own", "50")
+
+    theirs = pull(headers=partner)
+    assert [p["id"] for p in theirs["scheduled_payments"]] == ["bills"]
+    assert pay("mine", "x1", headers=partner).status_code == 403
+    assert pay("bills", "x2", headers=outsider).status_code == 403
+    assert pay("bills", "bills-oct", headers=partner).status_code == 200
+    assert balances(pull())["joint"] == Decimal("1800.00")

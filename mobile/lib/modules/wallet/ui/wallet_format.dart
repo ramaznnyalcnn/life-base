@@ -104,3 +104,15 @@ Widget syncBadge(BuildContext context, SyncMark mark) => switch (mark) {
       SyncMark.failed => Tooltip(message: 'Gönderilemedi', child: Icon(Icons.error_outline_rounded, size: 18, color: Theme.of(context).colorScheme.error)),
       SyncMark.confirmed => const SizedBox.shrink(),
     };
+
+/// "Bugün son gün", "Yarın", "5 gün sonra", "2 gün gecikti".
+String dueLabel(DateTime due, DateTime now) {
+  final days = DateUtils.dateOnly(due).difference(DateUtils.dateOnly(now)).inDays;
+  return switch (days) {
+    0 => 'Bugün son gün',
+    1 => 'Yarın',
+    < 0 => '${-days} gün gecikti',
+    < 7 => '$days gün sonra',
+    _ => DateFormat('d MMMM', 'tr_TR').format(due),
+  };
+}

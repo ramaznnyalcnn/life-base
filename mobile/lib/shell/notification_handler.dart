@@ -6,14 +6,20 @@ import '../core/meds/meds_store.dart';
 import '../core/notifications/reminder_sync.dart';
 import '../core/providers.dart';
 import '../core/routes.dart';
+import '../core/wallet/payment_reminders.dart';
 import 'router.dart';
 
-/// Routes a tapped notification: calendar reminders open Takvim; dose alarm
+/// Routes a tapped notification: calendar reminders open Takvim, payment
+/// reminders Cüzdan; dose alarm
 /// buttons record the answer, and the alarm itself opens the full-screen page.
 Future<void> handleNotificationTap(WidgetRef ref, NotificationTap tap) async {
   final router = ref.read(routerProvider);
   if (tap.payload.startsWith('$calendarNotificationGroup|')) {
     router.go(AppRoutes.calendar);
+    return;
+  }
+  if (tap.payload.startsWith('$paymentNotificationGroup|')) {
+    router.go(AppRoutes.wallet);
     return;
   }
   final doseId = doseIdFromPayload(tap.payload);

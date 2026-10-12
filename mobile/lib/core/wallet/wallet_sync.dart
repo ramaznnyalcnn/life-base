@@ -140,6 +140,7 @@ class WalletSyncEngine {
       await db.delete(db.walletTransactions).go();
       await db.delete(db.walletTransfers).go();
       await db.delete(db.walletStatementMarks).go();
+      await db.delete(db.walletScheduledPayments).go();
     }
     for (final a in _list(page['accounts'])) {
       await db.into(db.walletAccounts).insertOnConflictUpdate(WalletAccountsCompanion.insert(
@@ -203,6 +204,23 @@ class WalletSyncEngine {
             version: Value(m['version'] as int? ?? 1),
           ));
     }
+    for (final p in _list(page['scheduled_payments'])) {
+      await db.into(db.walletScheduledPayments).insertOnConflictUpdate(WalletScheduledPaymentsCompanion.insert(
+            id: p['id']! as String,
+            title: p['title'] as String? ?? 'Ödeme',
+            kind: p['kind']! as String,
+            accountId: p['account_id']! as String,
+            toAccountId: Value(p['to_account_id'] as String?),
+            categoryId: Value(p['category_id'] as int?),
+            amountCents: centsOf(p['amount']),
+            dueAt: DateTime.parse(p['due_at']! as String).toUtc(),
+            repeatMonthly: Value(p['repeat_monthly'] == true),
+            completed: Value(p['completed'] == true),
+            lastPaidAt: Value(p['last_paid_at'] == null ? null : DateTime.parse(p['last_paid_at']! as String).toUtc()),
+            createdBy: p['created_by']! as int,
+            version: Value(p['version'] as int? ?? 1),
+          ));
+    }
     for (final d in _list(page['deleted'])) {
       final id = d['id']! as String;
       switch (d['kind']) {
@@ -211,6 +229,7 @@ class WalletSyncEngine {
           await (db.delete(db.walletAccounts)..where((t) => t.id.equals(id))).go();
           await (db.delete(db.walletTransactions)..where((t) => t.accountId.equals(id))).go();
           await (db.delete(db.walletStatementMarks)..where((t) => t.accountId.equals(id))).go();
+          await (db.delete(db.walletScheduledPayments)..where((t) => t.accountId.equals(id))).go();
           await (db.delete(db.walletTransfers)
                 ..where((t) =>
                     (t.fromAccountId.equals(id) & t.toAccountId.isNotInQuery(db.selectOnly(db.walletAccounts)..addColumns([db.walletAccounts.id]))) |
@@ -222,6 +241,8 @@ class WalletSyncEngine {
           await (db.delete(db.walletTransfers)..where((t) => t.id.equals(id))).go();
         case 'statement_mark':
           await (db.delete(db.walletStatementMarks)..where((t) => t.id.equals(id))).go();
+        case 'scheduled_payment':
+          await (db.delete(db.walletScheduledPayments)..where((t) => t.id.equals(id))).go();
       }
     }
     await db.setSyncState(membersKey, jsonEncode(page['members'] ?? const []));

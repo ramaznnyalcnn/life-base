@@ -86,12 +86,14 @@ class WalletData {
     this.transactions = const {},
     this.transfers = const {},
     this.marks = const {},
+    this.payments = const {},
   });
 
   final Map<String, WalletAccount> accounts;
   final Map<String, WalletTransaction> transactions;
   final Map<String, WalletTransfer> transfers;
   final Map<String, StatementMark> marks;
+  final Map<String, ScheduledPayment> payments;
 }
 
 /// The wallet as the user should see it: the confirmed state with every
@@ -102,6 +104,7 @@ WalletData applyOutbox(WalletData confirmed, Iterable<WalletOp> ops, {required i
   final transactions = Map.of(confirmed.transactions);
   final transfers = Map.of(confirmed.transfers);
   final marks = Map.of(confirmed.marks);
+  final payments = Map.of(confirmed.payments);
 
   void move(String accountId, Cents delta, SyncMark mark) {
     final account = accounts[accountId];
@@ -229,9 +232,67 @@ WalletData applyOutbox(WalletData confirmed, Iterable<WalletOp> ops, {required i
         } else {
           marks[key] = StatementMark(accountId: v['account_id']! as String, month: DateTime(month.year, month.month), paid: v['paid'] == true, sync: mark);
         }
+      case 'wallet.payment.save':
+        final id = v['id']! as String;
+        final existing = payments[id];
+        payments[id] = ScheduledPayment(
+          id: id,
+          title: v['title']! as String,
+          accountId: v['account_id']! as String,
+          toAccountId: v['kind'] == 'transfer' ? v['to_account_id'] as String? : null,
+          categoryId: v['kind'] == 'expense' ? v['category_id'] as int? : null,
+          amount: centsOf(v['amount']),
+          dueAt: DateTime.parse(v['due_at']! as String).toLocal(),
+          repeatMonthly: v['repeat_monthly'] == true,
+          completed: existing?.completed ?? false,
+          lastPaidAt: existing?.lastPaidAt,
+          createdBy: existing?.createdBy ?? me,
+          version: existing?.version ?? 1,
+          sync: mark,
+        );
+      case 'wallet.payment.delete':
+        payments.remove(v['id']! as String);
+      case 'wallet.payment.complete':
+        final payment = payments[v['id']! as String];
+        if (payment == null || payment.completed) break;
+        final at = DateTime.parse(v['paid_at']! as String).toLocal();
+        final entryId = v['entry_id']! as String;
+        if (payment.isTransfer) {
+          transfers[entryId] = WalletTransfer(
+            id: entryId,
+            fromAccountId: payment.accountId,
+            toAccountId: payment.toAccountId!,
+            amount: payment.amount,
+            occurredAt: at,
+            note: payment.title,
+            createdBy: me,
+            sync: mark,
+          );
+          move(payment.accountId, -payment.amount, mark);
+          move(payment.toAccountId!, payment.amount, mark);
+        } else {
+          final account = accounts[payment.accountId];
+          transactions[entryId] = WalletTransaction(
+            id: entryId,
+            accountId: payment.accountId,
+            kind: TxKind.expense,
+            categoryId: payment.categoryId,
+            category: categoryNames[payment.categoryId] ?? TxKind.expense.label,
+            amount: payment.amount,
+            occurredAt: at,
+            statementMonth: account != null && account.isCard && account.statementDay != null
+                ? statementMonthOf(at, account.statementDay!)
+                : null,
+            note: payment.title,
+            createdBy: me,
+            sync: mark,
+          );
+          move(payment.accountId, -payment.amount, mark);
+        }
+        payments[payment.id] = payment.paid(at).copyWith(sync: mark);
     }
   }
-  return WalletData(accounts: accounts, transactions: transactions, transfers: transfers, marks: marks);
+  return WalletData(accounts: accounts, transactions: transactions, transfers: transfers, marks: marks, payments: payments);
 }
 
 SyncMark _worse(SyncMark a, SyncMark b) => a.index >= b.index ? a : b;
