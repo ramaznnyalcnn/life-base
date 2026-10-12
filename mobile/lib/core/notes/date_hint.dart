@@ -36,6 +36,7 @@ final _nextWeek = _re('haftaya');
 final _namedDate = _re('(\\d{1,2}) (${_months.join('|')})(?: (\\d{4}))?');
 final _slashDate = _re(r'(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?');
 final _dottedDate = _re(r'(\d{1,2})\.(\d{1,2})\.(\d{2,4})');
+final _shortDottedDate = _re(r'(\d{1,2})\.(\d{1,2})');
 final _clock = _re(r'(?:saat )?([01]?\d|2[0-3])[:.]([0-5]\d)');
 final _period = _re(r'(sabah|öğleden sonra|akşam|gece) (?:saat )?(\d{1,2})(?:[:.]([0-5]\d))?');
 final _hourOnly = _re(r'saat (\d{1,2})');
@@ -96,6 +97,12 @@ DateHint? findDateHint(String text, DateTime now) {
   });
   candidate(_slashDate, (m) => _date(int.parse(m.group(1)!), int.parse(m.group(2)!), m.group(3), today));
   candidate(_dottedDate, (m) => _date(int.parse(m.group(1)!), int.parse(m.group(2)!), m.group(3), today));
+  // "13.10" reads like a time too; it is a date only when a time sits beside it.
+  final full = first(_dottedDate);
+  final short = _shortDottedDate.allMatches(lower).where((m) => full == null || !_overlaps(m, full)).firstOrNull;
+  if (short != null && _clock.allMatches(lower).any((c) => !_overlaps(c, short))) {
+    candidates.add((short, (m) => _date(int.parse(m.group(1)!), int.parse(m.group(2)!), null, today)));
+  }
   final weekdayMatch = first(_weekday);
   if (weekdayMatch != null && !candidates.any((c) => _overlaps(c.$1, weekdayMatch))) {
     candidates.add((weekdayMatch, (m) {
