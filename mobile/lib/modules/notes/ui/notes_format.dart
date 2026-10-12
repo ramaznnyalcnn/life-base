@@ -17,7 +17,7 @@ Color? noteColor(BuildContext context, int? index) {
   return index >= 0 && index < colors.length ? colors[index] : null;
 }
 
-/// "Bugün 15:00", "Yarın", "Cuma 10 Eki 15:00", "12 Mar 2027".
+/// "Bugün 15:00", "Yarın", "Pazartesi 09:00", "16 Ekim Cuma 15:00", "12 Mart 2027".
 String eventWhen(DateTime at, {required bool allDay}) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -26,8 +26,8 @@ String eventWhen(DateTime at, {required bool allDay}) {
   final date = switch (diff) {
     0 => 'Bugün',
     1 => 'Yarın',
-    _ when diff > 1 && diff < 7 => DateFormat('EEEE d MMM', 'tr_TR').format(at),
-    _ => DateFormat(at.year == now.year ? 'd MMM EEE' : 'd MMM y', 'tr_TR').format(at),
+    _ when diff > 1 && diff < 7 => DateFormat('EEEE', 'tr_TR').format(at),
+    _ => DateFormat(at.year == now.year ? 'd MMMM EEEE' : 'd MMMM y', 'tr_TR').format(at),
   };
   return allDay ? date : '$date ${DateFormat('HH:mm').format(at)}';
 }

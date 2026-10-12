@@ -29,7 +29,7 @@ void main() {
         theme: AppTheme.build(LbPalette.kum, Brightness.light),
         home: Builder(
           builder: (context) => TextButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => EventEditPage(day: DateTime(2026, 10, 12)))),
+            onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => EventEditPage(day: DateTime(2099, 10, 12)))),
             child: const Text('aç'),
           ),
         ),
@@ -51,8 +51,8 @@ void main() {
     final saved = CalendarEvent.fromRow(await db.select(db.localEvents).getSingle());
     expect(saved.title, 'Diş hekimi');
     expect(saved.notes, 'Kontrol');
-    expect(saved.startsAt, DateTime(2026, 10, 12, 9));
-    expect(saved.endsAt, DateTime(2026, 10, 12, 10));
+    expect(saved.startsAt, DateTime(2099, 10, 12, 9));
+    expect(saved.endsAt, DateTime(2099, 10, 12, 10));
     expect(saved.reminders, DefaultReminders.fallback);
     expect(find.byType(EventEditPage), findsNothing);
   });

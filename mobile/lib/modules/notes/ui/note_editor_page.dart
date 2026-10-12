@@ -307,7 +307,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
                 child: Text('Takvimde: ${eventWhen(event.startsAt, allDay: event.allDay)}',
                     style: TextStyle(color: t.onBase, fontWeight: FontWeight.w700)),
               ),
-              TextButton(onPressed: () => context.go(AppRoutes.calendar), child: const Text('Aç')),
+              TextButton(onPressed: () => context.go(AppRoutes.calendarOn(event.startsAt)), child: const Text('Aç')),
               IconButton(tooltip: 'Takvimden kaldır', onPressed: _unlink, icon: const Icon(Icons.link_off_rounded)),
             ]),
           )

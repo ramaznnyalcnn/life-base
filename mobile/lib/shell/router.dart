@@ -18,16 +18,16 @@ import 'app_shell.dart';
 /// own back stack. Account lives above the shell on the root navigator.
 GoRouter buildRouter({String initialLocation = AppRoutes.today}) {
   final rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
-  GoRoute tab(String path, Widget screen) => GoRoute(path: path, builder: (context, state) => screen);
+  GoRoute tab(String path, Widget Function(GoRouterState state) screen) => GoRoute(path: path, builder: (context, state) => screen(state));
   // One per tab: tells the shell when a page is open on top of a module.
   final stacks = List.generate(shellDestinations.length, (_) => TabStackObserver());
   // Same order as shellDestinations: Cüzdan · Takvim · Bugün · İlaç · Notlar.
-  final screens = {
-    AppRoutes.wallet: const WalletScreen(),
-    AppRoutes.calendar: const CalendarScreen(),
-    AppRoutes.today: const TodayScreen(),
-    AppRoutes.meds: const MedsScreen(),
-    AppRoutes.notes: const NotesScreen(),
+  final screens = <String, Widget Function(GoRouterState)>{
+    AppRoutes.wallet: (_) => const WalletScreen(),
+    AppRoutes.calendar: (state) => CalendarScreen(focusDay: DateTime.tryParse(state.uri.queryParameters['day'] ?? '')),
+    AppRoutes.today: (_) => const TodayScreen(),
+    AppRoutes.meds: (_) => const MedsScreen(),
+    AppRoutes.notes: (_) => const NotesScreen(),
   }.entries.toList();
   return GoRouter(
     navigatorKey: rootKey,

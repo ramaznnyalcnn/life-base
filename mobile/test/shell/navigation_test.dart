@@ -199,4 +199,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(EventEditPage), findsOneWidget);
   });
+
+  testWidgets('a link to a calendar day opens the calendar on that day', (tester) async {
+    await pumpApp(tester);
+    router.go(AppRoutes.calendarOn(DateTime(2026, 12, 25)));
+    await tester.pumpAndSettle();
+
+    expect(location(), AppRoutes.calendar);
+    expect(find.text('Aralık 2026'), findsOneWidget);
+  });
 }

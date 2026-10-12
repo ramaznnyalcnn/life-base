@@ -101,11 +101,39 @@ final calendarItemsProvider = Provider<List<CalendarItem>>((ref) {
     });
 });
 
-class CalendarScreen extends ConsumerWidget {
-  const CalendarScreen({super.key});
+class CalendarScreen extends ConsumerStatefulWidget {
+  const CalendarScreen({super.key, this.focusDay});
+
+  /// Opens on this day (`/calendar?day=yyyy-MM-dd`, e.g. from a note).
+  final DateTime? focusDay;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
+}
+
+class _CalendarScreenState extends ConsumerState<CalendarScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _focus();
+  }
+
+  @override
+  void didUpdateWidget(CalendarScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusDay != oldWidget.focusDay) _focus();
+  }
+
+  void _focus() {
+    final day = widget.focusDay;
+    if (day == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(calendarDayProvider.notifier).state = DateUtils.dateOnly(day);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final view = ref.watch(calendarViewProvider);
     final day = ref.watch(calendarDayProvider);
     final items = ref.watch(calendarItemsProvider);
