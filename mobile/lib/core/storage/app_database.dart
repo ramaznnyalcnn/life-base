@@ -49,7 +49,12 @@ class QueuedOperations extends Table {
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase({QueryExecutor? executor})
-      : super(executor ?? driftDatabase(name: 'lifebase'));
+      : super(executor ??
+            driftDatabase(
+              name: 'lifebase',
+              // Flutter Web: SQLite compiled to WebAssembly, in a worker (web/).
+              web: DriftWebOptions(sqlite3Wasm: Uri.parse('sqlite3.wasm'), driftWorker: Uri.parse('drift_worker.js')),
+            ));
 
   @override
   int get schemaVersion => 5;

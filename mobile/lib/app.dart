@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/calendar/google_projection.dart';
 import 'core/design_system/app_theme.dart';
 import 'core/design_system/appearance.dart';
+import 'core/notifications/in_app_reminders.dart';
 import 'core/notifications/reminder_sync.dart';
 import 'core/sync/sync_controller.dart';
 import 'modules/account/data/session_controller.dart';
@@ -22,6 +23,8 @@ const _localizations = [
   GlobalWidgetsLocalizations.delegate,
   GlobalCupertinoLocalizations.delegate,
 ];
+
+final _messenger = GlobalKey<ScaffoldMessengerState>();
 
 class LifeBaseApp extends ConsumerWidget {
   const LifeBaseApp({super.key});
@@ -54,8 +57,20 @@ class LifeBaseApp extends ConsumerWidget {
       ref.listen(notificationTapProvider, (_, tap) {
         if (tap != null) handleNotificationTap(ref, tap);
       });
+      // Without system notifications (the web), due reminders show in the app.
+      ref.listen(inAppReminderSyncProvider, (_, _) {});
+      ref.listen(inAppReminderProvider, (_, reminder) {
+        if (reminder == null) return;
+        _messenger.currentState?.showSnackBar(SnackBar(
+          duration: const Duration(seconds: 12),
+          showCloseIcon: true,
+          content: Text('${reminder.title}\n${reminder.body}'),
+          action: SnackBarAction(label: 'Aç', onPressed: () => handleNotificationTap(ref, (actionId: null, payload: reminder.payload, at: 0))),
+        ));
+      });
       return MaterialApp.router(
         title: 'LifeBase',
+        scaffoldMessengerKey: _messenger,
         debugShowCheckedModeBanner: false,
         locale: _locale,
         supportedLocales: const [_locale],

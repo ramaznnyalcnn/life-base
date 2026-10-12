@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,7 +12,8 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 }
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
-  final _server = TextEditingController(text: 'http://10.0.2.2:8000');
+  // On the web the app is served next to the API, so its own address is the server's.
+  final _server = TextEditingController(text: kIsWeb ? Uri.base.origin : 'http://10.0.2.2:8000');
   final _email = TextEditingController();
   final _password = TextEditingController();
   var _step = 0;

@@ -9,3 +9,7 @@ backend/.pytest_cache
 *.pyo
 *.db
 .env
+mobile/build
+mobile/.dart_tool
+mobile/android/.gradle
+mobile/android/app/build

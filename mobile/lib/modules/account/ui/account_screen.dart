@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -39,12 +40,26 @@ class AccountScreen extends ConsumerWidget {
         const HouseholdCard(),
         const SizedBox(height: 24),
         const _SectionLabel('Bildirimler'),
-        const Card(child: Column(children: [_DefaultRemindersTile(), Divider(height: 1), _AlarmPermissionTiles()])),
+        Card(
+          child: Column(children: [
+            const _DefaultRemindersTile(),
+            const Divider(height: 1),
+            if (kIsWeb)
+              const ListTile(
+                minTileHeight: 64,
+                leading: Icon(Icons.tab_rounded),
+                title: Text('Web hatırlatmaları'),
+                subtitle: Text('Web\'de hatırlatmalar yalnızca bu sekme açıkken çalışır. Alarm ve kilit ekranı bildirimleri telefonda.'),
+              )
+            else
+              const _AlarmPermissionTiles(),
+          ]),
+        ),
         const SizedBox(height: 24),
         const _SectionLabel('Eşitleme'),
         Card(child: Column(children: [
-          const _GoogleCalendarTile(),
-          const Divider(height: 1),
+          // Google calendar goes through the phone's own calendar.
+          if (!kIsWeb) ...[const _GoogleCalendarTile(), const Divider(height: 1)],
           const _LocalBackupTile(),
           const Divider(height: 1),
           ListTile(
