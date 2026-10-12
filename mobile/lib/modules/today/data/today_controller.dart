@@ -1,75 +1,88 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-import 'package:uuid/uuid.dart';
 
-import '../../../core/models/agenda.dart';
-import '../../../core/models/operation.dart';
+import '../../../core/calendar/calendar_store.dart';
+import '../../../core/meds/meds_store.dart';
+import '../../../core/platform/device_calendar.dart';
 import '../../../core/providers.dart';
+import '../../../core/wallet/wallet_store.dart';
+import 'today_view.dart';
 
-final todayAgendaProvider = FutureProvider<TodayAgenda>((ref) async {
-  final api = ref.watch(apiClientProvider);
-  if (api == null) throw StateError('Oturum yok');
-  final agenda = await api.today(DateTime.now());
-  await ref.read(platformBridgeProvider).updateWidget(agenda);
-  return agenda;
+/// The current time, ticking on each minute (countdowns, missed doses, the date).
+final minuteClockProvider = StreamProvider<DateTime>((ref) {
+  final controller = StreamController<DateTime>();
+  Timer? timer;
+  void tick() {
+    final now = DateTime.now();
+    controller.add(now);
+    timer = Timer(Duration(seconds: 60 - now.second, milliseconds: -now.millisecond), tick);
+  }
+
+  tick();
+  final lifecycle = AppLifecycleListener(onResume: () {
+    timer?.cancel();
+    tick();
+  });
+  ref.onDispose(() {
+    timer?.cancel();
+    lifecycle.dispose();
+    unawaited(controller.close());
+  });
+  return controller.stream;
 });
 
-final quickActionProvider = Provider<QuickActionController>(QuickActionController.new);
-final optimisticCompletedProvider = StateProvider<Set<String>>((ref) => <String>{});
+DateTime _now(Ref ref) => ref.watch(minuteClockProvider).value ?? DateTime.now();
 
-class QuickActionController {
-  QuickActionController(this.ref);
-  final Ref ref;
+/// Bugün for [day]: LifeBase and Google events plus doses, all from the device.
+final todayViewProvider = Provider.family<TodayView, DateTime>((ref, day) {
+  final now = _now(ref);
+  final start = DateTime(day.year, day.month, day.day);
+  final end = start.add(const Duration(days: 1)).subtract(const Duration(microseconds: 1));
+  return buildToday(
+    events: occurrencesIn(ref.watch(localEventsProvider).value ?? const [], start, start),
+    google: ref.watch(deviceEventsProvider((from: start, to: start))).value ?? const [],
+    doses: doseEntries(ref.watch(localMedicationsProvider).value ?? const [], ref.watch(doseLogsProvider).value ?? const {}, start, end, now),
+    now: now,
+  );
+});
 
-  Future<void> complete(AgendaItem item) async {
-    ref.read(optimisticCompletedProvider.notifier).state = {
-      ...ref.read(optimisticCompletedProvider),
-      item.id,
-    };
-    final operation = switch (item.kind) {
-      'task' => OperationEnvelope(
-          requestId: const Uuid().v4(),
-          operationKey: 'planning.task.complete',
-          values: {
-            'task_id': item.sourceId,
-            'expected_version': item.metadata['entity_version'],
-          },
-        ),
-      'medication' => OperationEnvelope(
-          requestId: const Uuid().v4(),
-          operationKey: 'health.medication.take',
-          values: {
-            'medication_id': item.sourceId,
-            'scheduled_for': item.metadata['scheduled_for'],
-          },
-        ),
-      _ => throw StateError('Bu öğe hızlı tamamlanamaz.'),
-    };
-    final sync = ref.read(syncServiceProvider)!;
-    await sync.enqueue(operation);
-    final report = await sync.flush();
-    await ref.read(platformBridgeProvider).syncNow();
-    if (!report.paused && report.conflicts == 0) {
-      final next = {...ref.read(optimisticCompletedProvider)}..remove(item.id);
-      ref.read(optimisticCompletedProvider.notifier).state = next;
-    }
-    ref.invalidate(todayAgendaProvider);
+final todayWalletProvider = Provider<WalletGlance?>((ref) {
+  final wallet = ref.watch(walletProvider).value;
+  return wallet == null ? null : walletGlance(wallet, _now(ref));
+});
+
+/// Keeps the home-screen widget's snapshot in step with today and tomorrow.
+final todayWidgetSyncProvider = Provider<void>((ref) {
+  String? last;
+  Timer? debounce;
+  void push() {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 500), () async {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+      final snapshot = widgetSnapshot({
+        today: ref.read(todayViewProvider(today)),
+        tomorrow: ref.read(todayViewProvider(tomorrow)),
+      }, now)
+        ..remove('generated_at');
+      final payload = jsonEncode(snapshot);
+      if (payload == last) return;
+      last = payload;
+      await ref.read(platformBridgeProvider).updateWidget(payload).catchError((Object _) {});
+    });
   }
 
-  Future<void> snooze(AgendaItem item, int minutes) async {
-    if (item.kind != 'medication') return;
-    final sync = ref.read(syncServiceProvider)!;
-    await sync.enqueue(OperationEnvelope(
-      requestId: const Uuid().v4(),
-      operationKey: 'health.medication.snooze',
-      values: {
-        'medication_id': item.sourceId,
-        'scheduled_for': item.metadata['scheduled_for'],
-        'snooze_minutes': minutes,
-      },
-    ));
-    await sync.flush();
-    await ref.read(platformBridgeProvider).syncNow();
-    ref.invalidate(todayAgendaProvider);
-  }
-}
+  ref.listen(minuteClockProvider, (previous, next) {
+    // A new day changes which days the snapshot covers.
+    final before = previous?.value, after = next.value;
+    if (before == null || after == null || before.day != after.day) push();
+  }, fireImmediately: true);
+  ref.listen(localEventsProvider, (_, _) => push());
+  ref.listen(localMedicationsProvider, (_, _) => push());
+  ref.listen(doseLogsProvider, (_, _) => push());
+  ref.onDispose(() => debounce?.cancel());
+});

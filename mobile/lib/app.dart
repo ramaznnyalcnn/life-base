@@ -11,6 +11,7 @@ import 'core/sync/sync_controller.dart';
 import 'modules/account/data/session_controller.dart';
 import 'modules/calendar/data/server_import.dart';
 import 'modules/account/ui/onboarding_screen.dart';
+import 'modules/today/data/today_controller.dart';
 import 'shell/notification_handler.dart';
 import 'shell/router.dart';
 
@@ -48,6 +49,8 @@ class LifeBaseApp extends ConsumerWidget {
       ref.listen(serverCalendarImportProvider, (_, _) {});
       ref.listen(medReminderSyncProvider, (_, _) {});
       ref.listen(paymentReminderSyncProvider, (_, _) {});
+      // The home-screen widget reads a snapshot of today and tomorrow.
+      ref.listen(todayWidgetSyncProvider, (_, _) {});
       ref.listen(notificationTapProvider, (_, tap) {
         if (tap != null) handleNotificationTap(ref, tap);
       });

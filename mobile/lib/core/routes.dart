@@ -3,6 +3,10 @@
 /// Modules navigate by path only, so they never import one another.
 abstract final class AppRoutes {
   static const today = '/today';
+
+  /// A calendar event opened from Bugün, in Bugün's own stack; the
+  /// occurrence goes as the route's `extra`.
+  static const todayEvent = '/today/event';
   static const wallet = '/wallet';
   static const calendar = '/calendar';
 

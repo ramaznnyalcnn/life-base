@@ -44,29 +44,6 @@ class ApiClient {
     }
   }
 
-  Future<TodayAgenda> today(DateTime date) async {
-    final key = _key('agenda:${DateFormat('yyyy-MM-dd').format(date)}');
-    try {
-      final response = await _dio.get<Map<String, Object?>>(
-        '/api/v2/agenda/today',
-        queryParameters: {
-          'date': DateFormat('yyyy-MM-dd').format(date),
-          'timezone': 'Europe/Istanbul',
-        },
-      );
-      final body = response.data!;
-      await _database.cache(key, jsonEncode(body));
-      return TodayAgenda.fromJson(body);
-    } on DioException {
-      final cached = await _database.cached(key);
-      if (cached == null) rethrow;
-      return TodayAgenda.fromJson(
-        Map<String, Object?>.from(jsonDecode(cached) as Map),
-        fromCache: true,
-      );
-    }
-  }
-
   Future<List<AgendaItem>> agendaRange(DateTime from, DateTime to) async {
     final fromValue = DateFormat('yyyy-MM-dd').format(from);
     final toValue = DateFormat('yyyy-MM-dd').format(to);

@@ -2,11 +2,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/calendar/calendar_event.dart';
 import '../core/design_system/fade_through_branches.dart';
 import '../core/routes.dart';
 import '../modules/account/data/session_controller.dart';
 import '../modules/account/ui/account_screen.dart';
 import '../modules/calendar/ui/calendar_screen.dart';
+import '../modules/calendar/ui/event_detail_page.dart';
 import '../modules/meds/ui/dose_alarm_page.dart';
 import '../modules/meds/ui/meds_screen.dart';
 import '../modules/notes/ui/notes_screen.dart';
@@ -18,7 +20,11 @@ import 'app_shell.dart';
 /// own back stack. Account lives above the shell on the root navigator.
 GoRouter buildRouter({String initialLocation = AppRoutes.today}) {
   final rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
-  GoRoute tab(String path, Widget Function(GoRouterState state) screen) => GoRoute(path: path, builder: (context, state) => screen(state));
+  GoRoute tab(String path, Widget Function(GoRouterState state) screen) => GoRoute(
+        path: path,
+        builder: (context, state) => screen(state),
+        routes: [if (path == AppRoutes.today) _todayEvent],
+      );
   // One per tab: tells the shell when a page is open on top of a module.
   final stacks = List.generate(shellDestinations.length, (_) => TabStackObserver());
   // Same order as shellDestinations: Cüzdan · Takvim · Bugün · İlaç · Notlar.
@@ -55,6 +61,14 @@ GoRouter buildRouter({String initialLocation = AppRoutes.today}) {
     ],
   );
 }
+
+/// Bugün opens an event in its own stack. Without the occurrence (e.g. a
+/// reloaded web page) it goes back to Bugün.
+final _todayEvent = GoRoute(
+  path: AppRoutes.todayEvent.substring(AppRoutes.today.length + 1),
+  redirect: (context, state) => state.extra is EventOccurrence ? null : AppRoutes.today,
+  builder: (context, state) => EventDetailPage(occurrence: state.extra! as EventOccurrence),
+);
 
 final routerProvider = Provider<GoRouter>((ref) {
   // A fresh router per session, so signing in again starts on Bugün.

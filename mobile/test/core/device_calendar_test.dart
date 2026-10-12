@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lifebase_mobile/core/models/agenda.dart';
 import 'package:lifebase_mobile/core/platform/device_calendar.dart';
-import 'package:lifebase_mobile/modules/today/ui/today_screen.dart';
 
 void main() {
   test('all-day Google events keep their calendar day regardless of timezone', () {
@@ -35,26 +33,5 @@ void main() {
     expect(item.day, DateTime(2026, 10, 9));
     expect(item.title, '(Başlıksız)');
     expect(item.metadata['color'], 0xFF4285F4);
-  });
-
-  AgendaItem at(String id, String kind, DateTime day, [int? hour]) => AgendaItem(
-        id: id,
-        sourceId: id,
-        kind: kind,
-        title: id,
-        day: day,
-        startsAt: hour == null ? null : DateTime(day.year, day.month, day.day, hour),
-        isAllDay: hour == null,
-      );
-
-  test('next item prefers a sooner upcoming Google event over the server one', () {
-    final day = DateTime(2026, 10, 9);
-    final now = DateTime(2026, 10, 9, 8);
-    final server = at('server', 'event', day, 12);
-
-    expect(nextItem(server, [at('google', googleKind, day, 10)], now)?.id, 'google');
-    expect(nextItem(server, [at('later', googleKind, day, 13)], now)?.id, 'server');
-    expect(nextItem(server, [at('past', googleKind, day, 7)], now)?.id, 'server');
-    expect(nextItem(null, [at('google', googleKind, day, 10)], now)?.id, 'google');
   });
 }

@@ -6,150 +6,321 @@ import 'package:intl/intl.dart';
 import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
-import '../../../core/calendar/calendar_event.dart';
-import '../../../core/calendar/calendar_store.dart';
-import '../../../core/models/agenda.dart';
+import '../../../core/meds/medication.dart';
+import '../../../core/meds/meds_store.dart';
 import '../../../core/platform/device_calendar.dart';
 import '../../../core/routes.dart';
+import '../../../core/sync/sync_controller.dart';
+import '../../../core/wallet/wallet_models.dart';
 import '../data/today_controller.dart';
+import '../data/today_view.dart';
 
+/// Bugün: a read-only summary of the day. Everything is added in its own module.
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final agenda = ref.watch(todayAgendaProvider);
-    final today = DateUtils.dateOnly(DateTime.now());
-    final google = ref.watch(deviceEventsProvider((from: today, to: today))).value ?? const <AgendaItem>[];
-    // Calendar events live on the device; Google and LifeBase events side by side.
-    final events = [
-      ...occurrencesIn(ref.watch(localEventsProvider).value ?? const [], today, today).map(occurrenceToAgendaItem),
-      ...google,
-    ];
-    final t = LbTokens.of(context);
+    final now = ref.watch(minuteClockProvider).value ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final view = ref.watch(todayViewProvider(today));
+    final wallet = ref.watch(todayWalletProvider);
+
     return ModuleScaffold(
       module: LbModule.today,
       title: 'Bugün',
-      subtitle: DateFormat('d MMMM, EEEE', 'tr_TR').format(DateTime.now()),
+      subtitle: '${greeting(now)} · ${DateFormat('d MMMM, EEEE', 'tr_TR').format(now)}',
       body: RefreshIndicator(
         onRefresh: () {
           ref.invalidate(deviceEventsProvider);
-          return ref.refresh(todayAgendaProvider.future);
+          return ref.read(syncControllerProvider.notifier).syncNow();
         },
-        child: agenda.when(
-          loading: () => ListView(children: const [SizedBox(height: 240), Center(child: CircularProgressIndicator())]),
-          error: (error, _) => ListView(padding: moduleListPadding(context), children: [
-            const SizedBox(height: 80),
-            Icon(Icons.cloud_off_rounded, size: 48, color: t.muted),
-            const SizedBox(height: 16),
-            Center(child: Text('Gündem alınamadı. Yenilemek için aşağı çek.', style: TextStyle(color: t.muted))),
-          ]),
-          data: (data) {
-            final timeline = mergeTimeline(data.timeline.where(_fromServer).toList(), events);
-            return ListView(
-            padding: moduleListPadding(context),
-            children: [
-              if (data.fromCache)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Chip(avatar: const Icon(Icons.cloud_off_rounded, size: 16), label: const Text('Çevrimdışı')),
-                  ),
-                ),
-              _NextCard(item: nextItem(data.nextItem != null && _fromServer(data.nextItem!) ? data.nextItem : null, events, DateTime.now())),
-              if (data.overdue.isNotEmpty) ...[
-                const SizedBox(height: 28),
-                _SectionTitle('Gecikenler', count: data.overdue.length, color: t.danger),
-                ...data.overdue.map((item) => _AgendaTile(item: item)),
-              ],
-              if (data.tasks.isNotEmpty) ...[
-                const SizedBox(height: 28),
-                _SectionTitle('Görevler', count: data.tasks.length),
-                ...data.tasks.map((item) => _AgendaTile(item: item)),
-              ],
-              const SizedBox(height: 28),
-              _SectionTitle('Saat saat', count: timeline.length),
-              if (timeline.isEmpty) const _Empty(text: 'Bugün sakin.'),
-              ...timeline.map((item) => _AgendaTile(item: item, showTime: true)),
-            ],
-          );
-          },
-        ),
+        child: ListView(padding: moduleListPadding(context), children: [
+          const _SyncLine(),
+          const SizedBox(height: 12),
+          _NextCard(item: view.next, now: now),
+          if (view.missed.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _SectionTitle('Kaçırılan dozlar', count: view.missed.length, danger: true),
+            _MissedStrip(missed: view.missed),
+          ],
+          if (wallet != null) ...[
+            const SizedBox(height: 24),
+            _WalletCard(glance: wallet, now: now),
+          ],
+          const SizedBox(height: 24),
+          _SectionTitle('Saat saat', count: view.timeline.length),
+          if (view.timeline.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: Text('Bugün sakin.', style: TextStyle(color: LbTokens.of(context).muted))),
+            ),
+          for (final item in view.timeline) _TimelineTile(item: item, now: now),
+        ]),
       ),
     );
   }
 }
 
-/// Server agenda kinds that are not calendar events (those are local now).
-bool _fromServer(AgendaItem item) => item.kind != 'event' && item.kind != 'routine';
+void _open(BuildContext context, WidgetRef ref, TodayItem item) {
+  switch (item.kind) {
+    case TodayKind.event:
+      // Opens over Bugün, in its own stack; back returns here.
+      context.push(AppRoutes.todayEvent, extra: item.occurrence);
+    case TodayKind.google:
+      context.go(AppRoutes.calendarOn(item.start));
+    case TodayKind.dose:
+      showDoseActions(context, ref, item.dose!);
+  }
+}
 
-/// A local calendar occurrence shown in Bugün's timeline.
-AgendaItem occurrenceToAgendaItem(EventOccurrence occurrence) => AgendaItem(
-      id: 'local:${occurrence.key}',
-      sourceId: occurrence.event.id,
-      kind: 'event',
-      title: occurrence.event.title,
-      day: DateTime(occurrence.start.year, occurrence.start.month, occurrence.start.day),
-      startsAt: occurrence.event.allDay ? null : occurrence.start,
-      endsAt: occurrence.event.allDay ? null : occurrence.end,
-      isAllDay: occurrence.event.allDay,
-      isImportant: occurrence.event.important,
+/// Aldım / Ertele / Atla for one dose (or Geri al once answered).
+Future<void> showDoseActions(BuildContext context, WidgetRef ref, DoseEntry entry) => showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final t = LbTokens.of(sheetContext);
+        final dose = entry.dose;
+        final med = dose.medication;
+        final actions = ref.read(doseActionsProvider);
+        final answered = entry.status == DoseStatus.taken || entry.status == DoseStatus.skipped;
+        Future<void> act(Future<void> Function() action) async {
+          Navigator.pop(sheetContext);
+          await action();
+        }
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(med.name, style: Theme.of(sheetContext).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: t.onBase)),
+              const SizedBox(height: 4),
+              Text(
+                [DateFormat('HH:mm').format(dose.at), med.doseLabel, if (med.mealRelation != null) mealRelations[med.mealRelation] ?? ''].join(' · '),
+                style: TextStyle(color: t.muted),
+              ),
+              const SizedBox(height: 20),
+              if (answered)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.undo_rounded),
+                  label: Text(entry.status == DoseStatus.taken ? 'Alındı — geri al' : 'Atlandı — geri al'),
+                  onPressed: () => act(() => actions.undo(dose)),
+                )
+              else ...[
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Aldım'),
+                  onPressed: () => act(() => actions.take(dose)),
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => act(() => actions.snooze(dose, med.alarm.snoozeMinutes)),
+                      child: Text('${med.alarm.snoozeMinutes} dk ertele'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: OutlinedButton(onPressed: () => act(() => actions.skip(dose)), child: const Text('Atla'))),
+                ]),
+              ],
+            ]),
+          ),
+        );
+      },
     );
 
-/// Today's server timeline plus calendar events: all-day first, then by time.
-List<AgendaItem> mergeTimeline(List<AgendaItem> server, List<AgendaItem> google) {
-  int key(AgendaItem item) => item.startsAt == null ? -1 : item.startsAt!.toLocal().hour * 60 + item.startsAt!.toLocal().minute;
-  return [...server, ...google]..sort((a, b) => key(a).compareTo(key(b)));
+/// Backup state, so the user knows whether today's changes have left the phone.
+class _SyncLine extends ConsumerWidget {
+  const _SyncLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = LbTokens.of(context);
+    final status = ref.watch(syncControllerProvider);
+    final pending = ref.watch(localPendingCountProvider).value ?? 0;
+    final last = status.lastSyncedAt;
+    final (IconData icon, String text) = switch (status.phase) {
+      SyncPhase.syncing => (Icons.sync_rounded, 'Eşitleniyor…'),
+      SyncPhase.offline => (Icons.cloud_off_rounded, pending > 0 ? 'Çevrimdışı · $pending kayıt bekliyor' : 'Çevrimdışı'),
+      SyncPhase.unauthorized => (Icons.lock_clock_rounded, 'Oturum yenilenmeli'),
+      SyncPhase.failed => (Icons.error_outline_rounded, 'Eşitlenemedi'),
+      SyncPhase.idle when pending > 0 => (Icons.cloud_upload_rounded, '$pending kayıt bekliyor'),
+      SyncPhase.idle when last != null => (Icons.cloud_done_rounded, 'Eşitlendi · ${DateFormat('HH:mm').format(last)}'),
+      SyncPhase.idle => (Icons.cloud_queue_rounded, 'Henüz eşitlenmedi'),
+    };
+    return Semantics(
+      liveRegion: true,
+      child: Row(children: [
+        Icon(icon, size: 16, color: t.muted),
+        const SizedBox(width: 6),
+        Flexible(child: Text(text, style: TextStyle(color: t.muted, fontSize: 13, fontWeight: FontWeight.w600))),
+      ]),
+    );
+  }
 }
 
-/// The server's next item, unless a calendar event starts sooner.
-AgendaItem? nextItem(AgendaItem? server, List<AgendaItem> google, DateTime now) {
-  final upcoming = google.where((item) => item.startsAt != null && item.startsAt!.isAfter(now)).toList()
-    ..sort((a, b) => a.startsAt!.compareTo(b.startsAt!));
-  final candidate = upcoming.firstOrNull;
-  if (candidate == null) return server;
-  if (server?.startsAt == null) return server ?? candidate;
-  return candidate.startsAt!.isBefore(server!.startsAt!) ? candidate : server;
+class _NextCard extends ConsumerWidget {
+  const _NextCard({required this.item, required this.now});
+  final TodayItem? item;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = LbTokens.of(context);
+    final color = t.module(LbModule.today);
+    final next = item;
+    if (next == null) {
+      return NeuSurface(
+        padding: const EdgeInsets.all(22),
+        child: Row(children: [
+          Icon(Icons.check_circle_outline_rounded, color: color),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Sıradaki plan beklemiyor', style: TextStyle(color: t.onBase, fontWeight: FontWeight.w700))),
+        ]),
+      );
+    }
+    final dose = next.dose;
+    return GestureDetector(
+      onTap: () => _open(context, ref, next),
+      child: NeuSurface(
+        padding: const EdgeInsets.all(22),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text('SIRADAKİ', style: TextStyle(color: color, letterSpacing: 1.4, fontWeight: FontWeight.w800, fontSize: 12)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Semantics(
+                liveRegion: true,
+                child: Text(countdown(next.start, now),
+                    textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Icon(_icon(next.kind), color: t.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(next.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: t.onBase)),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            [DateFormat('HH:mm').format(next.start), if (dose != null) dose.dose.medication.doseLabel else if (shortDuration(next).isNotEmpty) shortDuration(next)]
+                .join(' · '),
+            style: TextStyle(color: t.muted, fontWeight: FontWeight.w700),
+          ),
+          if (dose != null) ...[
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: t.module(LbModule.meds), foregroundColor: t.onAccent),
+              icon: const Icon(Icons.check_rounded),
+              label: const Text('Aldım'),
+              onPressed: () => ref.read(doseActionsProvider).take(dose.dose),
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
 }
 
-class _NextCard extends StatelessWidget {
-  const _NextCard({this.item});
-  final AgendaItem? item;
+class _MissedStrip extends ConsumerWidget {
+  const _MissedStrip({required this.missed});
+  final List<DoseEntry> missed;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = LbTokens.of(context);
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: missed.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final entry = missed[index];
+          return ActionChip(
+            avatar: Icon(Icons.medication_rounded, size: 18, color: t.danger),
+            label: Text('${DateFormat('HH:mm').format(entry.dose.at)} ${entry.dose.medication.name}'),
+            onPressed: () => showDoseActions(context, ref, entry),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WalletCard extends StatelessWidget {
+  const _WalletCard({required this.glance, required this.now});
+  final WalletGlance glance;
+  final DateTime now;
 
   @override
   Widget build(BuildContext context) {
     final t = LbTokens.of(context);
-    final color = t.module(LbModule.today);
-    return NeuSurface(
-      padding: const EdgeInsets.all(22),
-      child: item == null
-          ? Row(children: [
-              Icon(Icons.check_circle_outline_rounded, color: color),
-              const SizedBox(width: 12),
-              Text('Sıradaki plan beklemiyor', style: TextStyle(color: t.onBase, fontWeight: FontWeight.w700)),
-            ])
-          : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('SIRADAKİ',
-                  style: TextStyle(color: color, letterSpacing: 1.4, fontWeight: FontWeight.w800, fontSize: 12)),
-              const SizedBox(height: 10),
-              Text(item!.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: t.onBase)),
-              if (item!.startsAt != null) ...[
-                const SizedBox(height: 6),
-                Text(DateFormat('HH:mm').format(item!.startsAt!.toLocal()),
-                    style: TextStyle(color: t.muted, fontWeight: FontWeight.w700)),
-              ],
-            ]),
+    final color = t.module(LbModule.wallet);
+    return GestureDetector(
+      onTap: () => context.go(AppRoutes.wallet),
+      child: NeuSurface(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text('CÜZDAN', style: TextStyle(color: color, letterSpacing: 1.4, fontWeight: FontWeight.w800, fontSize: 12)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('Bugün ${formatMoney(glance.spentToday)} harcandı',
+                  textAlign: TextAlign.end,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: t.muted, fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
+          ]),
+          if (glance.dues.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text('Bu hafta ödeme yok.', style: TextStyle(color: t.onBase, fontWeight: FontWeight.w600)),
+            ),
+          for (final due in glance.dues.take(3))
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(children: [
+                Icon(due.payment == null ? Icons.credit_card_rounded : Icons.event_repeat_rounded, size: 20, color: color),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    due.payment == null ? '${due.title} son ödeme' : due.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: t.onBase, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(dueIn(due.due, now),
+                    style: TextStyle(color: due.due.isBefore(DateTime(now.year, now.month, now.day)) ? t.danger : t.muted, fontSize: 13)),
+                const SizedBox(width: 10),
+                Text(formatMoney(due.amount, short: true), style: TextStyle(color: t.onBase, fontWeight: FontWeight.w800)),
+              ]),
+            ),
+          if (glance.dues.length > 3)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('+${glance.dues.length - 3} ödeme daha', style: TextStyle(color: t.muted, fontSize: 12)),
+            ),
+        ]),
+      ),
     );
   }
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text, {required this.count, this.color});
+  const _SectionTitle(this.text, {required this.count, this.danger = false});
   final String text;
   final int count;
-  final Color? color;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +328,7 @@ class _SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(children: [
-        Text(text, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: color ?? t.onBase)),
+        Text(text, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: danger ? t.danger : t.onBase)),
         const SizedBox(width: 8),
         Text('$count', style: TextStyle(color: t.muted, fontWeight: FontWeight.w700)),
       ]),
@@ -165,34 +336,39 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _AgendaTile extends ConsumerWidget {
-  const _AgendaTile({required this.item, this.showTime = false});
-  final AgendaItem item;
-  final bool showTime;
+class _TimelineTile extends ConsumerWidget {
+  const _TimelineTile({required this.item, required this.now});
+  final TodayItem item;
+  final DateTime now;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = LbTokens.of(context);
-    final completed = item.isCompleted || ref.watch(optimisticCompletedProvider).contains(item.id);
-    final canComplete = !completed && (item.kind == 'task' || item.kind == 'medication');
+    final dose = item.dose;
+    final past = !item.allDay && (item.end ?? item.start).isBefore(now) && dose == null;
+    final subtitle = switch (item.kind) {
+      TodayKind.dose => [
+          'İlaç · ${dose!.dose.medication.doseLabel}',
+          if (dose.status == DoseStatus.taken) 'alındı',
+          if (dose.status == DoseStatus.skipped) 'atlandı',
+          if (dose.status == DoseStatus.snoozed) 'ertelendi',
+        ].join(' · '),
+      TodayKind.google => ['Google', if (shortDuration(item).isNotEmpty && !item.allDay) shortDuration(item)].join(' · '),
+      TodayKind.event => ['Etkinlik', if (shortDuration(item).isNotEmpty && !item.allDay) shortDuration(item)].join(' · '),
+    };
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
-        onTap: item.kind == 'event' || item.kind == googleKind ? () => context.go(AppRoutes.calendar) : null,
-        onLongPress: item.kind == 'medication' && !completed
-            ? () => ref.read(quickActionProvider).snooze(item, 10)
-            : null,
+        onTap: () => _open(context, ref, item),
         child: NeuSurface(
           depth: 4,
           radius: LbTokens.radiusSmall + 4,
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
           child: Row(children: [
             SizedBox(
-              width: 48,
-              child: showTime && item.startsAt != null
-                  ? Text(DateFormat('HH:mm').format(item.startsAt!.toLocal()),
-                      style: TextStyle(fontWeight: FontWeight.w800, color: t.onBase))
-                  : Icon(_icon(item.kind), color: t.muted),
+              width: 56,
+              child: Text(item.allDay ? 'Tüm gün' : DateFormat('HH:mm').format(item.start),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: item.allDay ? 12 : 14, color: past || item.done ? t.muted : t.onBase)),
             ),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -201,54 +377,31 @@ class _AgendaTile extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: completed ? t.muted : t.onBase,
+                    color: past || item.done ? t.muted : t.onBase,
                     fontWeight: FontWeight.w700,
-                    decoration: completed ? TextDecoration.lineThrough : null,
+                    decoration: item.done ? TextDecoration.lineThrough : null,
                   ),
                 ),
-                Text(_kind(item.kind), style: TextStyle(color: t.muted, fontSize: 12)),
+                Text(subtitle, style: TextStyle(color: t.muted, fontSize: 12)),
               ]),
             ),
-            if (canComplete)
+            if (dose != null && !item.done)
               IconButton(
-                tooltip: item.kind == 'medication' ? 'Alındı' : 'Tamamla',
-                onPressed: () => ref.read(quickActionProvider).complete(item),
-                icon: Icon(Icons.check_circle_outline_rounded, color: t.module(LbModule.today)),
+                tooltip: 'Aldım',
+                onPressed: () => ref.read(doseActionsProvider).take(dose.dose),
+                icon: Icon(Icons.check_circle_outline_rounded, color: t.module(LbModule.meds)),
               )
             else
-              const SizedBox(height: 48),
+              Padding(padding: const EdgeInsets.all(12), child: Icon(_icon(item.kind), size: 20, color: t.muted)),
           ]),
         ),
       ),
     );
   }
-
-  IconData _icon(String kind) => switch (kind) {
-        'medication' => Icons.medication_rounded,
-        'scheduled_payment' => Icons.payments_rounded,
-        'task' => Icons.task_alt_rounded,
-        'routine' => Icons.repeat_rounded,
-        googleKind => Icons.event_available_rounded,
-        _ => Icons.event_rounded,
-      };
-
-  String _kind(String kind) => switch (kind) {
-        'medication' => 'İlaç',
-        'scheduled_payment' => 'Ödeme',
-        'task' => 'Görev',
-        'routine' => 'Rutin',
-        googleKind => 'Google',
-        _ => 'Etkinlik',
-      };
 }
 
-class _Empty extends StatelessWidget {
-  const _Empty({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: Text(text, style: TextStyle(color: LbTokens.of(context).muted))),
-      );
-}
+IconData _icon(TodayKind kind) => switch (kind) {
+      TodayKind.event => Icons.event_rounded,
+      TodayKind.google => Icons.event_available_rounded,
+      TodayKind.dose => Icons.medication_rounded,
+    };

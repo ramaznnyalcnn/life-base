@@ -123,7 +123,6 @@ class CalendarSyncer(private val context: Context) {
             // Events and routines live on the device now; the app projects and
             // reminds them itself, so the server copies would duplicate them.
             .filter { it.optString("kind") !in localKinds }
-        updateWidgetSnapshot(today, items)
         ReminderScheduler(context).reconcile(items)
         val calendarId = vault.calendarId() ?: return true
         if (!hasPermission()) return true
@@ -269,24 +268,6 @@ class CalendarSyncer(private val context: Context) {
                 put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
             })
         }
-    }
-
-    private fun updateWidgetSnapshot(today: LocalDate, items: List<org.json.JSONObject>) {
-        val current = items.filter { it.optString("day") == today.toString() && !it.optBoolean("is_completed") }
-            .sortedBy { if (it.isNull("starts_at")) "9999" else it.optString("starts_at") }
-        val next = current.firstOrNull()
-        val actionable = current.firstOrNull { it.optString("kind") == "task" || it.optString("kind") == "medication" }
-        val snapshot = org.json.JSONObject().apply {
-            put("next", next?.optString("title").orEmpty())
-            put("count", current.size)
-            put("action", actionable?.let { item -> org.json.JSONObject().apply {
-                put("kind", item.optString("kind"))
-                put("id", item.opt("source_id"))
-                put("scheduled_for", item.optJSONObject("metadata")?.optString("scheduled_for").orEmpty())
-                put("entity_version", item.optJSONObject("metadata")?.optInt("entity_version") ?: 0)
-            }})
-        }
-        vault.saveWidget(snapshot.toString())
     }
 
     /** Deletes projected events of one origin ([prefix]) that are no longer wanted. */
