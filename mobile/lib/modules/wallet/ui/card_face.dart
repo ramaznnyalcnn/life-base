@@ -6,59 +6,31 @@ import '../../../core/wallet/wallet_models.dart';
 import '../../../core/wallet/wallet_outbox.dart';
 import 'wallet_format.dart';
 
-/// The card's printed surface at real card proportions (85.6 × 54 mm): its
-/// scheme's gradient with soft colour glows and a glassy sheen.
+/// The card's surface at real card proportions (85.6 × 54 mm), in its
+/// scheme's single colour.
 class CardSurface extends StatelessWidget {
   const CardSurface({super.key, required this.color, required this.child, this.dim = false});
 
   final String? color;
   final Widget child;
 
-  /// The back: a frosted veil so the details read clearly.
+  /// The back: a veil so the details read clearly.
   final bool dim;
 
   @override
   Widget build(BuildContext context) {
-    final (gradient, ink) = schemeOf(color);
+    final (fill, ink) = schemeOf(color);
+    final veil = (ink.computeLuminance() > .5 ? Colors.black : Colors.white).withValues(alpha: .18);
     return AspectRatio(
       aspectRatio: 85.6 / 54,
       child: DecoratedBox(
         decoration: BoxDecoration(
+          color: dim ? Color.alphaBlend(veil, fill) : fill,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: gradient.last.withValues(alpha: .35), blurRadius: 22, offset: const Offset(0, 10))],
+          border: Border.all(color: Colors.white.withValues(alpha: .14)),
+          boxShadow: [BoxShadow(color: fill.withValues(alpha: .35), blurRadius: 20, offset: const Offset(0, 8))],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(fit: StackFit.expand, children: [
-            DecoratedBox(
-              decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: gradient)),
-            ),
-            for (final (glow, at) in cardGlows(color))
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(center: at, radius: 1.05, colors: [glow.withValues(alpha: .85), glow.withValues(alpha: 0)]),
-                ),
-              ),
-            // Sheen across the top, as on a glossy card.
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.center,
-                  colors: [Colors.white.withValues(alpha: .22), Colors.white.withValues(alpha: 0)],
-                ),
-              ),
-            ),
-            if (dim) ColoredBox(color: (ink.computeLuminance() > .5 ? Colors.black : Colors.white).withValues(alpha: .38)),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: .28)),
-              ),
-            ),
-            DefaultTextStyle(style: TextStyle(color: ink), child: child),
-          ]),
-        ),
+        child: DefaultTextStyle(style: TextStyle(color: ink), child: child),
       ),
     );
   }
@@ -118,8 +90,8 @@ class CardFace extends StatelessWidget {
                 const SizedBox(height: 40),
             ]),
             const Spacer(),
-            Text(card.last4 == null ? '••••  ••••' : '••••  ${card.last4}',
-                style: TextStyle(color: ink, fontSize: 19, letterSpacing: 2.5, fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
+            Text('**** **** **** ${card.last4 ?? '****'}',
+                style: TextStyle(color: ink, fontSize: 19, letterSpacing: 1.5, fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
             const Spacer(),
             if (share != null) ...[
               Padding(

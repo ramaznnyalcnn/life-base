@@ -31,39 +31,20 @@ IconData categoryIcon(String? name, TxKind kind) {
   return kind == TxKind.income ? Icons.south_west_rounded : Icons.north_east_rounded;
 }
 
-/// Card colour schemes: (label, gradient, text colour). The card face lays
-/// soft colour glows over the gradient (see [cardGlows]).
-const cardSchemes = <String, (String, List<Color>, Color)>{
-  'aurora': ('Aurora', [Color(0xFFC6ECFF), Color(0xFFF7A8D8), Color(0xFFFFF1C9)], Color(0xFF1B1530)),
-  'gece': ('Gece', [Color(0xFF1F2937), Color(0xFF111827)], Colors.white),
-  'okyanus': ('Okyanus', [Color(0xFF1E5BA8), Color(0xFF0E3366)], Colors.white),
-  'zumrut': ('Zümrüt', [Color(0xFF1F7A5A), Color(0xFF0E4A36)], Colors.white),
-  'yakut': ('Yakut', [Color(0xFFB0303F), Color(0xFF6E1624)], Colors.white),
-  'altin': ('Altın', [Color(0xFFE2C275), Color(0xFFB08A3C)], Color(0xFF2B2111)),
-  'lavanta': ('Lavanta', [Color(0xFF8C72D4), Color(0xFF55409A)], Colors.white),
-  'gumus': ('Gümüş', [Color(0xFFE3E6EA), Color(0xFFAEB4BC)], Color(0xFF1F2328)),
-  'turuncu': ('Turuncu', [Color(0xFFF08A3C), Color(0xFFB4501A)], Colors.white),
+/// Card colours, one solid colour each: (label, colour, text colour).
+const cardSchemes = <String, (String, Color, Color)>{
+  'gece': ('Gece', Color(0xFF1F2937), Colors.white),
+  'okyanus': ('Okyanus', Color(0xFF1E5BA8), Colors.white),
+  'zumrut': ('Zümrüt', Color(0xFF1F7A5A), Colors.white),
+  'yakut': ('Yakut', Color(0xFFB0303F), Colors.white),
+  'altin': ('Altın', Color(0xFFD9B865), Color(0xFF2B2111)),
+  'lavanta': ('Lavanta', Color(0xFF7E64C8), Colors.white),
+  'aurora': ('Pembe', Color(0xFFF2B5D4), Color(0xFF2A1424)),
+  'gumus': ('Gümüş', Color(0xFFD5D9DE), Color(0xFF1F2328)),
+  'turuncu': ('Turuncu', Color(0xFFE9803A), Colors.white),
 };
 
-/// Glows painted over each scheme's gradient: (colour, centre). Aurora is the
-/// pastel, holographic look; the others get a lighter and a deeper glow of
-/// their own colour.
-List<(Color, Alignment)> cardGlows(String? key) => switch (key) {
-      'aurora' => const [
-          (Color(0xFFE040FB), Alignment(.1, -.75)),
-          (Color(0xFF9C6BFF), Alignment(1.1, -1.1)),
-          (Color(0xFFFF8FA3), Alignment(1.1, .7)),
-          (Color(0xFFB9E6FF), Alignment(-1.1, -1.1)),
-          (Color(0xFFFFF6B8), Alignment(-.9, 1.2)),
-        ],
-      _ => [
-          (Color.lerp(schemeOf(key).$1.first, Colors.white, .45)!, const Alignment(-.9, -1.1)),
-          (Color.lerp(schemeOf(key).$1.first, const Color(0xFFE040FB), .35)!, const Alignment(1.0, -.6)),
-          (Color.lerp(schemeOf(key).$1.last, Colors.black, .25)!, const Alignment(.8, 1.2)),
-        ],
-    };
-
-(List<Color>, Color) schemeOf(String? key) {
+(Color, Color) schemeOf(String? key) {
   final scheme = cardSchemes[key] ?? cardSchemes['gece']!;
   return (scheme.$2, scheme.$3);
 }

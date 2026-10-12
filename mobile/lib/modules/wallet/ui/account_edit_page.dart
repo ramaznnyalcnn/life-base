@@ -76,7 +76,7 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
     _limit = TextEditingController(text: a?.limit == null ? '' : _plain(a!.limit!));
     _last4 = TextEditingController(text: a?.last4 ?? '');
     _iban = TextEditingController(text: a?.iban == null ? '' : formatIban(a!.iban!));
-    _color = a?.color ?? 'aurora';
+    _color = a?.color ?? 'gece';
     _network = a?.network;
     _statementDay = a?.statementDay;
     _dueDay = a?.dueDay;
@@ -437,7 +437,7 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
                       height: 30,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
-                        gradient: LinearGradient(colors: entry.value.$2),
+                        color: entry.value.$2,
                         border: Border.all(color: _color == entry.key ? t.onBase : Colors.transparent, width: 2.5),
                       ),
                     ),
