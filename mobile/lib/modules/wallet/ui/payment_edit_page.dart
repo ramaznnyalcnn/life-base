@@ -124,7 +124,8 @@ class _PaymentEditPageState extends ConsumerState<PaymentEditPage> {
     final accounts = wallet.accounts.values.where((a) => a.active).toList()..sort((a, b) => a.name.compareTo(b.name));
     final sources = _cardPayment ? accounts.where((a) => !a.isCard).toList() : accounts;
     final cards = accounts.where((a) => a.isCard).toList();
-    _accountId ??= sources.firstOrNull?.id;
+    // Bills are usually paid from a bank account rather than a card.
+    _accountId ??= (sources.where((a) => !a.isCard).firstOrNull ?? sources.firstOrNull)?.id;
     final categories = (ref.watch(walletCategoriesProvider).value ?? const <WalletCategory>[])
         .where((c) => c.kind == TxKind.expense)
         .toList();

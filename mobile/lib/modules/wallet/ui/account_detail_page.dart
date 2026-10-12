@@ -63,12 +63,13 @@ class AccountDetailPage extends ConsumerWidget {
             ),
           ]),
           const SizedBox(height: 8),
-          if (account.statementDay == null)
+          if (account.statementDay == null) ...[
             Padding(
-              padding: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
               child: Text('Ekstreleri görmek için karta kesim günü ekle.', style: TextStyle(color: t.muted)),
-            )
-          else ...[
+            ),
+            for (final entry in entriesOf(wallet, {account.id}, now).take(100)) EntryTile(entry: entry, wallet: wallet),
+          ] else ...[
             Padding(
               padding: const EdgeInsets.only(top: 16, bottom: 8),
               child: Text('Ekstreler', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: t.onBase)),
