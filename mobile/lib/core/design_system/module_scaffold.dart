@@ -108,7 +108,8 @@ class _AddButton extends StatelessWidget {
     final t = LbTokens.of(context);
     final color = t.module(module);
     final reduce = t.reduceMotion || MediaQuery.disableAnimationsOf(context);
-    return OpenContainer(
+    // Object?: add pages close with a result (e.g. pop(true) after saving).
+    return OpenContainer<Object?>(
       key: ValueKey('add-${module.name}'),
       // Stay inside this tab's navigator so back returns to the module.
       useRootNavigator: false,
