@@ -12,12 +12,14 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import app.lifebase.mobile.widget.LifeBaseWidget
-import io.flutter.embedding.android.FlutterActivity
+import android.view.WindowManager
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.TimeUnit
 
-class MainActivity : FlutterActivity() {
+/** A FragmentActivity so local_auth can show the biometric prompt. */
+class MainActivity : FlutterFragmentActivity() {
     private val channelName = "app.lifebase.mobile/platform"
     private val calendarRequestCode = 4201
 
@@ -69,6 +71,15 @@ class MainActivity : FlutterActivity() {
                     }
                     "setShowOverLockScreen" -> {
                         setShowOverLockScreen(call.argument<Boolean>("enabled") == true)
+                        result.success(true)
+                    }
+                    "setSecure" -> {
+                        // Card details on screen: no screenshots, blank in recent apps.
+                        if (call.argument<Boolean>("enabled") == true) {
+                            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                        } else {
+                            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                        }
                         result.success(true)
                     }
                     "canUseFullScreenIntent" -> result.success(canUseFullScreenIntent())

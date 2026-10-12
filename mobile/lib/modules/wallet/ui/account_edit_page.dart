@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/design_system/add_page_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/platform/platform_bridge.dart';
+import '../../../core/providers.dart';
+import '../../../core/wallet/card_secrets.dart';
 import '../../../core/wallet/wallet_models.dart';
 import '../../../core/wallet/wallet_outbox.dart';
 import '../../../core/wallet/wallet_store.dart';
@@ -41,6 +46,18 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
   late final String _id;
   late final String _snapshot;
 
+  // Card details: only on this device. An existing card's are loaded after unlocking.
+  final _number = TextEditingController();
+  final _expiry = TextEditingController();
+  final _cvv = TextEditingController();
+  final _holder = TextEditingController();
+  final _phone = TextEditingController();
+  late bool _secretsOpen;
+  CardSecrets? _storedSecrets;
+  bool _secureScreen = false;
+  // Read up front: ref is gone by dispose, when screenshots must be allowed again.
+  late final PlatformBridge _bridge;
+
   WalletAccount? get _initial => widget.initial;
   bool get _isNew => _initial == null;
   bool get _isCard => _type == AccountType.creditCard;
@@ -64,24 +81,76 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
     _statementDay = a?.statementDay;
     _dueDay = a?.dueDay;
     _shared = a?.shared ?? false;
-    for (final c in [_name, _bank, _balance, _limit, _last4, _iban]) {
+    _bridge = ref.read(platformBridgeProvider);
+    _secretsOpen = a == null;
+    for (final c in [_name, _bank, _balance, _limit, _last4, _iban, ..._secretFields]) {
       c.addListener(() => setState(() {}));
     }
+    _number.addListener(_numberChanged);
     _snapshot = _signature;
   }
 
   @override
   void dispose() {
-    for (final c in [_name, _bank, _balance, _limit, _last4, _iban]) {
+    for (final c in [_name, _bank, _balance, _limit, _last4, _iban, ..._secretFields]) {
       c.dispose();
     }
+    if (_secureScreen) unawaited(_bridge.setSecure(false).catchError((Object _) {}));
     super.dispose();
+  }
+
+  List<TextEditingController> get _secretFields => [_number, _expiry, _cvv, _holder, _phone];
+
+  String get _digits => _number.text.replaceAll(RegExp(r'\D'), '');
+
+  /// The full number fills in the last four digits, and the screen stops
+  /// allowing screenshots while card details are typed.
+  void _numberChanged() {
+    final digits = _digits;
+    if (digits.length >= 12 && _last4.text != digits.substring(digits.length - 4)) {
+      _last4.text = digits.substring(digits.length - 4);
+    }
+    if (digits.isNotEmpty) _hideFromScreenshots();
+  }
+
+  void _hideFromScreenshots() {
+    if (_secureScreen) return;
+    _secureScreen = true;
+    unawaited(_bridge.setSecure(true).catchError((Object _) {}));
+  }
+
+  Future<void> _unlockSecrets() async {
+    final problem = await ref.read(cardUnlockerProvider).unlock('${_initial!.name} kart bilgilerini düzenle');
+    if (!mounted) return;
+    if (problem != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+      return;
+    }
+    final secrets = await ref.read(cardSecretsStoreProvider).read(_id);
+    if (!mounted) return;
+    _hideFromScreenshots();
+    setState(() {
+      _storedSecrets = secrets;
+      _secretsOpen = true;
+      _number.text = secrets?.groupedNumber ?? '';
+      _expiry.text = secrets?.expiry ?? '';
+      _cvv.text = secrets?.cvv ?? '';
+      _holder.text = secrets?.holder ?? '';
+      _phone.text = secrets?.supportPhone ?? '';
+    });
+  }
+
+  CardSecrets? get _typedSecrets {
+    if (_digits.isEmpty) return null;
+    String? optional(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
+    return CardSecrets(number: _digits, expiry: optional(_expiry), cvv: optional(_cvv), holder: optional(_holder), supportPhone: optional(_phone));
   }
 
   static String _plain(Cents cents) => decimalOf(cents).replaceAll('.', ',').replaceAll(RegExp(r',00$'), '');
 
   String get _signature =>
-      [_type, _name.text, _bank.text, _balance.text, _limit.text, _last4.text, _iban.text, _color, _network, _statementDay, _dueDay, _shared].join('|');
+      [_type, _name.text, _bank.text, _balance.text, _limit.text, _last4.text, _iban.text, _color, _network, _statementDay, _dueDay, _shared,
+        for (final c in _secretFields) c.text].join('|');
 
   String? get _problem {
     if (_name.text.trim().isEmpty) return 'Hesap adı gerekli';
@@ -89,6 +158,13 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
     if (_isCard) {
       if (_limit.text.trim().isNotEmpty && (parseCents(_limit.text) ?? -1) < 0) return 'Limit bir sayı olmalı';
       if (_last4.text.isNotEmpty && _last4.text.length != 4) return 'Son 4 hane eksik';
+      if (_secretsOpen && _digits.isNotEmpty) {
+        if (_digits.length < 12 || _digits.length > 19) return 'Kart numarası 12–19 hane olmalı';
+        if (_expiry.text.isNotEmpty && !RegExp(r'^(0[1-9]|1[0-2])/\d{2}$').hasMatch(_expiry.text)) return 'SKT AA/YY biçiminde olmalı';
+        if (_cvv.text.isNotEmpty && !RegExp(r'^\d{3,4}$').hasMatch(_cvv.text)) return 'CVV 3 ya da 4 hane olmalı';
+      } else if (_secretsOpen && [_expiry, _cvv, _holder, _phone].any((c) => c.text.trim().isNotEmpty)) {
+        return 'Kart bilgileri için kart numarasını da gir';
+      }
     }
     final iban = _iban.text.replaceAll(' ', '');
     if (_type == AccountType.bank && iban.isNotEmpty && !RegExp(r'^TR\d{24}$').hasMatch(iban.toUpperCase())) {
@@ -127,6 +203,11 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
       return;
     }
     await ref.read(walletRepositoryProvider).saveAccount(_draft, expectedVersion: _initial?.version);
+    final secrets = _typedSecrets;
+    if (_isCard && _secretsOpen && secrets != _storedSecrets) {
+      await ref.read(cardSecretsStoreProvider).write(_id, secrets);
+      ref.invalidate(hasCardSecretsProvider(_id));
+    }
     if (mounted) Navigator.of(context).pop(true);
   }
 
@@ -146,6 +227,69 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
     if (confirmed != true) return;
     await ref.read(walletRepositoryProvider).archiveAccount(account, archived: account.active);
     if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  Widget _secretsSection(BuildContext context) {
+    final t = LbTokens.of(context);
+    final header = Padding(
+      padding: const EdgeInsets.only(top: 18, bottom: 4),
+      child: Row(children: [
+        Icon(Icons.lock_rounded, size: 16, color: t.muted),
+        const SizedBox(width: 6),
+        Flexible(child: Text('Kart bilgileri (sadece bu cihazda)', style: TextStyle(color: t.muted, fontWeight: FontWeight.w700))),
+      ]),
+    );
+    if (!_secretsOpen) {
+      final stored = ref.watch(hasCardSecretsProvider(_id)).value ?? false;
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        header,
+        Row(children: [
+          Expanded(child: Text(stored ? 'Kayıtlı. Değiştirmek için kilidi aç.' : 'Kayıtlı değil.', style: TextStyle(color: t.muted))),
+          TextButton.icon(
+            icon: Icon(stored ? Icons.fingerprint_rounded : Icons.add_rounded),
+            label: Text(stored ? 'Kilidi aç' : 'Ekle'),
+            onPressed: stored ? _unlockSecrets : () => setState(() => _secretsOpen = true),
+          ),
+        ]),
+      ]);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      header,
+      Text('Tam numara, SKT ve CVV telefonda şifreli durur, sunucuya gitmez. Kartın arka yüzünde parmak izinle görünür.',
+          style: TextStyle(color: t.muted, fontSize: 12)),
+      const SizedBox(height: 8),
+      TextField(
+        controller: _number,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')), LengthLimitingTextInputFormatter(23)],
+        decoration: const InputDecoration(labelText: 'Kart numarası'),
+      ),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(
+          child: TextField(
+            controller: _expiry,
+            keyboardType: TextInputType.datetime,
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')), LengthLimitingTextInputFormatter(5)],
+            decoration: const InputDecoration(labelText: 'SKT', hintText: 'AA/YY'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextField(
+            controller: _cvv,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
+            decoration: const InputDecoration(labelText: 'CVV'),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 8),
+      TextField(controller: _holder, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(labelText: 'Kart sahibi')),
+      const SizedBox(height: 8),
+      TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Bankanın müşteri hizmetleri', hintText: '0850 …')),
+    ]);
   }
 
   @override
@@ -269,6 +413,7 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: const InputDecoration(labelText: 'Son 4 hane', counterText: ''),
             ),
+            if (ref.watch(cardSecretsStoreProvider).supported) _secretsSection(context),
             label('Kart ağı'),
             Wrap(spacing: 8, children: [
               for (final entry in networkLabels.entries)

@@ -49,6 +49,10 @@ class PlatformBridge {
       _channel.invokeMethod<void>('setShowOverLockScreen', {'enabled': enabled});
 
   /// Writes the app's local events into the connected Google calendar.
+  /// Blocks screenshots and blanks the recent-apps preview while card
+  /// details are on screen.
+  Future<void> setSecure(bool enabled) => _channel.invokeMethod<void>('setSecure', {'enabled': enabled});
+
   Future<void> projectLocalEvents(String itemsJson) =>
       _channel.invokeMethod<void>('projectLocalEvents', {'items': itemsJson});
 

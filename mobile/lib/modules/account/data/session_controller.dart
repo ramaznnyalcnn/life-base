@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/server_address.dart';
 import '../../../core/providers.dart';
+import '../../../core/wallet/card_secrets.dart';
 
 class SessionState {
   const SessionState._({this.ready = false, this.displayName, this.error});
@@ -102,6 +103,8 @@ class SessionController extends AsyncNotifier<SessionState> {
     await ref.read(databaseProvider).clearCache();
     // Local-first data belongs to this account; the server keeps the backup.
     await ref.read(databaseProvider).clearLocalData();
+    // Card details have no backup anywhere: they go with the account.
+    await ref.read(cardSecretsStoreProvider).clear().catchError((Object _) {});
     ref.read(connectionProvider.notifier).state = null;
     state = const AsyncData(SessionState.signedOut());
   }

@@ -11,8 +11,8 @@ import '../../../core/wallet/wallet_outbox.dart';
 import '../../../core/wallet/wallet_store.dart';
 import '../data/wallet_repository.dart';
 import 'account_edit_page.dart';
-import 'card_face.dart';
 import 'entry_page.dart';
+import 'secure_card.dart';
 import 'wallet_format.dart';
 import 'wallet_screen.dart';
 
@@ -43,7 +43,7 @@ class AccountDetailPage extends ConsumerWidget {
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
         if (account.isCard) ...[
-          CardFace(card: account, wallet: wallet, now: now),
+          SecureCard(card: account, wallet: wallet, now: now),
           const SizedBox(height: 16),
           Row(children: [
             Expanded(

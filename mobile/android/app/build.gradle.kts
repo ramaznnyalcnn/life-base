@@ -36,6 +36,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.glance:glance-appwidget:1.1.1")
