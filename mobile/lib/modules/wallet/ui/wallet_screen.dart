@@ -338,12 +338,13 @@ class _CardsState extends State<_Cards> {
             final card = widget.cards[index];
             return Padding(
               padding: const EdgeInsets.only(right: 12, bottom: 16),
-              // Tap turns the card over; the pencil edits it.
+              // Tap opens the card's page; the eye shows its details, the pencil edits it.
               child: SecureCard(
                 card: card,
                 wallet: widget.wallet,
                 now: widget.now,
                 onEdit: () => _openAccountEditor(context, card),
+                onOpen: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountDetailPage(accountId: card.id))),
               ),
             );
           },

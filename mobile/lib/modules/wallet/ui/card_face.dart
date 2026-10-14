@@ -39,7 +39,7 @@ class CardSurface extends StatelessWidget {
 /// The front of a credit card: bank, last four digits, how much of the limit
 /// is used, the statement dates and the network.
 class CardFace extends StatelessWidget {
-  const CardFace({super.key, required this.card, required this.wallet, required this.now, this.onEdit});
+  const CardFace({super.key, required this.card, required this.wallet, required this.now, this.onEdit, this.onReveal});
 
   final WalletAccount card;
   final WalletData wallet;
@@ -47,6 +47,9 @@ class CardFace extends StatelessWidget {
 
   /// Shows an edit button on the card.
   final VoidCallback? onEdit;
+
+  /// Shows an eye button that turns the card over to its details.
+  final VoidCallback? onReveal;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +79,19 @@ class CardFace extends StatelessWidget {
               if (card.shared) Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.group_rounded, size: 18, color: muted)),
               if (card.sync != SyncMark.confirmed)
                 Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.schedule_rounded, size: 16, color: muted)),
+              if (onReveal != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: IconButton(
+                    tooltip: 'Kart bilgilerini göster',
+                    visualDensity: VisualDensity.compact,
+                    style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .22)),
+                    color: ink,
+                    iconSize: 18,
+                    onPressed: onReveal,
+                    icon: const Icon(Icons.visibility_rounded),
+                  ),
+                ),
               if (onEdit != null)
                 IconButton(
                   tooltip: 'Kartı düzenle',

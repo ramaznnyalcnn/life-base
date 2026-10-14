@@ -14,11 +14,13 @@ import '../../../core/wallet/wallet_outbox.dart';
 import 'card_face.dart';
 import 'wallet_format.dart';
 
-/// A card that turns over when tapped: to its details after the owner
-/// unlocks them, or, when this phone holds none, to an offer to add them. It
-/// turns back by itself after [showFor] or when the app goes to the background.
+/// A card that turns over to its details after the owner unlocks them, or,
+/// when this phone holds none, to an offer to add them: from the eye button,
+/// or from a tap when there is no [onOpen]. A tap on the turned card turns it
+/// back; it also turns back by itself after [showFor] or when the app goes to
+/// the background.
 class SecureCard extends ConsumerStatefulWidget {
-  const SecureCard({super.key, required this.card, required this.wallet, required this.now, this.onEdit, this.showFor = const Duration(seconds: 30)});
+  const SecureCard({super.key, required this.card, required this.wallet, required this.now, this.onEdit, this.onOpen, this.showFor = const Duration(seconds: 30)});
 
   final WalletAccount card;
   final WalletData wallet;
@@ -26,6 +28,10 @@ class SecureCard extends ConsumerStatefulWidget {
 
   /// The card's edit button (and "Ekle" on a back without details).
   final VoidCallback? onEdit;
+
+  /// What a tap on the front does (the card's page); without it a tap turns
+  /// the card over.
+  final VoidCallback? onOpen;
   final Duration showFor;
 
   @override
@@ -111,12 +117,12 @@ class _SecureCardState extends ConsumerState<SecureCard> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final front = CardFace(card: widget.card, wallet: widget.wallet, now: widget.now, onEdit: widget.onEdit);
+    final front = CardFace(card: widget.card, wallet: widget.wallet, now: widget.now, onEdit: widget.onEdit, onReveal: _open);
     return Semantics(
       button: true,
-      hint: _turned ? 'Kartı çevirmek için dokun' : 'Kart bilgilerini göstermek için dokun',
+      hint: _turned ? 'Kartı çevirmek için dokun' : (widget.onOpen != null ? 'Kartın sayfasını açmak için dokun' : 'Kart bilgilerini göstermek için dokun'),
       child: GestureDetector(
-        onTap: _turned ? _close : _open,
+        onTap: _turned ? _close : (widget.onOpen ?? _open),
         child: AnimatedBuilder(
           animation: _turn,
           builder: (context, _) {

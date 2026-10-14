@@ -16,6 +16,7 @@ import 'package:lifebase_mobile/core/wallet/wallet_outbox.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:lifebase_mobile/modules/wallet/ui/account_detail_page.dart';
 import 'package:lifebase_mobile/modules/wallet/ui/account_edit_page.dart';
+import 'package:lifebase_mobile/modules/wallet/ui/wallet_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MemoryCardSecrets implements CardSecretsStore {
@@ -175,6 +176,24 @@ void main() {
     expect(find.text('Ekle'), findsOneWidget);
     expect(unlocker.asked, 0);
     expect(secureCalls, isEmpty, reason: 'nothing secret is on screen');
+    await unmount(tester);
+  });
+
+  testWidgets('on the wallet a tap opens the card page; the eye shows the details', (tester) async {
+    secrets.saved['card'] = const CardSecrets(number: '4543123456789012', expiry: '08/28', cvv: '987', holder: 'AYSE YILMAZ');
+    await pump(tester, const WalletScreen());
+
+    await tester.tap(find.text('**** **** **** 9012'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountDetailPage), findsOneWidget);
+    expect(unlocker.asked, 0, reason: 'opening the page asks for nothing');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Kart bilgilerini göster'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountDetailPage), findsNothing);
+    expect(find.text('4543 1234 5678 9012'), findsOneWidget);
     await unmount(tester);
   });
 }
