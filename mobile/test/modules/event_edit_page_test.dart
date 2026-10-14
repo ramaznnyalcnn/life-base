@@ -55,5 +55,8 @@ void main() {
     expect(saved.endsAt, DateTime(2099, 10, 12, 10));
     expect(saved.reminders, DefaultReminders.fallback);
     expect(find.byType(EventEditPage), findsNothing);
+    // Close the database streams the page listened to.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
   });
 }

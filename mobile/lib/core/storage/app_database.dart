@@ -57,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
             ));
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -85,6 +85,17 @@ class AppDatabase extends _$AppDatabase {
           if (from < 5) {
             // Planned wallet payments.
             await migrator.createTable(walletScheduledPayments);
+          }
+          if (from < 6) {
+            // Everything is household-shared: who added it, whose phone rings.
+            // Tables created above already have the columns.
+            if (from >= 2) {
+              await migrator.addColumn(localEvents, localEvents.createdBy);
+              await migrator.addColumn(localEvents, localEvents.notify);
+              await migrator.addColumn(localMedications, localMedications.createdBy);
+              await migrator.addColumn(localMedications, localMedications.notify);
+            }
+            if (from >= 4) await migrator.addColumn(localNotes, localNotes.createdBy);
           }
         },
       );

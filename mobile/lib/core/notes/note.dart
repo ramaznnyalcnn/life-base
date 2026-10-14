@@ -15,8 +15,9 @@ class Note {
     this.color,
     this.eventId,
     this.archived = false,
-    this.shared = false,
+    this.shared = true,
     this.updatedAtMs = 0,
+    this.createdBy,
   });
 
   factory Note.fromRow(LocalNote row) => Note(
@@ -30,6 +31,7 @@ class Note {
         archived: row.archived,
         shared: row.space == 'household',
         updatedAtMs: row.updatedAtMs,
+        createdBy: row.createdBy,
       );
 
   final String id;
@@ -43,9 +45,13 @@ class Note {
   final String? eventId;
   final bool archived;
 
-  /// Shared with the household.
+  /// Shared with the household (every note is, since everything is shared;
+  /// only rows from before that are not).
   final bool shared;
   final int updatedAtMs;
+
+  /// Household member who added it.
+  final int? createdBy;
 
   bool get isList => kind == NoteKind.list;
 
@@ -78,6 +84,7 @@ class Note {
         archived: archived ?? this.archived,
         shared: shared,
         updatedAtMs: updatedAtMs,
+        createdBy: createdBy,
       );
 }
 

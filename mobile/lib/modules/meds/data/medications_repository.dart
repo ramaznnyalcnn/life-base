@@ -7,27 +7,36 @@ import '../../../core/providers.dart';
 import '../../../core/storage/app_database.dart';
 import '../../../core/sync/local_sync.dart';
 import '../../../core/sync/sync_controller.dart';
+import '../../../core/wallet/wallet_store.dart';
 
 final medicationsRepositoryProvider = Provider<MedicationsRepository>((ref) => MedicationsRepository(
       ref.watch(databaseProvider),
       onChanged: () => ref.read(syncControllerProvider.notifier).requestSync(),
+      me: () => ref.read(walletMeProvider),
     ));
 
 /// Medication writes; every write is stamped and queued for sync.
 class MedicationsRepository {
-  MedicationsRepository(this._db, {void Function()? onChanged}) : _onChanged = onChanged ?? (() {});
+  MedicationsRepository(this._db, {void Function()? onChanged, int Function()? me})
+      : _onChanged = onChanged ?? (() {}),
+        _me = me ?? (() => 0);
 
   final AppDatabase _db;
   final void Function() _onChanged;
+
+  /// This user's id (0 while unknown); stamped on medications they add.
+  final int Function() _me;
 
   String newId() => const Uuid().v4();
 
   Future<LocalMedication?> _row(String id) => (_db.select(_db.localMedications)..where((t) => t.id.equals(id))).getSingleOrNull();
 
   Future<void> save(Medication medication) async {
+    final me = _me();
     await _db.transaction(() async {
       final previous = await _row(medication.id);
-      await _db.into(_db.localMedications).insertOnConflictUpdate(medication.toRow(nextStamp(previous?.updatedAtMs)));
+      final owner = previous?.createdBy ?? medication.createdBy ?? (me == 0 ? null : me);
+      await _db.into(_db.localMedications).insertOnConflictUpdate(medication.copyWith(createdBy: owner).toRow(nextStamp(previous?.updatedAtMs)));
     });
     _onChanged();
   }

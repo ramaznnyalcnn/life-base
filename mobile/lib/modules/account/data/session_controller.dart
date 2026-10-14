@@ -5,6 +5,13 @@ import '../../../core/network/server_address.dart';
 import '../../../core/providers.dart';
 import '../../../core/wallet/card_secrets.dart';
 
+/// A username (`ali`) signs in as `ali@lifebase.local`; an email
+/// is used as typed.
+String loginEmail(String input) {
+  final value = input.trim().toLowerCase();
+  return value.contains('@') ? value : '$value@lifebase.local';
+}
+
 class SessionState {
   const SessionState._({this.ready = false, this.displayName, this.error});
 
@@ -72,7 +79,7 @@ class SessionController extends AsyncNotifier<SessionState> {
       final dio = Dio(BaseOptions(baseUrl: normalized));
       final response = await dio.post<Map<String, Object?>>(
         '/api/v1/auth/login',
-        data: {'email': email.trim(), 'password': password},
+        data: {'email': loginEmail(email), 'password': password},
       );
       final body = response.data!;
       final token = body['access_token']! as String;

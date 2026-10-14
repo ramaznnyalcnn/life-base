@@ -6,6 +6,7 @@ import '../../../core/calendar/calendar_store.dart';
 import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/household/household_widgets.dart';
 import '../../../core/notes/note.dart';
 import '../../../core/notes/notes_store.dart';
 import 'note_editor_page.dart';
@@ -148,7 +149,7 @@ class _NoteCard extends StatelessWidget {
                 Expanded(
                   child: Text(heading, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.onBase, fontWeight: FontWeight.w800, fontSize: 16)),
                 ),
-                if (note.shared) Icon(Icons.group_rounded, size: 18, color: t.muted),
+                OwnerTag(note.createdBy),
                 if (note.isList && items.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(left: 8),

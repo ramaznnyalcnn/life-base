@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart';
 
+import '../household/household.dart';
 import '../storage/app_database.dart';
 
 enum RecurrenceFreq { daily, weekly, monthly, yearly }
@@ -113,6 +114,8 @@ class CalendarEvent {
     this.recurrence,
     this.reminders = const [],
     this.updatedAtMs = 0,
+    this.createdBy,
+    this.notify = notifyAll,
   });
 
   factory CalendarEvent.fromRow(LocalEvent row) => CalendarEvent(
@@ -127,6 +130,8 @@ class CalendarEvent {
         recurrence: row.recurrence == null ? null : RecurrenceRule.fromJson(Map<String, Object?>.from(jsonDecode(row.recurrence!) as Map)),
         reminders: (jsonDecode(row.reminders) as List).cast<Map>().map((r) => ReminderSpec.fromJson(Map<String, Object?>.from(r))).toList(),
         updatedAtMs: row.updatedAtMs,
+        createdBy: row.createdBy,
+        notify: row.notify,
       );
 
   final String id;
@@ -143,6 +148,12 @@ class CalendarEvent {
   final List<ReminderSpec> reminders;
   final int updatedAtMs;
 
+  /// Household member who added it.
+  final int? createdBy;
+
+  /// Whose phone reminds: [notifyAll] or a user id.
+  final String notify;
+
   /// The row stored for this event, stamped [stampMs] and queued for sync.
   LocalEventsCompanion toRow(int stampMs) => LocalEventsCompanion.insert(
         id: id,
@@ -155,6 +166,8 @@ class CalendarEvent {
         important: Value(important),
         recurrence: Value(recurrence == null ? null : jsonEncode(recurrence!.toJson())),
         reminders: Value(jsonEncode([for (final r in reminders) r.toJson()])),
+        createdBy: Value(createdBy),
+        notify: Value(notify),
         updatedAtMs: stampMs,
         deletedAtMs: const Value(null),
         dirty: const Value(true),
@@ -181,6 +194,8 @@ class CalendarEvent {
     RecurrenceRule? recurrence,
     bool clearRecurrence = false,
     List<ReminderSpec>? reminders,
+    int? createdBy,
+    String? notify,
   }) =>
       CalendarEvent(
         id: id ?? this.id,
@@ -194,6 +209,8 @@ class CalendarEvent {
         recurrence: clearRecurrence ? null : recurrence ?? this.recurrence,
         reminders: reminders ?? this.reminders,
         updatedAtMs: updatedAtMs,
+        createdBy: createdBy ?? this.createdBy,
+        notify: notify ?? this.notify,
       );
 
   /// Occurrences that overlap the local-date range [from, to] (inclusive).

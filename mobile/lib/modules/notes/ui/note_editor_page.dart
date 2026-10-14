@@ -102,14 +102,13 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     await _ensureStored();
     final items = _items;
     final last = items.isEmpty ? 0.0 : items.map((i) => i.position).reduce((a, b) => a > b ? a : b);
-    await _repo.saveItem(NoteItem(id: _repo.newId(), noteId: _note.id, content: content, position: last + 1), shared: _note.shared);
+    await _repo.saveItem(NoteItem(id: _repo.newId(), noteId: _note.id, content: content, position: last + 1));
     _newItem.clear();
     _newItemFocus.requestFocus();
   }
 
   Future<void> _toggle(NoteItem item, int me) => _repo.saveItem(
         NoteItem(id: item.id, noteId: item.noteId, content: item.content, done: !item.done, position: item.position, doneBy: item.done ? null : me),
-        shared: _note.shared,
       );
 
   Future<void> _reorder(List<NoteItem> open, int from, int to) async {
@@ -121,7 +120,6 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     final position = before == null ? (after ?? 1) - 1 : (after == null ? before + 1 : (before + after) / 2);
     await _repo.saveItem(
       NoteItem(id: moved.id, noteId: moved.noteId, content: moved.content, done: moved.done, position: position, doneBy: moved.doneBy),
-      shared: _note.shared,
     );
   }
 
@@ -138,7 +136,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     } else {
       final lines = _body.text.split('\n').map((l) => l.replaceFirst(RegExp(r'^\s*[-•*]\s*'), '').trim()).where((l) => l.isNotEmpty).toList();
       for (var i = 0; i < lines.length; i++) {
-        await _repo.saveItem(NoteItem(id: _repo.newId(), noteId: _note.id, content: lines[i], position: i + 1.0), shared: _note.shared);
+        await _repo.saveItem(NoteItem(id: _repo.newId(), noteId: _note.id, content: lines[i], position: i + 1.0));
       }
       _body.text = '';
       await _update(_note.copyWith(kind: NoteKind.list, body: ''));
@@ -191,7 +189,6 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     final open = items.where((i) => !i.done).toList();
     final done = items.where((i) => i.done).toList();
     final me = ref.watch(walletMeProvider);
-    final inHousehold = (ref.watch(walletScopeProvider).value ?? '').startsWith('h:');
     final members = {for (final m in ref.watch(walletMembersProvider).value ?? const []) m.userId: m.initials};
     final event = _note.eventId == null
         ? null
@@ -217,16 +214,8 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
           ),
           PopupMenuButton<String>(
             tooltip: 'Diğer',
-            onSelected: (value) async {
-              if (value == 'delete') return _delete();
-              _debounce?.cancel();
-              await _ensureStored();
-              final moved = await _repo.setShared(_current, shared: value == 'share');
-              if (mounted) setState(() => _note = moved);
-            },
+            onSelected: (_) => _delete(),
             itemBuilder: (_) => [
-              if (inHousehold && !_note.shared) const PopupMenuItem(value: 'share', child: Text('Haneyle paylaş')),
-              if (_note.shared) const PopupMenuItem(value: 'unshare', child: Text('Paylaşımı kaldır')),
               const PopupMenuItem(value: 'delete', child: Text('Sil')),
             ],
           ),
@@ -262,7 +251,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
             onReorder: (from, to) => _reorder([...open], from, to),
             children: [
               for (var i = 0; i < open.length; i++)
-                _ItemRow(key: ValueKey(open[i].id), item: open[i], index: i, onToggle: () => _toggle(open[i], me), repo: _repo, shared: _note.shared),
+                _ItemRow(key: ValueKey(open[i].id), item: open[i], index: i, onToggle: () => _toggle(open[i], me), repo: _repo),
             ],
           ),
           Row(children: [
@@ -291,8 +280,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
                 item: item,
                 onToggle: () => _toggle(item, me),
                 repo: _repo,
-                shared: _note.shared,
-                doneBy: _note.shared && members.length > 1 ? members[item.doneBy] : null,
+                doneBy: members.length > 1 ? members[item.doneBy] : null,
               ),
           ],
         ],
@@ -363,7 +351,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
 }
 
 class _ItemRow extends StatefulWidget {
-  const _ItemRow({super.key, required this.item, required this.onToggle, required this.repo, required this.shared, this.index, this.doneBy});
+  const _ItemRow({super.key, required this.item, required this.onToggle, required this.repo, this.index, this.doneBy});
   final NoteItem item;
 
   /// Initials of who ticked it (shared lists).
@@ -371,7 +359,6 @@ class _ItemRow extends StatefulWidget {
   final int? index;
   final VoidCallback onToggle;
   final NotesRepository repo;
-  final bool shared;
 
   @override
   State<_ItemRow> createState() => _ItemRowState();
@@ -398,7 +385,7 @@ class _ItemRowState extends State<_ItemRow> {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
       final i = widget.item;
-      widget.repo.saveItem(NoteItem(id: i.id, noteId: i.noteId, content: text, done: i.done, position: i.position, doneBy: i.doneBy), shared: widget.shared);
+      widget.repo.saveItem(NoteItem(id: i.id, noteId: i.noteId, content: text, done: i.done, position: i.position, doneBy: i.doneBy));
     });
   }
 

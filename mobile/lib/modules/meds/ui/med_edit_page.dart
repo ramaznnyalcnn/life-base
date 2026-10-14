@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../core/design_system/add_page_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/household/household_widgets.dart';
 import '../../../core/meds/medication.dart';
 import '../data/medications_repository.dart';
 
@@ -93,7 +94,8 @@ class _MedEditPageState extends ConsumerState<MedEditPage> {
         a.endsOn != b.endsOn ||
         a.stock != b.stock ||
         a.stockAlert != b.stockAlert ||
-        a.alarm != b.alarm;
+        a.alarm != b.alarm ||
+        a.notify != b.notify;
   }
 
   String? get _problem {
@@ -381,6 +383,8 @@ class _MedEditPageState extends ConsumerState<MedEditPage> {
               onMinus: _med.alarm.maxRepeats > 0 ? () => setState(() => _med = _med.copyWith(alarm: _med.alarm.copyWith(maxRepeats: _med.alarm.maxRepeats - 1))) : null,
               onPlus: _med.alarm.maxRepeats < maxAlarmRepeats ? () => setState(() => _med = _med.copyWith(alarm: _med.alarm.copyWith(maxRepeats: _med.alarm.maxRepeats + 1))) : null,
             ),
+            const SizedBox(height: 12),
+            NotifyTargetPicker(value: _med.notify, onChanged: (value) => setState(() => _med = _med.copyWith(notify: value))),
           ]),
         ],
       ]),

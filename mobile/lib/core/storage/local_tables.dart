@@ -31,6 +31,12 @@ class LocalEvents extends Table with SyncColumns {
 
   /// `[{"offsetMinutes": 10, "priority": "normal"}, {"at": "2026-10-09T08:00:00Z"}]`
   TextColumn get reminders => text().withDefault(const Constant('[]'))();
+
+  /// Household member who added it (user id); shown as a name tag.
+  IntColumn get createdBy => integer().nullable()();
+
+  /// Whose phone reminds: `all` or a user id.
+  TextColumn get notify => text().withDefault(const Constant('all'))();
 }
 
 class LocalMedications extends Table with SyncColumns {
@@ -55,6 +61,12 @@ class LocalMedications extends Table with SyncColumns {
   /// `{"fullScreen": true, "snoozeMinutes": 10, "repeatEveryMinutes": 5, "maxRepeats": 3}`
   TextColumn get alarm => text().withDefault(const Constant('{}'))();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
+
+  /// Household member who added it (user id); shown as a name tag.
+  IntColumn get createdBy => integer().nullable()();
+
+  /// Whose phone reminds: `all` or a user id.
+  TextColumn get notify => text().withDefault(const Constant('all'))();
 }
 
 /// One row per scheduled dose that was acted on. The id is
@@ -85,6 +97,9 @@ class LocalNotes extends Table with SyncColumns {
   TextColumn get eventId => text().nullable()();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
   TextColumn get space => text().withDefault(const Constant('me'))();
+
+  /// Household member who added it (user id); shown as a name tag.
+  IntColumn get createdBy => integer().nullable()();
 }
 
 /// Checklist lines, one document each, so two people can tick different

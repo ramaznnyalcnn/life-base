@@ -11,25 +11,32 @@ import '../../../core/providers.dart';
 import '../../../core/storage/app_database.dart';
 import '../../../core/sync/local_sync.dart';
 import '../../../core/sync/sync_controller.dart';
+import '../../../core/wallet/wallet_store.dart';
 
 final notesRepositoryProvider = Provider<NotesRepository>((ref) => NotesRepository(
       ref.watch(databaseProvider),
       events: ref.watch(eventsRepositoryProvider),
       defaultReminders: () => ref.read(defaultRemindersProvider),
       onChanged: () => ref.read(syncControllerProvider.notifier).requestSync(),
+      me: () => ref.read(walletMeProvider),
     ));
 
 /// Note and checklist writes; every write is stamped and queued for sync.
 class NotesRepository {
-  NotesRepository(this._db, {required EventsRepository events, required List<ReminderSpec> Function() defaultReminders, void Function()? onChanged})
+  NotesRepository(this._db,
+      {required EventsRepository events, required List<ReminderSpec> Function() defaultReminders, void Function()? onChanged, int Function()? me})
       : _events = events,
         _defaultReminders = defaultReminders,
-        _onChanged = onChanged ?? (() {});
+        _onChanged = onChanged ?? (() {}),
+        _me = me ?? (() => 0);
 
   final AppDatabase _db;
   final EventsRepository _events;
   final List<ReminderSpec> Function() _defaultReminders;
   final void Function() _onChanged;
+
+  /// This user's id (0 while unknown); stamped on notes they add.
+  final int Function() _me;
 
   String newId() => const Uuid().v4();
 
@@ -37,6 +44,7 @@ class NotesRepository {
   Future<LocalNoteItem?> _item(String id) => (_db.select(_db.localNoteItems)..where((t) => t.id.equals(id))).getSingleOrNull();
 
   Future<void> save(Note note) async {
+    final me = _me();
     await _db.transaction(() async {
       final previous = await _note(note.id);
       await _db.into(_db.localNotes).insertOnConflictUpdate(LocalNotesCompanion.insert(
@@ -51,7 +59,8 @@ class NotesRepository {
             color: Value(note.color),
             eventId: Value(note.eventId),
             archived: Value(note.archived),
-            space: Value(note.shared ? 'household' : 'me'),
+            space: const Value('household'),
+            createdBy: Value(previous?.createdBy ?? note.createdBy ?? (me == 0 ? null : me)),
           ));
     });
     await _syncEvent(note);
@@ -77,7 +86,7 @@ class NotesRepository {
 
   // Checklist ---------------------------------------------------------------
 
-  Future<void> saveItem(NoteItem item, {bool shared = false}) async {
+  Future<void> saveItem(NoteItem item) async {
     await _db.transaction(() async {
       final previous = await _item(item.id);
       await _db.into(_db.localNoteItems).insertOnConflictUpdate(LocalNoteItemsCompanion.insert(
@@ -90,7 +99,7 @@ class NotesRepository {
             done: Value(item.done),
             position: Value(item.position),
             doneBy: Value(item.doneBy),
-            space: Value(shared ? 'household' : 'me'),
+            space: const Value('household'),
           ));
     });
     _onChanged();
@@ -105,33 +114,6 @@ class NotesRepository {
           .write(LocalNoteItemsCompanion(deletedAtMs: Value(stamp), updatedAtMs: Value(stamp), dirty: const Value(true)));
     });
     _onChanged();
-  }
-
-  /// Moves a note (with its lines) into the household's shared space or back.
-  /// Documents cannot change space, so it is copied under new ids and the
-  /// old copy is deleted.
-  Future<Note> setShared(Note note, {required bool shared}) async {
-    if (note.shared == shared) return note;
-    final moved = Note(
-      id: newId(),
-      title: note.title,
-      body: note.body,
-      kind: note.kind,
-      pinned: note.pinned,
-      color: note.color,
-      eventId: note.eventId,
-      shared: shared,
-    );
-    final items = await (_db.select(_db.localNoteItems)..where((t) => t.noteId.equals(note.id) & t.deletedAtMs.isNull())).get();
-    await save(moved);
-    for (final item in items) {
-      await saveItem(
-        NoteItem(id: newId(), noteId: moved.id, content: item.content, done: item.done, position: item.position, doneBy: item.doneBy),
-        shared: shared,
-      );
-    }
-    await delete(note.id);
-    return moved;
   }
 
   // Calendar ----------------------------------------------------------------

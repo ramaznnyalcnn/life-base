@@ -10,6 +10,7 @@ import '../../../core/calendar/calendar_store.dart';
 import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/household/household_widgets.dart';
 import '../../../core/models/agenda.dart';
 import '../../../core/platform/device_calendar.dart';
 import 'calendar_format.dart';
@@ -457,6 +458,8 @@ class _ItemTile extends StatelessWidget {
                   Text(item.notes!.split('\n').first, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.muted, fontSize: 12)),
               ]),
             ),
+            if (item.occurrence case final occurrence?)
+              Padding(padding: const EdgeInsets.only(right: 6), child: OwnerTag(occurrence.event.createdBy)),
             if (item.isGoogle) Text('Google', style: TextStyle(color: t.muted, fontSize: 11, fontWeight: FontWeight.w700)),
             if (item.occurrence?.isRecurring ?? false) Icon(Icons.repeat_rounded, size: 16, color: t.muted),
             if (item.hasReminders)

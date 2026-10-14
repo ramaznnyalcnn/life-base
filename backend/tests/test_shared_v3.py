@@ -69,9 +69,16 @@ def test_members_tick_different_lines_of_one_list_at_once(setup_database):
     assert authors["i2"] == partner_id
 
 
-def test_only_notes_can_be_shared(setup_database):
+def test_the_household_shares_calendar_and_medications_too(setup_database):
     _, partner = household(setup_database)
-    assert push(doc("e1", {"title": "x"}, collection="events"), headers=partner).status_code == 400
+    event = doc("e1", {"title": "Diş", "created_by": 1, "notify": "all"}, collection="events")
+    dose = doc("m1@2026-10-09T09:00:00Z", {"medication_id": "m1", "status": "taken"}, collection="dose_logs")
+    assert push(event, doc("m1", {"name": "Parol"}, collection="medications"), dose).status_code == 200
+
+    pulled = {(c["collection"], c["id"]): c["body"] for c in pull(headers=partner).json()["changes"]}
+    assert pulled[("events", "e1")]["notify"] == "all"
+    assert ("medications", "m1") in pulled and ("dose_logs", "m1@2026-10-09T09:00:00Z") in pulled
+
 
 
 def test_leaving_stops_access_and_the_last_one_out_clears_the_space(setup_database):

@@ -8,6 +8,7 @@ import '../../../core/calendar/reminder_picker.dart';
 import '../../../core/design_system/add_page_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/household/household_widgets.dart';
 import '../../../core/calendar/events_repository.dart';
 import 'calendar_format.dart';
 import 'series_scope_dialog.dart';
@@ -83,6 +84,7 @@ class _EventEditPageState extends ConsumerState<EventEditPage> {
         now.color != was.color ||
         now.important != was.important ||
         now.recurrence != was.recurrence ||
+        now.notify != was.notify ||
         !_sameReminders(now.reminders, was.reminders);
   }
 
@@ -236,6 +238,8 @@ class _EventEditPageState extends ConsumerState<EventEditPage> {
               padding: const EdgeInsets.only(top: 8),
               child: Text('Tüm gün etkinliklerde süre, o günün 09:00’una göre hesaplanır.', style: TextStyle(color: t.muted, fontSize: 12)),
             ),
+          const SizedBox(height: 12),
+          NotifyTargetPicker(value: _event.notify, onChanged: (value) => setState(() => _event = _event.copyWith(notify: value))),
         ]),
       ]),
     );

@@ -1,4 +1,4 @@
-"""Household-shared documents (shared notes and checklists).
+"""Household-shared documents: calendar, medications, doses, notes, lists.
 
 Same push/pull contract as /sync, but the documents belong to the caller's
 household. Only members may use it; a client whose household changed gets a
@@ -18,7 +18,7 @@ from app.services.sync import household_space, pull_changes, push_changes
 
 router = APIRouter(prefix="/shared", tags=["shared-v3"])
 
-SHARED_COLLECTIONS = frozenset({"notes", "note_items"})
+SHARED_COLLECTIONS = frozenset({"events", "medications", "dose_logs", "notes", "note_items"})
 
 
 def _space(db: Session, user: User):

@@ -53,7 +53,7 @@ class FakeServer implements SyncTransport {
 
 class Device {
   Device(FakeServer server) : db = AppDatabase(executor: NativeDatabase.memory()) {
-    engine = LocalSyncEngine(database: db, transport: server, collections: localSyncCollections(db));
+    engine = LocalSyncEngine(database: db, transport: server, collections: sharedSyncCollections(db));
   }
 
   final AppDatabase db;
@@ -157,10 +157,10 @@ void main() {
 
   test('an edit made while a push is in flight stays dirty', () async {
     await phone.saveEvent('e1', 'sent', at: 1000);
-    final sent = (await localSyncCollections(phone.db).first.dirty()).single;
+    final sent = (await sharedSyncCollections(phone.db).first.dirty()).single;
     await phone.saveEvent('e1', 'typed after sending', at: 1001);
 
-    await localSyncCollections(phone.db).first.markClean(sent);
+    await sharedSyncCollections(phone.db).first.markClean(sent);
 
     expect((await phone.event('e1'))!.dirty, isTrue);
   });

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart';
 
+import '../household/household.dart';
 import '../storage/app_database.dart';
 
 enum ScheduleMode { times, weekdays, everyNDays, everyNHours, asNeeded }
@@ -135,6 +136,8 @@ class Medication {
     this.stockAlert,
     this.alarm = const AlarmSettings(),
     this.active = true,
+    this.createdBy,
+    this.notify = notifyAll,
   });
 
   factory Medication.fromRow(LocalMedication row) => Medication(
@@ -152,6 +155,8 @@ class Medication {
         stockAlert: row.stockAlert,
         alarm: AlarmSettings.fromJson(Map<String, Object?>.from(jsonDecode(row.alarm) as Map)),
         active: row.active,
+        createdBy: row.createdBy,
+        notify: row.notify,
       );
 
   final String id;
@@ -170,6 +175,12 @@ class Medication {
   final double? stockAlert;
   final AlarmSettings alarm;
   final bool active;
+
+  /// Household member who added it.
+  final int? createdBy;
+
+  /// Whose phone rings: [notifyAll] or a user id.
+  final String notify;
 
   bool get lowStock => stock != null && stockAlert != null && stock! <= stockAlert!;
   bool get asNeeded => schedule.mode == ScheduleMode.asNeeded;
@@ -199,6 +210,8 @@ class Medication {
     bool clearStockAlert = false,
     AlarmSettings? alarm,
     bool? active,
+    int? createdBy,
+    String? notify,
   }) =>
       Medication(
         id: id ?? this.id,
@@ -215,6 +228,8 @@ class Medication {
         stockAlert: clearStockAlert ? null : stockAlert ?? this.stockAlert,
         alarm: alarm ?? this.alarm,
         active: active ?? this.active,
+        createdBy: createdBy ?? this.createdBy,
+        notify: notify ?? this.notify,
       );
 
   LocalMedicationsCompanion toRow(int stampMs) => LocalMedicationsCompanion.insert(
@@ -232,6 +247,8 @@ class Medication {
         stockAlert: Value(stockAlert),
         alarm: Value(jsonEncode(alarm.toJson())),
         active: Value(active),
+        createdBy: Value(createdBy),
+        notify: Value(notify),
         updatedAtMs: stampMs,
         deletedAtMs: const Value(null),
         dirty: const Value(true),

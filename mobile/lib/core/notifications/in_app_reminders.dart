@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import '../calendar/calendar_reminders.dart';
 import '../calendar/calendar_store.dart';
+import '../household/household.dart';
 import '../meds/med_reminders.dart';
 import '../meds/meds_store.dart';
 import '../wallet/payment_reminders.dart';
@@ -37,8 +38,9 @@ final inAppReminderSyncProvider = Provider<void>((ref) {
       from: last,
       to: now,
       plan: (from) => [
-        ...planCalendarReminders(ref.read(localEventsProvider).value ?? const [], from),
-        ...planMedReminders(ref.read(localMedicationsProvider).value ?? const [], ref.read(doseLogsProvider).value ?? const {}, from),
+        ...planCalendarReminders(remindedHere(ref.read(localEventsProvider).value ?? const [], (e) => e.notify, ref.read(walletMeProvider)), from),
+        ...planMedReminders(remindedHere(ref.read(localMedicationsProvider).value ?? const [], (m) => m.notify, ref.read(walletMeProvider)),
+            ref.read(doseLogsProvider).value ?? const {}, from),
         ...planPaymentReminders(ref.read(walletProvider).value?.payments.values ?? const [], from),
       ],
     );

@@ -80,7 +80,8 @@ class _AccountEditPageState extends ConsumerState<AccountEditPage> {
     _network = a?.network;
     _statementDay = a?.statementDay;
     _dueDay = a?.dueDay;
-    _shared = a?.shared ?? false;
+    // Everything is shared in a household; a personal account is the exception.
+    _shared = a?.shared ?? (ref.read(walletScopeProvider).value ?? '').startsWith('h:');
     _bridge = ref.read(platformBridgeProvider);
     _secretsOpen = a == null;
     for (final c in [_name, _bank, _balance, _limit, _last4, _iban, ..._secretFields]) {

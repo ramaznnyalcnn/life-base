@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/household/household_widgets.dart';
 import '../../../core/meds/medication.dart';
 import '../../../core/meds/meds_store.dart';
 import '../../../core/storage/app_database.dart';
@@ -51,6 +52,7 @@ class MedDetailPage extends ConsumerWidget {
           Expanded(
             child: Text(med.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: t.onBase)),
           ),
+          OwnerTag(med.createdBy),
         ]),
         const SizedBox(height: 20),
         _InfoRow(icon: Icons.medication_liquid_rounded, text: '${med.doseLabel} · ${medForms[med.form] ?? med.form}'),

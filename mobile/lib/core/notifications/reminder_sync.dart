@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import '../calendar/calendar_reminders.dart';
 import '../calendar/calendar_store.dart';
+import '../household/household.dart';
 import '../meds/med_reminders.dart';
 import '../meds/meds_store.dart';
 import '../providers.dart';
@@ -35,7 +36,8 @@ final calendarReminderSyncProvider = Provider<void>((ref) {
     final port = await ref.read(notificationPortProvider.future);
     final events = ref.read(localEventsProvider).value;
     if (port == null || events == null) return;
-    await reconcileNotifications(port, calendarNotificationGroup, planCalendarReminders(events, DateTime.now()));
+    final mine = remindedHere(events, (e) => e.notify, ref.read(walletMeProvider));
+    await reconcileNotifications(port, calendarNotificationGroup, planCalendarReminders(mine, DateTime.now()));
   }
 
   void schedule() {
@@ -46,6 +48,7 @@ final calendarReminderSyncProvider = Provider<void>((ref) {
   ref.listen(localEventsProvider, (_, next) {
     if (next.hasValue) schedule();
   }, fireImmediately: true);
+  ref.listen(walletMeProvider, (_, _) => schedule());
   final lifecycle = AppLifecycleListener(onResume: schedule);
   ref.onDispose(() {
     debounce?.cancel();
@@ -97,7 +100,7 @@ final medReminderSyncProvider = Provider<void>((ref) {
     for (final id in answeredShownAlarms(await port.shown(), logs, now)) {
       await port.cancel(id);
     }
-    final planned = planMedReminders(meds, logs, now);
+    final planned = planMedReminders(remindedHere(meds, (m) => m.notify, ref.read(walletMeProvider)), logs, now);
     await reconcileNotifications(port, medNotificationGroup, planned);
     nextRing?.cancel();
     final next = planned.where((n) => n.at.isAfter(now)).firstOrNull;
@@ -122,6 +125,7 @@ final medReminderSyncProvider = Provider<void>((ref) {
   ref.listen(doseLogsProvider, (_, next) {
     if (next.hasValue) schedule();
   }, fireImmediately: true);
+  ref.listen(walletMeProvider, (_, _) => schedule());
   final lifecycle = AppLifecycleListener(onResume: schedule);
   ref.onDispose(() {
     debounce?.cancel();

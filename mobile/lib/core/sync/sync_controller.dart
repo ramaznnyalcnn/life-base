@@ -31,7 +31,7 @@ final localSyncEngineProvider = Provider<LocalSyncEngine?>((ref) {
 const _sharedScopeKey = 'shared.scope';
 const _sharedCursorKey = 'shared.cursor';
 
-/// The household's shared notes and lists (only while in a household).
+/// Everything local-first, shared with the household (only while in one).
 final sharedSyncEngineProvider = Provider<LocalSyncEngine?>((ref) {
   final api = ref.watch(apiClientProvider);
   if (api == null) return null;
@@ -42,7 +42,13 @@ final sharedSyncEngineProvider = Provider<LocalSyncEngine?>((ref) {
       api,
       readScope: () => db.syncState(_sharedScopeKey),
       onReset: (scope) async {
-        await clearSharedSpace(db);
+        // First household on this phone: bring its data along. A different
+        // household: start from what that one has.
+        if ((await db.syncState(_sharedScopeKey) ?? '').isEmpty) {
+          await adoptIntoHousehold(db);
+        } else {
+          await clearSharedSpace(db);
+        }
         await db.setSyncState(_sharedScopeKey, scope);
       },
     ),
@@ -90,13 +96,17 @@ class SyncController extends Notifier<SyncStatus> {
     return const SyncStatus();
   }
 
-  /// Shared lists follow the household the wallet pull reported. Best effort:
+  /// Shared data follows the household the wallet pull reported. Best effort:
   /// a failure here is retried next time and does not mark sync as failed.
   Future<void> _syncShared() async {
     final db = ref.read(databaseProvider);
     final inHousehold = (await db.syncState('wallet.scope'))?.startsWith('h:') ?? false;
     if (inHousehold) {
-      await ref.read(sharedSyncEngineProvider)?.run();
+      final engine = ref.read(sharedSyncEngineProvider);
+      final joining = (await db.syncState(_sharedScopeKey) ?? '').isEmpty;
+      await engine?.run();
+      // Joining queues this phone's data during the pull; send it now.
+      if (joining) await engine?.run();
     } else if ((await db.syncState(_sharedScopeKey) ?? '').isNotEmpty) {
       await clearSharedSpace(db);
       await db.setSyncState(_sharedScopeKey, '');

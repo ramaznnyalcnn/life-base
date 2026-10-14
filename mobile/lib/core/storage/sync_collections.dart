@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../household/household.dart';
 import '../sync/local_sync.dart';
 import 'app_database.dart';
 
@@ -19,6 +20,8 @@ DateTime? _date(Object? value) => value is String ? DateTime.tryParse(value)?.to
 double? _num(Object? value) => value is num ? value.toDouble() : null;
 Object? _json(String? raw) => raw == null ? null : jsonDecode(raw);
 String? _encode(Object? value) => value == null ? null : jsonEncode(value);
+int? _int(Object? value) => value is num ? value.toInt() : null;
+String _notify(Object? value) => value is String && value.isNotEmpty ? value : notifyAll;
 
 final eventCodec = SyncRowCodec<LocalEvent>(
   meta: (r) => (id: r.id, updatedAtMs: r.updatedAtMs, deletedAtMs: r.deletedAtMs, dirty: r.dirty),
@@ -32,6 +35,8 @@ final eventCodec = SyncRowCodec<LocalEvent>(
     'important': r.important,
     'recurrence': _json(r.recurrence),
     'reminders': _json(r.reminders),
+    'created_by': r.createdBy,
+    'notify': r.notify,
   },
   fromBody: (id, b, ms) => LocalEventsCompanion.insert(
     id: id,
@@ -45,6 +50,8 @@ final eventCodec = SyncRowCodec<LocalEvent>(
     important: Value(b['important'] == true),
     recurrence: Value(_encode(b['recurrence'])),
     reminders: Value(_encode(b['reminders'] ?? const []) ?? '[]'),
+    createdBy: Value(_int(b['created_by'])),
+    notify: Value(_notify(b['notify'])),
   ),
 );
 
@@ -64,6 +71,8 @@ final medicationCodec = SyncRowCodec<LocalMedication>(
     'stock_alert': r.stockAlert,
     'alarm': _json(r.alarm),
     'active': r.active,
+    'created_by': r.createdBy,
+    'notify': r.notify,
   },
   fromBody: (id, b, ms) => LocalMedicationsCompanion.insert(
     id: id,
@@ -81,6 +90,8 @@ final medicationCodec = SyncRowCodec<LocalMedication>(
     stockAlert: Value(_num(b['stock_alert'])),
     alarm: Value(_encode(b['alarm'] ?? const {}) ?? '{}'),
     active: Value(b['active'] != false),
+    createdBy: Value(_int(b['created_by'])),
+    notify: Value(_notify(b['notify'])),
   ),
 );
 
@@ -115,6 +126,7 @@ SyncRowCodec<LocalNote> noteCodecFor(String space) => SyncRowCodec<LocalNote>(
     'color': r.color,
     'event_id': r.eventId,
     'archived': r.archived,
+    'created_by': r.createdBy,
   },
   fromBody: (id, b, ms) => LocalNotesCompanion.insert(
     id: id,
@@ -127,6 +139,7 @@ SyncRowCodec<LocalNote> noteCodecFor(String space) => SyncRowCodec<LocalNote>(
     eventId: Value(b['event_id'] as String?),
     archived: Value(b['archived'] == true),
     space: Value(space),
+    createdBy: Value(_int(b['created_by'])),
   ),
 );
 
@@ -151,22 +164,35 @@ SyncRowCodec<LocalNoteItem> noteItemCodecFor(String space) => SyncRowCodec<Local
   ),
 );
 
-List<SyncCollection> localSyncCollections(AppDatabase db) => [
+/// Backed up to this account alone: nothing any more, everything is
+/// household-shared (see [sharedSyncCollections]).
+List<SyncCollection> localSyncCollections(AppDatabase db) => const [];
+
+/// What the household shares: everything local-first.
+List<SyncCollection> sharedSyncCollections(AppDatabase db) => [
       DriftSyncCollection(db, db.localEvents, SyncCollections.events, eventCodec),
       DriftSyncCollection(db, db.localMedications, SyncCollections.medications, medicationCodec),
       DriftSyncCollection(db, db.localDoseLogs, SyncCollections.doseLogs, doseLogCodec),
-      DriftSyncCollection(db, db.localNotes, SyncCollections.notes, noteCodecFor('me'), filter: (t) => t.space.equals('me')),
-      DriftSyncCollection(db, db.localNoteItems, SyncCollections.noteItems, noteItemCodecFor('me'), filter: (t) => t.space.equals('me')),
+      DriftSyncCollection(db, db.localNotes, SyncCollections.notes, noteCodecFor('household')),
+      DriftSyncCollection(db, db.localNoteItems, SyncCollections.noteItems, noteItemCodecFor('household')),
     ];
 
-/// What the household shares: its notes and checklist lines.
-List<SyncCollection> sharedSyncCollections(AppDatabase db) => [
-      DriftSyncCollection(db, db.localNotes, SyncCollections.notes, noteCodecFor('household'), filter: (t) => t.space.equals('household')),
-      DriftSyncCollection(db, db.localNoteItems, SyncCollections.noteItems, noteItemCodecFor('household'), filter: (t) => t.space.equals('household')),
-    ];
+/// Joined a household for the first time: this phone's data goes to it.
+/// Every row is queued again, notes from before sharing included.
+Future<void> adoptIntoHousehold(AppDatabase db) => db.transaction(() async {
+      await db.update(db.localEvents).write(const LocalEventsCompanion(dirty: Value(true)));
+      await db.update(db.localMedications).write(const LocalMedicationsCompanion(dirty: Value(true)));
+      await db.update(db.localDoseLogs).write(const LocalDoseLogsCompanion(dirty: Value(true)));
+      await db.update(db.localNotes).write(const LocalNotesCompanion(dirty: Value(true), space: Value('household')));
+      await db.update(db.localNoteItems).write(const LocalNoteItemsCompanion(dirty: Value(true), space: Value('household')));
+    });
 
-/// Drops every shared note and line (left the household, or it changed).
+/// Drops the shared data the server has (left the household, or it
+/// changed). Unsent edits stay and go to whichever household comes next.
 Future<void> clearSharedSpace(AppDatabase db) => db.transaction(() async {
-      await (db.delete(db.localNotes)..where((t) => t.space.equals('household'))).go();
-      await (db.delete(db.localNoteItems)..where((t) => t.space.equals('household'))).go();
+      await (db.delete(db.localEvents)..where((t) => t.dirty.not())).go();
+      await (db.delete(db.localMedications)..where((t) => t.dirty.not())).go();
+      await (db.delete(db.localDoseLogs)..where((t) => t.dirty.not())).go();
+      await (db.delete(db.localNotes)..where((t) => t.dirty.not())).go();
+      await (db.delete(db.localNoteItems)..where((t) => t.dirty.not())).go();
     });

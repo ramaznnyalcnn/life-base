@@ -7,6 +7,7 @@ import '../providers.dart';
 import '../storage/app_database.dart';
 import '../sync/local_sync.dart';
 import '../sync/sync_controller.dart';
+import '../wallet/wallet_store.dart';
 
 /// Which part of a repeating series an edit or delete applies to.
 enum SeriesScope { thisOne, thisAndFollowing, all }
@@ -14,17 +15,22 @@ enum SeriesScope { thisOne, thisAndFollowing, all }
 final eventsRepositoryProvider = Provider<EventsRepository>((ref) => EventsRepository(
       ref.watch(databaseProvider),
       onChanged: () => ref.read(syncControllerProvider.notifier).requestSync(),
+      me: () => ref.read(walletMeProvider),
     ));
 
 /// All calendar writes. Every write stamps the row and marks it for sync.
 class EventsRepository {
-  EventsRepository(this._db, {void Function()? onChanged, String Function()? newId})
+  EventsRepository(this._db, {void Function()? onChanged, String Function()? newId, int Function()? me})
       : _onChanged = onChanged ?? (() {}),
-        _newId = newId ?? (() => const Uuid().v4());
+        _newId = newId ?? (() => const Uuid().v4()),
+        _me = me ?? (() => 0);
 
   final AppDatabase _db;
   final void Function() _onChanged;
   final String Function() _newId;
+
+  /// This user's id (0 while unknown); stamped on events they add.
+  final int Function() _me;
 
   String newId() => _newId();
 
@@ -34,7 +40,8 @@ class EventsRepository {
   }
 
   Future<void> save(CalendarEvent event) async {
-    await _db.transaction(() => _write(event));
+    final me = _me();
+    await _db.transaction(() => _write(event, me));
     _onChanged();
   }
 
@@ -65,14 +72,15 @@ class EventsRepository {
       ));
       return;
     }
+    final me = _me();
     await _db.transaction(() async {
       final day = _day(occurrence.start);
       if (scope == SeriesScope.thisOne) {
-        await _write(series.copyWith(recurrence: series.recurrence!.copyWith(exdates: [...series.recurrence!.exdates, day])));
-        await _write(edited.copyWith(id: newId(), clearRecurrence: true));
+        await _write(series.copyWith(recurrence: series.recurrence!.copyWith(exdates: [...series.recurrence!.exdates, day])), me);
+        await _write(edited.copyWith(id: newId(), clearRecurrence: true), me);
       } else {
-        await _write(series.copyWith(recurrence: series.recurrence!.copyWith(until: day.subtract(const Duration(days: 1)))));
-        await _write(edited.copyWith(id: newId(), recurrence: edited.recurrence ?? series.recurrence));
+        await _write(series.copyWith(recurrence: series.recurrence!.copyWith(until: day.subtract(const Duration(days: 1)))), me);
+        await _write(edited.copyWith(id: newId(), recurrence: edited.recurrence ?? series.recurrence), me);
       }
     });
     _onChanged();
@@ -91,9 +99,12 @@ class EventsRepository {
     await save(series.copyWith(recurrence: rule));
   }
 
-  Future<void> _write(CalendarEvent event) async {
+  /// [me] is read before the transaction: the provider behind it queries
+  /// the database, which would wait for the transaction to end.
+  Future<void> _write(CalendarEvent event, int me) async {
     final previous = await (_db.select(_db.localEvents)..where((t) => t.id.equals(event.id))).getSingleOrNull();
-    await _db.into(_db.localEvents).insertOnConflictUpdate(event.toRow(nextStamp(previous?.updatedAtMs)));
+    final owner = previous?.createdBy ?? event.createdBy ?? (me == 0 ? null : me);
+    await _db.into(_db.localEvents).insertOnConflictUpdate(event.copyWith(createdBy: owner).toRow(nextStamp(previous?.updatedAtMs)));
   }
 
   static bool _isFirst(EventOccurrence occurrence) => _day(occurrence.start) == _day(occurrence.event.startsAt);

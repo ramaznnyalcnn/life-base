@@ -894,6 +894,27 @@ class $LocalEventsTable extends LocalEvents
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _createdByMeta = const VerificationMeta(
+    'createdBy',
+  );
+  @override
+  late final GeneratedColumn<int> createdBy = GeneratedColumn<int>(
+    'created_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notifyMeta = const VerificationMeta('notify');
+  @override
+  late final GeneratedColumn<String> notify = GeneratedColumn<String>(
+    'notify',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('all'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -909,6 +930,8 @@ class $LocalEventsTable extends LocalEvents
     important,
     recurrence,
     reminders,
+    createdBy,
+    notify,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1011,6 +1034,18 @@ class $LocalEventsTable extends LocalEvents
         reminders.isAcceptableOrUnknown(data['reminders']!, _remindersMeta),
       );
     }
+    if (data.containsKey('created_by')) {
+      context.handle(
+        _createdByMeta,
+        createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta),
+      );
+    }
+    if (data.containsKey('notify')) {
+      context.handle(
+        _notifyMeta,
+        notify.isAcceptableOrUnknown(data['notify']!, _notifyMeta),
+      );
+    }
     return context;
   }
 
@@ -1072,6 +1107,14 @@ class $LocalEventsTable extends LocalEvents
         DriftSqlType.string,
         data['${effectivePrefix}reminders'],
       )!,
+      createdBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_by'],
+      ),
+      notify: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notify'],
+      )!,
     );
   }
 
@@ -1099,6 +1142,12 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
 
   /// `[{"offsetMinutes": 10, "priority": "normal"}, {"at": "2026-10-09T08:00:00Z"}]`
   final String reminders;
+
+  /// Household member who added it (user id); shown as a name tag.
+  final int? createdBy;
+
+  /// Whose phone reminds: `all` or a user id.
+  final String notify;
   const LocalEvent({
     required this.id,
     required this.updatedAtMs,
@@ -1113,6 +1162,8 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
     required this.important,
     this.recurrence,
     required this.reminders,
+    this.createdBy,
+    required this.notify,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1140,6 +1191,10 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
       map['recurrence'] = Variable<String>(recurrence);
     }
     map['reminders'] = Variable<String>(reminders);
+    if (!nullToAbsent || createdBy != null) {
+      map['created_by'] = Variable<int>(createdBy);
+    }
+    map['notify'] = Variable<String>(notify);
     return map;
   }
 
@@ -1168,6 +1223,10 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
           ? const Value.absent()
           : Value(recurrence),
       reminders: Value(reminders),
+      createdBy: createdBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdBy),
+      notify: Value(notify),
     );
   }
 
@@ -1190,6 +1249,8 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
       important: serializer.fromJson<bool>(json['important']),
       recurrence: serializer.fromJson<String?>(json['recurrence']),
       reminders: serializer.fromJson<String>(json['reminders']),
+      createdBy: serializer.fromJson<int?>(json['createdBy']),
+      notify: serializer.fromJson<String>(json['notify']),
     );
   }
   @override
@@ -1209,6 +1270,8 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
       'important': serializer.toJson<bool>(important),
       'recurrence': serializer.toJson<String?>(recurrence),
       'reminders': serializer.toJson<String>(reminders),
+      'createdBy': serializer.toJson<int?>(createdBy),
+      'notify': serializer.toJson<String>(notify),
     };
   }
 
@@ -1226,6 +1289,8 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
     bool? important,
     Value<String?> recurrence = const Value.absent(),
     String? reminders,
+    Value<int?> createdBy = const Value.absent(),
+    String? notify,
   }) => LocalEvent(
     id: id ?? this.id,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
@@ -1240,6 +1305,8 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
     important: important ?? this.important,
     recurrence: recurrence.present ? recurrence.value : this.recurrence,
     reminders: reminders ?? this.reminders,
+    createdBy: createdBy.present ? createdBy.value : this.createdBy,
+    notify: notify ?? this.notify,
   );
   LocalEvent copyWithCompanion(LocalEventsCompanion data) {
     return LocalEvent(
@@ -1262,6 +1329,8 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
           ? data.recurrence.value
           : this.recurrence,
       reminders: data.reminders.present ? data.reminders.value : this.reminders,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
+      notify: data.notify.present ? data.notify.value : this.notify,
     );
   }
 
@@ -1280,7 +1349,9 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
           ..write('color: $color, ')
           ..write('important: $important, ')
           ..write('recurrence: $recurrence, ')
-          ..write('reminders: $reminders')
+          ..write('reminders: $reminders, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('notify: $notify')
           ..write(')'))
         .toString();
   }
@@ -1300,6 +1371,8 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
     important,
     recurrence,
     reminders,
+    createdBy,
+    notify,
   );
   @override
   bool operator ==(Object other) =>
@@ -1317,7 +1390,9 @@ class LocalEvent extends DataClass implements Insertable<LocalEvent> {
           other.color == this.color &&
           other.important == this.important &&
           other.recurrence == this.recurrence &&
-          other.reminders == this.reminders);
+          other.reminders == this.reminders &&
+          other.createdBy == this.createdBy &&
+          other.notify == this.notify);
 }
 
 class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
@@ -1334,6 +1409,8 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
   final Value<bool> important;
   final Value<String?> recurrence;
   final Value<String> reminders;
+  final Value<int?> createdBy;
+  final Value<String> notify;
   final Value<int> rowid;
   const LocalEventsCompanion({
     this.id = const Value.absent(),
@@ -1349,6 +1426,8 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
     this.important = const Value.absent(),
     this.recurrence = const Value.absent(),
     this.reminders = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.notify = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalEventsCompanion.insert({
@@ -1365,6 +1444,8 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
     this.important = const Value.absent(),
     this.recurrence = const Value.absent(),
     this.reminders = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.notify = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        updatedAtMs = Value(updatedAtMs),
@@ -1384,6 +1465,8 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
     Expression<bool>? important,
     Expression<String>? recurrence,
     Expression<String>? reminders,
+    Expression<int>? createdBy,
+    Expression<String>? notify,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1400,6 +1483,8 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
       if (important != null) 'important': important,
       if (recurrence != null) 'recurrence': recurrence,
       if (reminders != null) 'reminders': reminders,
+      if (createdBy != null) 'created_by': createdBy,
+      if (notify != null) 'notify': notify,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1418,6 +1503,8 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
     Value<bool>? important,
     Value<String?>? recurrence,
     Value<String>? reminders,
+    Value<int?>? createdBy,
+    Value<String>? notify,
     Value<int>? rowid,
   }) {
     return LocalEventsCompanion(
@@ -1434,6 +1521,8 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
       important: important ?? this.important,
       recurrence: recurrence ?? this.recurrence,
       reminders: reminders ?? this.reminders,
+      createdBy: createdBy ?? this.createdBy,
+      notify: notify ?? this.notify,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1480,6 +1569,12 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
     if (reminders.present) {
       map['reminders'] = Variable<String>(reminders.value);
     }
+    if (createdBy.present) {
+      map['created_by'] = Variable<int>(createdBy.value);
+    }
+    if (notify.present) {
+      map['notify'] = Variable<String>(notify.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1502,6 +1597,8 @@ class LocalEventsCompanion extends UpdateCompanion<LocalEvent> {
           ..write('important: $important, ')
           ..write('recurrence: $recurrence, ')
           ..write('reminders: $reminders, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('notify: $notify, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1695,6 +1792,27 @@ class $LocalMedicationsTable extends LocalMedications
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _createdByMeta = const VerificationMeta(
+    'createdBy',
+  );
+  @override
+  late final GeneratedColumn<int> createdBy = GeneratedColumn<int>(
+    'created_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notifyMeta = const VerificationMeta('notify');
+  @override
+  late final GeneratedColumn<String> notify = GeneratedColumn<String>(
+    'notify',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('all'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1714,6 +1832,8 @@ class $LocalMedicationsTable extends LocalMedications
     stockAlert,
     alarm,
     active,
+    createdBy,
+    notify,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1845,6 +1965,18 @@ class $LocalMedicationsTable extends LocalMedications
         active.isAcceptableOrUnknown(data['active']!, _activeMeta),
       );
     }
+    if (data.containsKey('created_by')) {
+      context.handle(
+        _createdByMeta,
+        createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta),
+      );
+    }
+    if (data.containsKey('notify')) {
+      context.handle(
+        _notifyMeta,
+        notify.isAcceptableOrUnknown(data['notify']!, _notifyMeta),
+      );
+    }
     return context;
   }
 
@@ -1922,6 +2054,14 @@ class $LocalMedicationsTable extends LocalMedications
         DriftSqlType.bool,
         data['${effectivePrefix}active'],
       )!,
+      createdBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_by'],
+      ),
+      notify: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notify'],
+      )!,
     );
   }
 
@@ -1957,6 +2097,12 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
   /// `{"fullScreen": true, "snoozeMinutes": 10, "repeatEveryMinutes": 5, "maxRepeats": 3}`
   final String alarm;
   final bool active;
+
+  /// Household member who added it (user id); shown as a name tag.
+  final int? createdBy;
+
+  /// Whose phone reminds: `all` or a user id.
+  final String notify;
   const LocalMedication({
     required this.id,
     required this.updatedAtMs,
@@ -1975,6 +2121,8 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
     this.stockAlert,
     required this.alarm,
     required this.active,
+    this.createdBy,
+    required this.notify,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2008,6 +2156,10 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
     }
     map['alarm'] = Variable<String>(alarm);
     map['active'] = Variable<bool>(active);
+    if (!nullToAbsent || createdBy != null) {
+      map['created_by'] = Variable<int>(createdBy);
+    }
+    map['notify'] = Variable<String>(notify);
     return map;
   }
 
@@ -2042,6 +2194,10 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
           : Value(stockAlert),
       alarm: Value(alarm),
       active: Value(active),
+      createdBy: createdBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdBy),
+      notify: Value(notify),
     );
   }
 
@@ -2068,6 +2224,8 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
       stockAlert: serializer.fromJson<double?>(json['stockAlert']),
       alarm: serializer.fromJson<String>(json['alarm']),
       active: serializer.fromJson<bool>(json['active']),
+      createdBy: serializer.fromJson<int?>(json['createdBy']),
+      notify: serializer.fromJson<String>(json['notify']),
     );
   }
   @override
@@ -2091,6 +2249,8 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
       'stockAlert': serializer.toJson<double?>(stockAlert),
       'alarm': serializer.toJson<String>(alarm),
       'active': serializer.toJson<bool>(active),
+      'createdBy': serializer.toJson<int?>(createdBy),
+      'notify': serializer.toJson<String>(notify),
     };
   }
 
@@ -2112,6 +2272,8 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
     Value<double?> stockAlert = const Value.absent(),
     String? alarm,
     bool? active,
+    Value<int?> createdBy = const Value.absent(),
+    String? notify,
   }) => LocalMedication(
     id: id ?? this.id,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
@@ -2130,6 +2292,8 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
     stockAlert: stockAlert.present ? stockAlert.value : this.stockAlert,
     alarm: alarm ?? this.alarm,
     active: active ?? this.active,
+    createdBy: createdBy.present ? createdBy.value : this.createdBy,
+    notify: notify ?? this.notify,
   );
   LocalMedication copyWithCompanion(LocalMedicationsCompanion data) {
     return LocalMedication(
@@ -2160,6 +2324,8 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
           : this.stockAlert,
       alarm: data.alarm.present ? data.alarm.value : this.alarm,
       active: data.active.present ? data.active.value : this.active,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
+      notify: data.notify.present ? data.notify.value : this.notify,
     );
   }
 
@@ -2182,7 +2348,9 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
           ..write('stock: $stock, ')
           ..write('stockAlert: $stockAlert, ')
           ..write('alarm: $alarm, ')
-          ..write('active: $active')
+          ..write('active: $active, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('notify: $notify')
           ..write(')'))
         .toString();
   }
@@ -2206,6 +2374,8 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
     stockAlert,
     alarm,
     active,
+    createdBy,
+    notify,
   );
   @override
   bool operator ==(Object other) =>
@@ -2227,7 +2397,9 @@ class LocalMedication extends DataClass implements Insertable<LocalMedication> {
           other.stock == this.stock &&
           other.stockAlert == this.stockAlert &&
           other.alarm == this.alarm &&
-          other.active == this.active);
+          other.active == this.active &&
+          other.createdBy == this.createdBy &&
+          other.notify == this.notify);
 }
 
 class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
@@ -2248,6 +2420,8 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
   final Value<double?> stockAlert;
   final Value<String> alarm;
   final Value<bool> active;
+  final Value<int?> createdBy;
+  final Value<String> notify;
   final Value<int> rowid;
   const LocalMedicationsCompanion({
     this.id = const Value.absent(),
@@ -2267,6 +2441,8 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
     this.stockAlert = const Value.absent(),
     this.alarm = const Value.absent(),
     this.active = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.notify = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalMedicationsCompanion.insert({
@@ -2287,6 +2463,8 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
     this.stockAlert = const Value.absent(),
     this.alarm = const Value.absent(),
     this.active = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.notify = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        updatedAtMs = Value(updatedAtMs),
@@ -2311,6 +2489,8 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
     Expression<double>? stockAlert,
     Expression<String>? alarm,
     Expression<bool>? active,
+    Expression<int>? createdBy,
+    Expression<String>? notify,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2331,6 +2511,8 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
       if (stockAlert != null) 'stock_alert': stockAlert,
       if (alarm != null) 'alarm': alarm,
       if (active != null) 'active': active,
+      if (createdBy != null) 'created_by': createdBy,
+      if (notify != null) 'notify': notify,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2353,6 +2535,8 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
     Value<double?>? stockAlert,
     Value<String>? alarm,
     Value<bool>? active,
+    Value<int?>? createdBy,
+    Value<String>? notify,
     Value<int>? rowid,
   }) {
     return LocalMedicationsCompanion(
@@ -2373,6 +2557,8 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
       stockAlert: stockAlert ?? this.stockAlert,
       alarm: alarm ?? this.alarm,
       active: active ?? this.active,
+      createdBy: createdBy ?? this.createdBy,
+      notify: notify ?? this.notify,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2431,6 +2617,12 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
     if (active.present) {
       map['active'] = Variable<bool>(active.value);
     }
+    if (createdBy.present) {
+      map['created_by'] = Variable<int>(createdBy.value);
+    }
+    if (notify.present) {
+      map['notify'] = Variable<String>(notify.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2457,6 +2649,8 @@ class LocalMedicationsCompanion extends UpdateCompanion<LocalMedication> {
           ..write('stockAlert: $stockAlert, ')
           ..write('alarm: $alarm, ')
           ..write('active: $active, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('notify: $notify, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7572,6 +7766,17 @@ class $LocalNotesTable extends LocalNotes
     requiredDuringInsert: false,
     defaultValue: const Constant('me'),
   );
+  static const VerificationMeta _createdByMeta = const VerificationMeta(
+    'createdBy',
+  );
+  @override
+  late final GeneratedColumn<int> createdBy = GeneratedColumn<int>(
+    'created_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -7586,6 +7791,7 @@ class $LocalNotesTable extends LocalNotes
     eventId,
     archived,
     space,
+    createdBy,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -7678,6 +7884,12 @@ class $LocalNotesTable extends LocalNotes
         space.isAcceptableOrUnknown(data['space']!, _spaceMeta),
       );
     }
+    if (data.containsKey('created_by')) {
+      context.handle(
+        _createdByMeta,
+        createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta),
+      );
+    }
     return context;
   }
 
@@ -7735,6 +7947,10 @@ class $LocalNotesTable extends LocalNotes
         DriftSqlType.string,
         data['${effectivePrefix}space'],
       )!,
+      createdBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_by'],
+      ),
     );
   }
 
@@ -7761,6 +7977,9 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
   final String? eventId;
   final bool archived;
   final String space;
+
+  /// Household member who added it (user id); shown as a name tag.
+  final int? createdBy;
   const LocalNote({
     required this.id,
     required this.updatedAtMs,
@@ -7774,6 +7993,7 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
     this.eventId,
     required this.archived,
     required this.space,
+    this.createdBy,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7796,6 +8016,9 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
     }
     map['archived'] = Variable<bool>(archived);
     map['space'] = Variable<String>(space);
+    if (!nullToAbsent || createdBy != null) {
+      map['created_by'] = Variable<int>(createdBy);
+    }
     return map;
   }
 
@@ -7819,6 +8042,9 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
           : Value(eventId),
       archived: Value(archived),
       space: Value(space),
+      createdBy: createdBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdBy),
     );
   }
 
@@ -7840,6 +8066,7 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
       eventId: serializer.fromJson<String?>(json['eventId']),
       archived: serializer.fromJson<bool>(json['archived']),
       space: serializer.fromJson<String>(json['space']),
+      createdBy: serializer.fromJson<int?>(json['createdBy']),
     );
   }
   @override
@@ -7858,6 +8085,7 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
       'eventId': serializer.toJson<String?>(eventId),
       'archived': serializer.toJson<bool>(archived),
       'space': serializer.toJson<String>(space),
+      'createdBy': serializer.toJson<int?>(createdBy),
     };
   }
 
@@ -7874,6 +8102,7 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
     Value<String?> eventId = const Value.absent(),
     bool? archived,
     String? space,
+    Value<int?> createdBy = const Value.absent(),
   }) => LocalNote(
     id: id ?? this.id,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
@@ -7887,6 +8116,7 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
     eventId: eventId.present ? eventId.value : this.eventId,
     archived: archived ?? this.archived,
     space: space ?? this.space,
+    createdBy: createdBy.present ? createdBy.value : this.createdBy,
   );
   LocalNote copyWithCompanion(LocalNotesCompanion data) {
     return LocalNote(
@@ -7906,6 +8136,7 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
       eventId: data.eventId.present ? data.eventId.value : this.eventId,
       archived: data.archived.present ? data.archived.value : this.archived,
       space: data.space.present ? data.space.value : this.space,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
     );
   }
 
@@ -7923,7 +8154,8 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
           ..write('color: $color, ')
           ..write('eventId: $eventId, ')
           ..write('archived: $archived, ')
-          ..write('space: $space')
+          ..write('space: $space, ')
+          ..write('createdBy: $createdBy')
           ..write(')'))
         .toString();
   }
@@ -7942,6 +8174,7 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
     eventId,
     archived,
     space,
+    createdBy,
   );
   @override
   bool operator ==(Object other) =>
@@ -7958,7 +8191,8 @@ class LocalNote extends DataClass implements Insertable<LocalNote> {
           other.color == this.color &&
           other.eventId == this.eventId &&
           other.archived == this.archived &&
-          other.space == this.space);
+          other.space == this.space &&
+          other.createdBy == this.createdBy);
 }
 
 class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
@@ -7974,6 +8208,7 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
   final Value<String?> eventId;
   final Value<bool> archived;
   final Value<String> space;
+  final Value<int?> createdBy;
   final Value<int> rowid;
   const LocalNotesCompanion({
     this.id = const Value.absent(),
@@ -7988,6 +8223,7 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
     this.eventId = const Value.absent(),
     this.archived = const Value.absent(),
     this.space = const Value.absent(),
+    this.createdBy = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalNotesCompanion.insert({
@@ -8003,6 +8239,7 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
     this.eventId = const Value.absent(),
     this.archived = const Value.absent(),
     this.space = const Value.absent(),
+    this.createdBy = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        updatedAtMs = Value(updatedAtMs);
@@ -8019,6 +8256,7 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
     Expression<String>? eventId,
     Expression<bool>? archived,
     Expression<String>? space,
+    Expression<int>? createdBy,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -8034,6 +8272,7 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
       if (eventId != null) 'event_id': eventId,
       if (archived != null) 'archived': archived,
       if (space != null) 'space': space,
+      if (createdBy != null) 'created_by': createdBy,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -8051,6 +8290,7 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
     Value<String?>? eventId,
     Value<bool>? archived,
     Value<String>? space,
+    Value<int?>? createdBy,
     Value<int>? rowid,
   }) {
     return LocalNotesCompanion(
@@ -8066,6 +8306,7 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
       eventId: eventId ?? this.eventId,
       archived: archived ?? this.archived,
       space: space ?? this.space,
+      createdBy: createdBy ?? this.createdBy,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -8109,6 +8350,9 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
     if (space.present) {
       map['space'] = Variable<String>(space.value);
     }
+    if (createdBy.present) {
+      map['created_by'] = Variable<int>(createdBy.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -8130,6 +8374,7 @@ class LocalNotesCompanion extends UpdateCompanion<LocalNote> {
           ..write('eventId: $eventId, ')
           ..write('archived: $archived, ')
           ..write('space: $space, ')
+          ..write('createdBy: $createdBy, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9225,6 +9470,8 @@ typedef $$LocalEventsTableCreateCompanionBuilder =
       Value<bool> important,
       Value<String?> recurrence,
       Value<String> reminders,
+      Value<int?> createdBy,
+      Value<String> notify,
       Value<int> rowid,
     });
 typedef $$LocalEventsTableUpdateCompanionBuilder =
@@ -9242,6 +9489,8 @@ typedef $$LocalEventsTableUpdateCompanionBuilder =
       Value<bool> important,
       Value<String?> recurrence,
       Value<String> reminders,
+      Value<int?> createdBy,
+      Value<String> notify,
       Value<int> rowid,
     });
 
@@ -9316,6 +9565,16 @@ class $$LocalEventsTableFilterComposer
 
   ColumnFilters<String> get reminders => $composableBuilder(
     column: $table.reminders,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notify => $composableBuilder(
+    column: $table.notify,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -9393,6 +9652,16 @@ class $$LocalEventsTableOrderingComposer
     column: $table.reminders,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notify => $composableBuilder(
+    column: $table.notify,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalEventsTableAnnotationComposer
@@ -9448,6 +9717,12 @@ class $$LocalEventsTableAnnotationComposer
 
   GeneratedColumn<String> get reminders =>
       $composableBuilder(column: $table.reminders, builder: (column) => column);
+
+  GeneratedColumn<int> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
+
+  GeneratedColumn<String> get notify =>
+      $composableBuilder(column: $table.notify, builder: (column) => column);
 }
 
 class $$LocalEventsTableTableManager
@@ -9494,6 +9769,8 @@ class $$LocalEventsTableTableManager
                 Value<bool> important = const Value.absent(),
                 Value<String?> recurrence = const Value.absent(),
                 Value<String> reminders = const Value.absent(),
+                Value<int?> createdBy = const Value.absent(),
+                Value<String> notify = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalEventsCompanion(
                 id: id,
@@ -9509,6 +9786,8 @@ class $$LocalEventsTableTableManager
                 important: important,
                 recurrence: recurrence,
                 reminders: reminders,
+                createdBy: createdBy,
+                notify: notify,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9526,6 +9805,8 @@ class $$LocalEventsTableTableManager
                 Value<bool> important = const Value.absent(),
                 Value<String?> recurrence = const Value.absent(),
                 Value<String> reminders = const Value.absent(),
+                Value<int?> createdBy = const Value.absent(),
+                Value<String> notify = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalEventsCompanion.insert(
                 id: id,
@@ -9541,6 +9822,8 @@ class $$LocalEventsTableTableManager
                 important: important,
                 recurrence: recurrence,
                 reminders: reminders,
+                createdBy: createdBy,
+                notify: notify,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -9587,6 +9870,8 @@ typedef $$LocalMedicationsTableCreateCompanionBuilder =
       Value<double?> stockAlert,
       Value<String> alarm,
       Value<bool> active,
+      Value<int?> createdBy,
+      Value<String> notify,
       Value<int> rowid,
     });
 typedef $$LocalMedicationsTableUpdateCompanionBuilder =
@@ -9608,6 +9893,8 @@ typedef $$LocalMedicationsTableUpdateCompanionBuilder =
       Value<double?> stockAlert,
       Value<String> alarm,
       Value<bool> active,
+      Value<int?> createdBy,
+      Value<String> notify,
       Value<int> rowid,
     });
 
@@ -9702,6 +9989,16 @@ class $$LocalMedicationsTableFilterComposer
 
   ColumnFilters<bool> get active => $composableBuilder(
     column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notify => $composableBuilder(
+    column: $table.notify,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -9799,6 +10096,16 @@ class $$LocalMedicationsTableOrderingComposer
     column: $table.active,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notify => $composableBuilder(
+    column: $table.notify,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalMedicationsTableAnnotationComposer
@@ -9870,6 +10177,12 @@ class $$LocalMedicationsTableAnnotationComposer
 
   GeneratedColumn<bool> get active =>
       $composableBuilder(column: $table.active, builder: (column) => column);
+
+  GeneratedColumn<int> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
+
+  GeneratedColumn<String> get notify =>
+      $composableBuilder(column: $table.notify, builder: (column) => column);
 }
 
 class $$LocalMedicationsTableTableManager
@@ -9926,6 +10239,8 @@ class $$LocalMedicationsTableTableManager
                 Value<double?> stockAlert = const Value.absent(),
                 Value<String> alarm = const Value.absent(),
                 Value<bool> active = const Value.absent(),
+                Value<int?> createdBy = const Value.absent(),
+                Value<String> notify = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalMedicationsCompanion(
                 id: id,
@@ -9945,6 +10260,8 @@ class $$LocalMedicationsTableTableManager
                 stockAlert: stockAlert,
                 alarm: alarm,
                 active: active,
+                createdBy: createdBy,
+                notify: notify,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9966,6 +10283,8 @@ class $$LocalMedicationsTableTableManager
                 Value<double?> stockAlert = const Value.absent(),
                 Value<String> alarm = const Value.absent(),
                 Value<bool> active = const Value.absent(),
+                Value<int?> createdBy = const Value.absent(),
+                Value<String> notify = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalMedicationsCompanion.insert(
                 id: id,
@@ -9985,6 +10304,8 @@ class $$LocalMedicationsTableTableManager
                 stockAlert: stockAlert,
                 alarm: alarm,
                 active: active,
+                createdBy: createdBy,
+                notify: notify,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -12497,6 +12818,7 @@ typedef $$LocalNotesTableCreateCompanionBuilder =
       Value<String?> eventId,
       Value<bool> archived,
       Value<String> space,
+      Value<int?> createdBy,
       Value<int> rowid,
     });
 typedef $$LocalNotesTableUpdateCompanionBuilder =
@@ -12513,6 +12835,7 @@ typedef $$LocalNotesTableUpdateCompanionBuilder =
       Value<String?> eventId,
       Value<bool> archived,
       Value<String> space,
+      Value<int?> createdBy,
       Value<int> rowid,
     });
 
@@ -12582,6 +12905,11 @@ class $$LocalNotesTableFilterComposer
 
   ColumnFilters<String> get space => $composableBuilder(
     column: $table.space,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -12654,6 +12982,11 @@ class $$LocalNotesTableOrderingComposer
     column: $table.space,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalNotesTableAnnotationComposer
@@ -12704,6 +13037,9 @@ class $$LocalNotesTableAnnotationComposer
 
   GeneratedColumn<String> get space =>
       $composableBuilder(column: $table.space, builder: (column) => column);
+
+  GeneratedColumn<int> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
 }
 
 class $$LocalNotesTableTableManager
@@ -12749,6 +13085,7 @@ class $$LocalNotesTableTableManager
                 Value<String?> eventId = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 Value<String> space = const Value.absent(),
+                Value<int?> createdBy = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalNotesCompanion(
                 id: id,
@@ -12763,6 +13100,7 @@ class $$LocalNotesTableTableManager
                 eventId: eventId,
                 archived: archived,
                 space: space,
+                createdBy: createdBy,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -12779,6 +13117,7 @@ class $$LocalNotesTableTableManager
                 Value<String?> eventId = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
                 Value<String> space = const Value.absent(),
+                Value<int?> createdBy = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalNotesCompanion.insert(
                 id: id,
@@ -12793,6 +13132,7 @@ class $$LocalNotesTableTableManager
                 eventId: eventId,
                 archived: archived,
                 space: space,
+                createdBy: createdBy,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -7,6 +7,7 @@ import '../../../core/calendar/calendar_store.dart';
 import '../../../core/calendar/reminder_defaults.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/household/household_widgets.dart';
 import '../../../core/calendar/events_repository.dart';
 import 'calendar_format.dart';
 import 'event_edit_page.dart';
@@ -74,6 +75,7 @@ class EventDetailPage extends ConsumerWidget {
           Expanded(
             child: Text(event.title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: t.onBase)),
           ),
+          Padding(padding: const EdgeInsets.only(left: 8, top: 8), child: OwnerTag(event.createdBy)),
           if (event.important)
             Padding(
               padding: const EdgeInsets.only(left: 8, top: 6),

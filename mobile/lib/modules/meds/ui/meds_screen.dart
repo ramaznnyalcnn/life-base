@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/design_system/module_scaffold.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/tokens.dart';
+import '../../../core/household/household_widgets.dart';
 import '../../../core/meds/medication.dart';
 import '../../../core/meds/meds_store.dart';
 import '../../../core/notifications/reminder_sync.dart';
@@ -214,7 +215,11 @@ class _AsNeededCard extends ConsumerWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(med.name, style: TextStyle(color: t.onBase, fontWeight: FontWeight.w700)),
+              Row(children: [
+                Flexible(child: Text(med.name, style: TextStyle(color: t.onBase, fontWeight: FontWeight.w700))),
+                const SizedBox(width: 6),
+                OwnerTag(med.createdBy),
+              ]),
               Text(
                 last == null ? med.doseLabel : '${med.doseLabel} · son: ${DateFormat('d MMM HH:mm', 'tr_TR').format(last.toLocal())}',
                 style: TextStyle(color: t.muted, fontSize: 12),
@@ -314,7 +319,11 @@ class _MedTile extends StatelessWidget {
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(med.name, style: TextStyle(color: t.onBase, fontWeight: FontWeight.w700)),
+                Row(children: [
+                  Flexible(child: Text(med.name, style: TextStyle(color: t.onBase, fontWeight: FontWeight.w700))),
+                  const SizedBox(width: 6),
+                  OwnerTag(med.createdBy),
+                ]),
                 Text('${med.doseLabel} · ${scheduleLabel(med.schedule)}', style: TextStyle(color: t.muted, fontSize: 12)),
                 if (med.stock != null)
                   Text(

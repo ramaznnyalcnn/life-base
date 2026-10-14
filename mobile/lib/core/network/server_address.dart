@@ -1,3 +1,7 @@
+/// The home server, set at build time:
+/// `flutter build apk --dart-define=LIFEBASE_SERVER=http://<tailscale-host>:8000`.
+const bakedServerAddress = String.fromEnvironment('LIFEBASE_SERVER');
+
 String normalizeServerAddress(String input) {
   final value = input.trim();
   final uri = Uri.tryParse(value);
