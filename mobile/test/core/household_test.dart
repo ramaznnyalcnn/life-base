@@ -12,9 +12,8 @@ void main() {
     expect(remindedHere(['all', '2', '3'], (n) => n, 3), ['all', '3']);
   });
 
-  test('a username signs in as its lifebase.local address', () {
-    expect(loginEmail(' Ali '), 'ali@lifebase.local');
-    expect(loginEmail('ayse'), 'ayse@lifebase.local');
-    expect(loginEmail('owner@lifeos.local'), 'owner@lifeos.local');
+  test('a username or an email is sent as typed, trimmed and lowercased', () {
+    expect(loginIdentifier(' Ali '), 'ali');
+    expect(loginIdentifier('Owner@LifeOS.local'), 'owner@lifeos.local');
   });
 }

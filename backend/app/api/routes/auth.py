@@ -30,9 +30,10 @@ def login(
 ):
     settings = get_settings()
     ensure_default_user(db, settings)
-    user = authenticate_user_password(
+    email = settings.login_email(payload.email)
+    user = None if email is None else authenticate_user_password(
         db,
-        email=payload.email,
+        email=email,
         password=payload.password,
     )
     if user is None:

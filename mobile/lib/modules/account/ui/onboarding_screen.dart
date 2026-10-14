@@ -70,7 +70,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         controller: _email,
                         autocorrect: false,
                         enableSuggestions: false,
-                        decoration: const InputDecoration(labelText: 'Kullanıcı adı'),
+                        decoration: const InputDecoration(labelText: 'Kullanıcı adı veya e-posta'),
                       ),
                       const SizedBox(height: 12),
                       TextField(

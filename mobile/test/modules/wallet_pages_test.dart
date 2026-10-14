@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,8 @@ import 'package:lifebase_mobile/core/design_system/tokens.dart';
 import 'package:lifebase_mobile/core/providers.dart';
 import 'package:lifebase_mobile/core/storage/app_database.dart';
 import 'package:lifebase_mobile/core/wallet/wallet_outbox.dart';
+import 'package:lifebase_mobile/modules/wallet/ui/all_entries_page.dart';
+import 'package:lifebase_mobile/modules/wallet/ui/wallet_analysis_page.dart';
 import 'package:lifebase_mobile/modules/wallet/ui/entry_page.dart';
 import 'package:lifebase_mobile/modules/wallet/ui/wallet_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,6 +57,48 @@ void main() {
   }
 
   Future<List<WalletOp>> outbox() async => [for (final row in await db.select(db.walletOutbox).get()) WalletOp.fromRow(row)];
+
+  testWidgets('recent movements fade after three; a tap lists them all, and the analysis opens below', (tester) async {
+    await pump(tester, const SizedBox());
+    await db.into(db.walletAccounts).insert(WalletAccountsCompanion.insert(id: 'bank', ownerId: 1, name: 'Banka', type: 'bank', balanceCents: 0));
+    final today = DateTime.now();
+    for (var i = 0; i < 8; i++) {
+      await db.into(db.walletTransactions).insert(WalletTransactionsCompanion.insert(
+            id: 't$i',
+            accountId: 'bank',
+            kind: 'expense',
+            amountCents: (i + 1) * 1000,
+            occurredAt: DateTime(today.year, today.month, today.day, 8, i).toUtc(),
+            createdBy: 1,
+            category: Value(i.isEven ? 'Market' : 'Yemek'),
+          ));
+    }
+    await tester.pumpWidget(ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(db)],
+      child: MaterialApp(theme: AppTheme.build(LbPalette.kum, Brightness.light), home: const WalletScreen()),
+    ));
+    await tester.pumpAndSettle();
+
+    // Six of eight rows show; the last three are faded.
+    final faded = find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1);
+    expect(faded, findsNWidgets(3));
+    final fadedRow = find.ancestor(of: faded.first, matching: find.byType(GestureDetector)).first;
+    await tester.ensureVisible(fadedRow);
+    await tester.pumpAndSettle();
+    await tester.tap(fadedRow);
+    await tester.pumpAndSettle();
+    expect(find.byType(AllEntriesPage), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Detaylı analiz'), 300);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Detaylı analiz'));
+    await tester.pumpAndSettle();
+    expect(find.byType(WalletAnalysisPage), findsOneWidget);
+    expect(find.text('En büyük harcamalar'), findsOneWidget);
+    await unmount(tester);
+  });
 
   testWidgets('a card added offline shows at once, marked as an estimate', (tester) async {
     await pump(tester, const WalletScreen());

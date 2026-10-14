@@ -78,8 +78,10 @@ class Settings(BaseSettings):
     # Household members whose edit wins when two phones stamp the same
     # millisecond (their emails).
     sync_tie_winners: Annotated[list[str], NoDecode] = Field(default_factory=list, alias="SYNC_TIE_WINNERS")
+    # Usernames that sign in as an email: "name:email,name:email".
+    login_aliases: Annotated[list[str], NoDecode] = Field(default_factory=list, alias="LOGIN_ALIASES")
 
-    @field_validator("cors_origins", "sync_tie_winners", mode="before")
+    @field_validator("cors_origins", "sync_tie_winners", "login_aliases", mode="before")
     @classmethod
     def parse_cors_origins(cls, value):
         return _parse_list_env(value)
@@ -97,6 +99,18 @@ class Settings(BaseSettings):
         if origin not in self.cors_origins:
             self.cors_origins.append(origin)
         return self
+
+
+    def login_email(self, identifier: str) -> str | None:
+        """The email to sign in as: an email as given, a username through the aliases."""
+
+        if "@" in identifier:
+            return identifier
+        for pair in self.login_aliases:
+            name, _, email = pair.partition(":")
+            if name.strip().lower() == identifier and email.strip():
+                return email.strip().lower()
+        return None
 
 
 @lru_cache

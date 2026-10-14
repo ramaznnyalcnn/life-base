@@ -7,10 +7,11 @@ import 'package:intl/intl.dart';
 import '../../../core/design_system/neu.dart';
 import '../../../core/design_system/reveal_on_scroll.dart';
 import '../../../core/design_system/tokens.dart';
-import '../../../core/wallet/card_summary.dart';
+import '../../../core/wallet/spending_summary.dart';
 import '../../../core/wallet/wallet_models.dart';
 import '../../../core/wallet/wallet_outbox.dart';
 import '../../../core/wallet/wallet_store.dart';
+import 'wallet_screen.dart';
 
 /// Categorical colours in fixed slot order (validated for colour-vision
 /// deficiency on the app's light and dark surfaces).
@@ -25,31 +26,38 @@ Color _sliceColor(BuildContext context, int? slot) {
 
 String _percent(Cents part, Cents total) => total <= 0 ? '' : '%${(part * 100 / total).round()}';
 
-/// A card's spending and payments: totals, categories, months, people. Each
-/// block draws itself in as it scrolls into view.
-class CardSummarySection extends ConsumerStatefulWidget {
-  const CardSummarySection({super.key, required this.card, required this.wallet, required this.now});
+/// Whose summary it is: one card (spent / paid) or the whole wallet
+/// (spent / income, compared with the previous span, biggest expenses).
+enum SummaryMode { card, wallet }
 
-  final WalletAccount card;
+/// Spending over a set of accounts: totals, categories, months, people. Each
+/// block draws itself in as it scrolls into view.
+class SpendingSummarySection extends ConsumerStatefulWidget {
+  const SpendingSummarySection({super.key, required this.accountIds, required this.wallet, required this.now, this.mode = SummaryMode.card});
+
+  final Set<String> accountIds;
   final WalletData wallet;
   final DateTime now;
+  final SummaryMode mode;
 
   @override
-  ConsumerState<CardSummarySection> createState() => _CardSummarySectionState();
+  ConsumerState<SpendingSummarySection> createState() => _SpendingSummarySectionState();
 }
 
-class _CardSummarySectionState extends ConsumerState<CardSummarySection> {
+class _SpendingSummarySectionState extends ConsumerState<SpendingSummarySection> {
   var _period = SummaryPeriod.month;
 
   @override
   Widget build(BuildContext context) {
     final t = LbTokens.of(context);
-    final summary = summarizeCard(widget.card, widget.wallet, _period, widget.now);
+    final summary = summarizeSpending(widget.accountIds, widget.wallet, _period, widget.now);
     final members = {for (final m in ref.watch(walletMembersProvider).value ?? const <HouseholdMember>[]) m.userId: m.name};
     final heading = Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: t.onBase);
+    final wallet = widget.mode == SummaryMode.wallet;
+    final change = summary.change;
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Padding(padding: const EdgeInsets.only(top: 24, bottom: 8), child: Text('Özet', style: heading)),
+      if (!wallet) Padding(padding: const EdgeInsets.only(top: 24, bottom: 8), child: Text('Özet', style: heading)),
       Wrap(spacing: 8, runSpacing: 8, children: [
         for (final period in SummaryPeriod.values)
           ChoiceChip(label: Text(period.label), selected: _period == period, onSelected: (_) => setState(() => _period = period)),
@@ -59,9 +67,11 @@ class _CardSummarySectionState extends ConsumerState<CardSummarySection> {
         builder: (context, _) => Row(children: [
           Expanded(child: _StatTile(label: 'Harcama', value: summary.spent)),
           const SizedBox(width: 12),
-          Expanded(child: _StatTile(label: 'Ödeme', value: summary.paid)),
+          Expanded(child: wallet ? _StatTile(label: 'Gelir', value: summary.income) : _StatTile(label: 'Ödeme', value: summary.paid)),
         ]),
       ),
+      if (wallet && change != null && _period.comparedLabel != null)
+        Padding(padding: const EdgeInsets.only(top: 10), child: ChangeLine(change: change, comparedLabel: _period.comparedLabel!)),
       const SizedBox(height: 12),
       RevealOnScroll(
         builder: (context, reveal) => NeuSurface(
@@ -87,7 +97,136 @@ class _CardSummarySectionState extends ConsumerState<CardSummarySection> {
           ),
         ),
       ],
+      if (wallet && summary.top.isNotEmpty) ...[
+        Padding(padding: const EdgeInsets.only(top: 24, bottom: 4), child: Text('En büyük harcamalar', style: heading)),
+        RevealOnScroll(
+          builder: (context, _) => Column(children: [
+            for (final tx in summary.top) EntryTile(entry: WalletEntry.tx(tx), wallet: widget.wallet),
+          ]),
+        ),
+      ],
     ]);
+  }
+}
+
+/// "↑ %12 geçen aya göre": how spending moved against the previous span.
+class ChangeLine extends StatelessWidget {
+  const ChangeLine({super.key, required this.change, required this.comparedLabel});
+  final double change;
+  final String comparedLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LbTokens.of(context);
+    final percent = (change.abs() * 100).round();
+    final icon = percent == 0 ? Icons.trending_flat_rounded : (change > 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded);
+    return Row(children: [
+      Icon(icon, size: 18, color: t.muted),
+      const SizedBox(width: 6),
+      Flexible(
+        child: Text(percent == 0 ? 'Aynı, $comparedLabel' : '%$percent ${change > 0 ? 'daha fazla' : 'daha az'}, $comparedLabel',
+            style: TextStyle(color: t.muted, fontWeight: FontWeight.w600)),
+      ),
+    ]);
+  }
+}
+
+/// The wallet tab's analysis card: this month's ring with the total in the
+/// middle, the change against last month and the three biggest categories.
+/// Draws in as it scrolls into view; [onOpen] shows the full analysis.
+class SpendingTeaser extends StatelessWidget {
+  const SpendingTeaser({super.key, required this.accountIds, required this.wallet, required this.now, required this.onOpen});
+
+  final Set<String> accountIds;
+  final WalletData wallet;
+  final DateTime now;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LbTokens.of(context);
+    final summary = summarizeSpending(accountIds, wallet, SummaryPeriod.month, now);
+    final total = summary.slices.fold<int>(0, (s, c) => s + c.amount);
+    final biggest = [...summary.slices]..sort((a, b) => b.amount.compareTo(a.amount));
+    final change = summary.change;
+
+    return RevealOnScroll(
+      builder: (context, reveal) => NeuSurface(
+        padding: EdgeInsets.zero,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(LbTokens.radius),
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 12, 18),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                Expanded(child: Text('Bu ay', style: TextStyle(color: t.muted, fontWeight: FontWeight.w700))),
+                Text('Detaylı analiz', style: TextStyle(color: t.accent, fontWeight: FontWeight.w700)),
+                Icon(Icons.chevron_right_rounded, color: t.accent),
+              ]),
+              const SizedBox(height: 12),
+              if (summary.slices.isEmpty)
+                Text('Bu ay henüz harcama yok.', style: TextStyle(color: t.muted))
+              else
+                Row(children: [
+                  SizedBox.square(
+                    dimension: 132,
+                    child: AnimatedBuilder(
+                      animation: reveal,
+                      builder: (context, _) => CustomPaint(
+                        painter: _DonutPainter(
+                          slices: summary.slices,
+                          colors: [for (final s in summary.slices) _sliceColor(context, s.slot)],
+                          progress: reveal.value,
+                          selected: null,
+                          stroke: 16,
+                        ),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(26),
+                            child: Column(mainAxisSize: MainAxisSize.min, children: [
+                              Text('Harcama', style: TextStyle(color: t.muted, fontSize: 11, fontWeight: FontWeight.w700)),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(formatMoney(total, short: true), style: TextStyle(color: t.onBase, fontWeight: FontWeight.w900, fontSize: 18)),
+                              ),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      for (final slice in biggest.take(3))
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(color: _sliceColor(context, slice.slot), borderRadius: BorderRadius.circular(3)),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(slice.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.onBase, fontWeight: FontWeight.w600)),
+                            ),
+                            Text(_percent(slice.amount, total), style: TextStyle(color: t.muted, fontWeight: FontWeight.w700)),
+                          ]),
+                        ),
+                      if (change != null) ...[
+                        const SizedBox(height: 8),
+                        ChangeLine(change: change, comparedLabel: SummaryPeriod.month.comparedLabel!),
+                      ],
+                    ]),
+                  ),
+                ]),
+            ]),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -118,7 +257,7 @@ class _StatTile extends StatelessWidget {
 /// names every slice and its amount (colour is never the only label).
 class _CategoryDonut extends StatefulWidget {
   const _CategoryDonut({super.key, required this.summary, required this.reveal});
-  final CardSummary summary;
+  final SpendingSummary summary;
   final Animation<double> reveal;
 
   @override

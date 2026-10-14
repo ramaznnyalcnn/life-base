@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lifebase_mobile/core/wallet/card_summary.dart';
+import 'package:lifebase_mobile/core/wallet/spending_summary.dart';
 import 'package:lifebase_mobile/core/wallet/wallet_models.dart';
 import 'package:lifebase_mobile/core/wallet/wallet_outbox.dart';
 
@@ -38,8 +38,8 @@ void main() {
   test('colours follow the category, not its rank in the period', () {
     final month = summarizeCard(card, wallet, SummaryPeriod.month, now);
     final all = summarizeCard(card, wallet, SummaryPeriod.all, now);
-    // Yemek is the biggest of all time, so it keeps slot 0 even when Market leads this month.
-    expect([for (final s in month.slices) (s.name, s.slot)], [('Yemek', 0), ('Market', 1), (otherCategory, null)]);
+    // Yemek is the biggest of all time, so it keeps slot 0 even when Market leads (and is listed first) this month.
+    expect([for (final s in month.slices) (s.name, s.slot)], [('Market', 1), ('Yemek', 0), (otherCategory, null)]);
     expect(all.slices.first.amount, 100000);
   });
 
@@ -48,5 +48,32 @@ void main() {
     expect(s.months.map((m) => m.month.month), [5, 6, 7, 8, 9, 10]);
     expect(s.months[1].amount, 90000);
     expect(s.months.last.amount, 35777);
+  });
+
+  test('across accounts: bank income is income, a card refund is not; previous month and top expenses', () {
+    final multi = WalletData(
+      accounts: {
+        'card': card,
+        'bank': const WalletAccount(id: 'bank', ownerId: 1, name: 'Banka', type: AccountType.bank, balance: 0),
+      },
+      transactions: {
+        for (final t in [
+          tx('a', TxKind.expense, 30000, DateTime(2026, 10, 2), category: 'Market'),
+          tx('r', TxKind.income, 5000, DateTime(2026, 10, 6), category: 'Market'), // refund on the card
+          tx('s', TxKind.income, 900000, DateTime(2026, 10, 1), account: 'bank'), // salary
+          tx('b', TxKind.expense, 70000, DateTime(2026, 10, 3), category: 'Kira', account: 'bank'),
+          tx('p', TxKind.expense, 50000, DateTime(2026, 9, 10), category: 'Kira', account: 'bank'),
+          tx('late', TxKind.expense, 99000, DateTime(2026, 9, 20), account: 'bank'), // after "the same day" last month
+        ])
+          t.id: t,
+      },
+    );
+    final s = summarizeSpending({'card', 'bank'}, multi, SummaryPeriod.month, now);
+    expect(s.spent, 30000 - 5000 + 70000);
+    expect(s.income, 900000);
+    expect(s.previousSpent, 50000);
+    expect(s.change, closeTo((95000 - 50000) / 50000, 1e-9));
+    expect(s.top.map((t) => t.id), ['b', 'a']);
+    expect(summarizeSpending({'card', 'bank'}, multi, SummaryPeriod.all, now).previousSpent, isNull);
   });
 }

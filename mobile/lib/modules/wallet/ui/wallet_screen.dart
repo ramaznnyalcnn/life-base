@@ -14,11 +14,14 @@ import '../../../core/wallet/wallet_store.dart';
 import '../data/wallet_repository.dart';
 import 'account_detail_page.dart';
 import 'account_edit_page.dart';
+import 'all_entries_page.dart';
 import 'entry_detail_page.dart';
 import 'entry_page.dart';
 import 'outbox_issues_page.dart';
 import 'payment_edit_page.dart';
 import 'secure_card.dart';
+import 'spending_summary_section.dart';
+import 'wallet_analysis_page.dart';
 import 'wallet_format.dart';
 
 enum WalletFilter { all, personal, shared }
@@ -69,8 +72,6 @@ class WalletScreen extends ConsumerStatefulWidget {
 }
 
 class _WalletScreenState extends ConsumerState<WalletScreen> {
-  int _shown = 40;
-
   @override
   Widget build(BuildContext context) {
     final t = LbTokens.of(context);
@@ -134,11 +135,21 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text('Banka veya nakit hesabı yok.', style: TextStyle(color: t.muted)),
                   ),
-                _SectionHeader(title: 'Hareketler'),
-                if (entries.isEmpty) Text('Henüz hareket yok. Sağ alttan ekleyebilirsin.', style: TextStyle(color: t.muted)),
-                ..._grouped(context, entries.take(_shown).toList(), wallet, now),
-                if (entries.length > _shown)
-                  TextButton(onPressed: () => setState(() => _shown += 60), child: const Text('Daha fazla göster')),
+                _SectionHeader(
+                  title: 'Son hareketler',
+                  action: entries.isEmpty ? null : TextButton(onPressed: () => _openEntries(context, ids), child: const Text('Tümünü gör')),
+                ),
+                if (entries.isEmpty)
+                  Text('Henüz hareket yok. Sağ alttan ekleyebilirsin.', style: TextStyle(color: t.muted))
+                else
+                  _RecentEntries(entries: entries, wallet: wallet, onMore: () => _openEntries(context, ids)),
+                _SectionHeader(title: 'Analiz'),
+                SpendingTeaser(
+                  accountIds: ids,
+                  wallet: wallet,
+                  now: now,
+                  onOpen: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => WalletAnalysisPage(accountIds: ids))),
+                ),
               ],
             ]),
           );
@@ -151,23 +162,39 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     final byType = a.type.index.compareTo(b.type.index);
     return byType != 0 ? byType : a.name.toLowerCase().compareTo(b.name.toLowerCase());
   }
+}
 
-  List<Widget> _grouped(BuildContext context, List<WalletEntry> entries, WalletData wallet, DateTime now) {
-    final today = DateUtils.dateOnly(now);
-    final widgets = <Widget>[];
-    DateTime? day;
-    for (final entry in entries) {
-      final entryDay = DateUtils.dateOnly(entry.at);
-      if (entryDay != day) {
-        day = entryDay;
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 14, bottom: 6),
-          child: Text(dayLabel(entryDay, today), style: TextStyle(color: LbTokens.of(context).muted, fontWeight: FontWeight.w700)),
-        ));
-      }
-      widgets.add(EntryTile(entry: entry, wallet: wallet));
-    }
-    return widgets;
+void _openEntries(BuildContext context, Set<String> accountIds) =>
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AllEntriesPage(accountIds: accountIds)));
+
+/// The latest movements; the last few fade out, and tapping those (or
+/// "Tümünü gör") opens every movement.
+class _RecentEntries extends StatelessWidget {
+  const _RecentEntries({required this.entries, required this.wallet, required this.onMore});
+
+  final List<WalletEntry> entries;
+  final WalletData wallet;
+  final VoidCallback onMore;
+
+  static const _fade = [1.0, 1.0, 1.0, .6, .35, .15];
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = entries.take(_fade.length).toList();
+    final fades = shown.length == entries.length ? 0 : 3;
+    return Column(children: [
+      for (var i = 0; i < shown.length; i++)
+        if (i < shown.length - fades)
+          EntryTile(entry: shown[i], wallet: wallet)
+        else
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onMore,
+            child: IgnorePointer(
+              child: ExcludeSemantics(child: Opacity(opacity: _fade[i], child: EntryTile(entry: shown[i], wallet: wallet))),
+            ),
+          ),
+    ]);
   }
 }
 

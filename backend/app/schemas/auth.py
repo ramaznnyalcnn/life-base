@@ -14,14 +14,15 @@ class UserRead(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(min_length=5, max_length=255)
+    # An email, or a username the server maps to one (LOGIN_ALIASES).
+    email: str = Field(min_length=2, max_length=255)
     password: str = Field(min_length=8, max_length=256)
 
     @field_validator("email")
     @classmethod
     def validate_email(cls, value: str) -> str:
         normalized = value.strip().lower()
-        if "@" not in normalized or "." not in normalized.rsplit("@", 1)[-1]:
+        if "@" in normalized and "." not in normalized.rsplit("@", 1)[-1]:
             raise ValueError("Gecerli bir e-posta girin.")
         return normalized
 
