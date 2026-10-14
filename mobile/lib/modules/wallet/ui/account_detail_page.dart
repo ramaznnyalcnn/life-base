@@ -11,6 +11,7 @@ import '../../../core/wallet/wallet_outbox.dart';
 import '../../../core/wallet/wallet_store.dart';
 import '../data/wallet_repository.dart';
 import 'account_edit_page.dart';
+import 'card_summary_section.dart';
 import 'entry_page.dart';
 import 'secure_card.dart';
 import 'wallet_format.dart';
@@ -76,6 +77,7 @@ class AccountDetailPage extends ConsumerWidget {
             ),
             for (final period in statementsOf(account, wallet, now)) _StatementTile(card: account, period: period, wallet: wallet),
           ],
+          CardSummarySection(card: account, wallet: wallet, now: now),
         ] else ...[
           NeuSurface(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

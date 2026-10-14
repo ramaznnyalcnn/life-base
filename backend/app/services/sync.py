@@ -1,7 +1,8 @@
 """Last-writer-wins document sync for local-first client data.
 
 Rules:
-- A change replaces the stored copy only if its ``updated_at`` is newer.
+- A change replaces the stored copy only if its ``updated_at`` is newer. On
+  an exact tie a household member with tie priority wins over the other.
 - Deletion is final: once a document is a tombstone, later edits from a stale
   device are refused instead of resurrecting it.
 - Every stored change gets the space's next ``seq``; clients pull "since seq".
@@ -31,6 +32,7 @@ class Space:
     owner: str
     owner_id: int
     author_id: int | None = None
+    wins_ties: bool = False
 
     def doc_owner(self):
         return getattr(self.document, self.owner)
@@ -43,8 +45,8 @@ def personal(user_id: int) -> Space:
     return Space(SyncDocument, SyncCursor, "user_id", user_id)
 
 
-def household_space(household_id: int, author_id: int) -> Space:
-    return Space(SharedDocument, SharedCursor, "household_id", household_id, author_id)
+def household_space(household_id: int, author_id: int, *, wins_ties: bool = False) -> Space:
+    return Space(SharedDocument, SharedCursor, "household_id", household_id, author_id, wins_ties)
 
 
 @dataclass
@@ -143,6 +145,9 @@ def push_changes(db: Session, owner: int | Space, changes: list[SyncChange]) -> 
             result.applied.append(key)
         elif change.updated_at == stored_at and change.deleted == existing.deleted and change.body == existing.body:
             result.applied.append(key)  # Same change sent again (retry).
+        elif change.updated_at == stored_at and space.wins_ties and existing.updated_by_user_id != space.author_id:
+            _apply(space, existing, change, _next_seq(db, space))
+            result.applied.append(key)
         else:
             result.stale.append(to_read(existing))
     db.flush()

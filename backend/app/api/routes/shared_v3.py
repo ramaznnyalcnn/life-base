@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.security import get_current_user, resolve_route_user
+from app.core.config import get_settings
 from app.db import get_db
 from app.models import User
 from app.schemas.sync import SyncPushRequest
@@ -25,7 +26,8 @@ def _space(db: Session, user: User):
     household_id = household_id_of(db, user.id)
     if household_id is None:
         raise HTTPException(status_code=403, detail="Bir haneye uye degilsin.")
-    return household_space(household_id, user.id)
+    winners = {email.strip().lower() for email in get_settings().sync_tie_winners}
+    return household_space(household_id, user.id, wins_ties=user.email.lower() in winners)
 
 
 @router.post("/push")

@@ -75,8 +75,11 @@ class Settings(BaseSettings):
         alias="REMINDER_DISPATCH_INTERVAL_SECONDS",
     )
     reminder_dispatch_limit: int = Field(default=20, alias="REMINDER_DISPATCH_LIMIT")
+    # Household members whose edit wins when two phones stamp the same
+    # millisecond (their emails).
+    sync_tie_winners: Annotated[list[str], NoDecode] = Field(default_factory=list, alias="SYNC_TIE_WINNERS")
 
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins", "sync_tie_winners", mode="before")
     @classmethod
     def parse_cors_origins(cls, value):
         return _parse_list_env(value)

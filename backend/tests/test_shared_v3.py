@@ -3,6 +3,7 @@
 from sqlalchemy import select
 
 from app.models import Household, SharedDocument, User
+from app.core.config import get_settings
 from app.services.auth import issue_access_token
 from tests.conftest import api_request
 
@@ -93,3 +94,19 @@ def test_leaving_stops_access_and_the_last_one_out_clears_the_space(setup_databa
     with setup_database() as session:
         assert session.scalars(select(SharedDocument)).all() == []
         assert session.scalars(select(Household)).all() == []
+
+
+def test_on_the_same_millisecond_the_member_with_tie_priority_wins(setup_database, monkeypatch):
+    monkeypatch.setenv("SYNC_TIE_WINNERS", "Partner@example.com")
+    get_settings.cache_clear()
+    try:
+        _, partner = household(setup_database)
+        assert push(doc("e1", {"title": "Benim"}, collection="events")).json()["applied"] == ["events/e1"]
+
+        # Same stamp, different text: the partner has priority and wins.
+        assert push(doc("e1", {"title": "Onun"}, collection="events"), headers=partner).json()["applied"] == ["events/e1"]
+        # The other way round it stays the partner's.
+        late = push(doc("e1", {"title": "Benim yine"}, collection="events")).json()
+        assert late["applied"] == [] and late["stale"][0]["body"] == {"title": "Onun"}
+    finally:
+        get_settings.cache_clear()
